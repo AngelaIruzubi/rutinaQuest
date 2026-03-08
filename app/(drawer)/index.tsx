@@ -13,30 +13,38 @@ import {
   View
 } from 'react-native';
 
+import { buscarPictograma } from "../../services/arasaac";
+
 export default function Home() {
 
+
+  // ===== STATES =====
   const [modalVisible, setModalVisible] = useState(false);
   const [taskModalVisible, setTaskModalVisible] = useState(false);
 
-  const [newTask, setNewTask] = useState('');
   const [search, setSearch] = useState('');
-
   const [selectedTask, setSelectedTask] = useState<any>(null);
-
-  const [tasks, setTasks] = useState([
-    { id: '1', title: 'Hacer la cama', hora: '08:00', completed: false },
-    { id: '2', title: 'Lavar los platos', hora: '12:30', completed: false },
-    { id: '3', title: 'Sacar la basura', hora: '18:00', completed: false },
-  ]);
+  const [tasks, setTasks] = useState<any[]>([]);
 
   const [showPicker, setShowPicker] = useState(false);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
-  const [tempTime, setTempTime] = useState(new Date());
+  const [tempTime] = useState(new Date());
 
-  const filteredTasks = tasks.filter(task =>
-    task.title.toLowerCase().includes(search.toLowerCase())
-  );
+  const [titulo, setTitulo] = useState("");
+  const [pictogramId, setPictogramId] = useState<number | null>(null);
 
+
+
+  // ===== BUSCAR PICTOGRAMA =====
+  const buscarImagen = async (texto: string) => {
+    setTitulo(texto);
+
+    const id = await buscarPictograma(texto);
+    console.log("ID pictograma:", id);
+    if (id) setPictogramId(id);
+  };
+
+  // ===== DATE =====
   const handleTimeChange = (event: any, date?: Date) => {
     if (date) {
       const formatted = date.toLocaleTimeString([], {
@@ -47,67 +55,54 @@ export default function Home() {
     }
     setShowPicker(false);
   };
+
+  // ===== TODAY FORMAT =====
   const today = new Date();
 
-const weekday = today.toLocaleDateString('es-ES', { weekday: 'long' });
-const day = today.getDate();
-const month = today.toLocaleDateString('es-ES', { month: 'long' });
-const year = today.getFullYear();
+  const weekday = today.toLocaleDateString('es-ES', { weekday: 'long' });
+  const day = today.getDate();
+  const month = today.toLocaleDateString('es-ES', { month: 'long' });
+  const year = today.getFullYear();
 
-const capitalize = (text: string) =>
-  text.charAt(0).toUpperCase() + text.slice(1);
+  const capitalize = (text: string) =>
+    text.charAt(0).toUpperCase() + text.slice(1);
 
-const formattedToday = `${capitalize(weekday)}, ${day} de ${capitalize(month)} de ${year}`;
-  
-    return (
-      <View style={{
-        flex: 1,
-        backgroundColor: '#ffffff',
-        paddingTop: 60,
-        paddingHorizontal: 20,
+  const formattedToday =
+    `${capitalize(weekday)}, ${day} de ${capitalize(month)} de ${year}`;
+
+  const filteredTasks = tasks.filter(task =>
+    task.title.toLowerCase().includes(search.toLowerCase())
+  );
+
+  // ===== UI =====
+  return (
+    <View style={{
+      flex: 1,
+      backgroundColor: '#ffffff',
+      paddingTop: 60,
+      paddingHorizontal: 20,
+    }}>
+
+      <Text style={{
+        fontSize: 36,
+        fontWeight: '600',
+        color: '#A77BBE',
+        textAlign: 'center',
+        marginBottom: 20,
       }}>
+        Mis Tareas
+      </Text>
 
-
-      <View style={{
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 40,
+      <Text style={{
+        textAlign: 'center',
+        color: '#888',
+        marginBottom: 30,
+        fontSize: 20
       }}>
-        <Text style={{
-          fontSize: 36,
-          fontWeight: '600',
-          color: '#A77BBE',
-          marginRight: 10,
-        }}>
-          Mis Tareas
-        </Text>
+        {formattedToday}
+      </Text>
 
-        <Ionicons style={{
-
-          marginTop: 10,
-        }} name="list" size={28} color="#A77BBE" />
-      </View>
-
-      <View style={{
-        flexDirection: 'row',
-        justifyContent: 'flex-start',
-        alignItems: 'center',
-        marginBottom: 40,
-      }}>
-           <Text style={{
-              textAlign: 'left',
-              color: '#888',
-              marginTop: -25,
-              fontSize: 20
-            }}>
-              {formattedToday}
-            </Text>
-
-      </View>
-
-
-  
+      {/* SEARCH */}
       <View style={{
         flexDirection: 'row',
         alignItems: 'center',
@@ -119,7 +114,6 @@ const formattedToday = `${capitalize(weekday)}, ${day} de ${capitalize(month)} d
       }}>
         <TextInput
           placeholder="Buscar..."
-          placeholderTextColor="#999"
           value={search}
           onChangeText={setSearch}
           style={{ flex: 1, fontSize: 16 }}
@@ -127,7 +121,7 @@ const formattedToday = `${capitalize(weekday)}, ${day} de ${capitalize(month)} d
         <Ionicons name="search" size={20} color="#999" />
       </View>
 
-      
+      {/* LIST */}
       <FlatList
         data={filteredTasks}
         keyExtractor={(item) => item.id}
@@ -147,25 +141,35 @@ const formattedToday = `${capitalize(weekday)}, ${day} de ${capitalize(month)} d
               padding: 18,
               borderRadius: 15,
               marginBottom: 15,
-              elevation: 2,
             }}>
-              <Text style={{
-                fontSize: 17,
-                color: '#333',
-                textDecorationLine: item.completed ? 'line-through' : 'none'
-              }}>
-                {item.title}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
 
-              <Text style={{ color: '#555' }}>
-                {item.hora}
-              </Text>
+                  {pictogramId && (
+                    <Image
+                      source={{
+                        uri: `https://static.arasaac.org/pictograms/${pictogramId}/${pictogramId}_300.png`
+                      }}
+                      style={{ width: 40, height: 40, marginRight: 10 }}
+                    />
+                  )}
+
+                  <Text style={{
+                    fontSize: 17,
+                    textDecorationLine: item.completed ? 'line-through' : 'none'
+                  }}>
+                    {item.title}
+                  </Text>
+
+                </View>
+
+                {/* DERECHA: hora */}
+                <Text>{item.hora}</Text>
             </View>
           </Pressable>
         )}
       />
 
-
+      {/* BOTON AGREGAR */}
       <Pressable
         onPress={() => setModalVisible(true)}
         style={{
@@ -178,13 +182,12 @@ const formattedToday = `${capitalize(weekday)}, ${day} de ${capitalize(month)} d
           borderRadius: 35,
           justifyContent: 'center',
           alignItems: 'center',
-          elevation: 5,
         }}
       >
         <Ionicons name="add" size={36} color="#FFF" />
       </Pressable>
 
-
+      {/* MODAL ADD TASK */}
       <Modal visible={modalVisible} transparent animationType="slide">
         <View style={{
           flex: 1,
@@ -198,12 +201,10 @@ const formattedToday = `${capitalize(weekday)}, ${day} de ${capitalize(month)} d
             padding: 20,
             width: '85%',
           }}>
+
             <ScrollView>
 
-              <Pressable
-                onPress={() => setModalVisible(false)}
-                style={{ alignSelf: 'flex-start' }}
-              >
+              <Pressable onPress={() => setModalVisible(false)}>
                 <Ionicons name="close" size={28} color="#A77BBE" />
               </Pressable>
 
@@ -218,8 +219,8 @@ const formattedToday = `${capitalize(weekday)}, ${day} de ${capitalize(month)} d
               }}>
                 <TextInput
                   placeholder="Escribe tu tarea..."
-                  value={newTask}
-                  onChangeText={setNewTask}
+                  value={titulo}
+                  onChangeText={buscarImagen}
                   style={{ flex: 1, paddingVertical: 10 }}
                 />
 
@@ -231,7 +232,6 @@ const formattedToday = `${capitalize(weekday)}, ${day} de ${capitalize(month)} d
               <Text style={{
                 marginTop: 10,
                 textAlign: 'center',
-                color: '#555'
               }}>
                 {selectedTime
                   ? `Hora seleccionada: ${selectedTime}`
@@ -242,39 +242,46 @@ const formattedToday = `${capitalize(weekday)}, ${day} de ${capitalize(month)} d
                 <DateTimePicker
                   value={tempTime}
                   mode="time"
-                  is24Hour={true}
+                  is24Hour
                   display={Platform.OS === "ios" ? "spinner" : "default"}
                   onChange={handleTimeChange}
                 />
               )}
 
+              {/* PICTOGRAMA */}
               <View style={{
                 justifyContent: 'center',
                 alignItems: 'center',
                 marginTop: 30,
               }}>
-                <Image
-                  source={require("../../assets/images/cine.png")}
-                  style={{ width: 180, height: 180 }}
-                  resizeMode="contain"
-                />
+                {pictogramId && (
+                  <Image
+                    source={{
+                      uri: `https://static.arasaac.org/pictograms/${pictogramId}/${pictogramId}_300.png`
+                    }}
+                    style={{ width: 120, height: 120 }}
+                  />
+                )}
               </View>
 
               <Pressable
-                onPress={() => {
-                  if (newTask.trim() !== '') {
+               onPress={() => {
+                  if (titulo.trim() !== '') {
+
                     setTasks(prev => [
                       ...prev,
                       {
                         id: Date.now().toString(),
-                        title: newTask,
+                        title: titulo,
+                        pictogramId: pictogramId,
                         hora: selectedTime ?? "Sin hora",
                         completed: false
                       }
                     ]);
 
-                    setNewTask('');
+                    setTitulo('');
                     setSelectedTime(null);
+                    setPictogramId(null);
                     setModalVisible(false);
                   }
                 }}
@@ -300,7 +307,7 @@ const formattedToday = `${capitalize(weekday)}, ${day} de ${capitalize(month)} d
         </View>
       </Modal>
 
-   
+      {/* TASK DETAIL MODAL */}
       <Modal visible={taskModalVisible} transparent animationType="slide">
         <View style={{
           flex: 1,
@@ -331,21 +338,31 @@ const formattedToday = `${capitalize(weekday)}, ${day} de ${capitalize(month)} d
               {selectedTask?.title}
             </Text>
 
-            <Image
-              source={require("../../assets/images/cine.png")}
-              style={{ width: 150, height: 150 }}
-              resizeMode="contain"
-            />
+            <Text style={{
+              fontSize: 16,
+              textAlign: 'center',
+              color: '#555',
+              marginTop: 20
+            }}>
+ 
+              {selectedTask?.pictogramId && (
+                <Image
+                  source={{
+                    uri:`https://static.arasaac.org/pictograms/${selectedTask.pictogramId}/${selectedTask.pictogramId}_300.png`
+                  }}
+                  style={{width:150,height:150,marginBottom:20}}
+                />
+              )}
+            </Text>
 
             <Pressable
               onPress={() => {
-                  setTasks(prev =>
-                    prev.filter(task => task.id !== selectedTask.id)
-                  );
-
-                  setTaskModalVisible(false);
-                }}
-                style={{
+                setTasks(prev =>
+                  prev.filter(task => task.id !== selectedTask?.id)
+                );
+                setTaskModalVisible(false);
+              }}
+              style={{
                 marginTop: 30,
                 backgroundColor: '#E5D9EE',
                 padding: 15,
@@ -370,7 +387,6 @@ const formattedToday = `${capitalize(weekday)}, ${day} de ${capitalize(month)} d
     </View>
   );
 }
-
 
 
 
