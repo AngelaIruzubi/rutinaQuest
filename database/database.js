@@ -1,26 +1,28 @@
-
 import * as SQLite from 'expo-sqlite';
 
-const db = SQLite.openDatabase('rutinaquest.db');
+const db = SQLite.openDatabaseSync('taskmanager.db');
 
-export const initDB = () => {
-  db.transaction(tx => {
-    tx.executeSql(
-      `CREATE TABLE IF NOT EXISTS tasks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        pictogramId INTEGER,
-        hora TEXT,
-        completed INTEGER DEFAULT 0
-      );`,
-      [],
-      () => console.log('Tabla tasks inicializada'),
-      (_, error) => {
-        console.error('Error al crear tabla tasks:', error);
-        return false;
-      }
+export function initDB() {
+  db.execSync(`
+    CREATE TABLE IF NOT EXISTS usuario (
+      id INTEGER PRIMARY KEY,
+      cara INTEGER DEFAULT 0,
+      eyes INTEGER DEFAULT 0,
+      peloCorto INTEGER DEFAULT 0,
+      peloLargo INTEGER DEFAULT -1,
+      shirt INTEGER DEFAULT 0
     );
- });
-};
 
-export const getDB = () => db;
+    CREATE TABLE IF NOT EXISTS tareas (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      pictogramId INTEGER,
+      hora TEXT,
+      completed INTEGER DEFAULT 0
+    );
+
+    INSERT OR IGNORE INTO usuario (id) VALUES (1);
+  `);
+}
+
+export default db;
