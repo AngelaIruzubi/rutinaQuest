@@ -1,4 +1,5 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
+import db, { initDB } from '../database/database';
 
 type AvatarType = {
   cara: number;
@@ -24,11 +25,31 @@ export const AvatarProvider = ({ children }: any) => {
     shirt: 0,
   });
 
+
+  useEffect(() => {
+    initDB();
+    const row = db.getFirstSync('SELECT * FROM usuario WHERE id = 1') as AvatarType | null;
+    if (row) {
+      setAvatar({
+        cara: row.cara,
+        eyes: row.eyes,
+        peloCorto: row.peloCorto,
+        peloLargo: row.peloLargo,
+        shirt: row.shirt,
+      });
+    }
+  }, []);
+
   const updateAvatar = (field: keyof AvatarType, value: number) => {
-    setAvatar(prev => ({
-      ...prev,
-      [field]: value,
-    }));
+    setAvatar(prev => {
+      const next = { ...prev, [field]: value };
+
+      db.runSync(
+        `UPDATE usuario SET cara=?, eyes=?, peloCorto=?, peloLargo=?, shirt=? WHERE id=1`,
+        [next.cara, next.eyes, next.peloCorto, next.peloLargo, next.shirt]
+      );
+      return next;
+    });
   };
 
   return (
@@ -40,8 +61,6 @@ export const AvatarProvider = ({ children }: any) => {
 
 export const useAvatar = () => {
   const context = useContext(AvatarContext);
-  if (!context) {
-    throw new Error('useAvatar must be used inside AvatarProvider');
-  }
+  if (!context) throw new Error('useAvatar must be used inside AvatarProvider');
   return context;
 };

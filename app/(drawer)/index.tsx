@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   FlatList,
   Image,
@@ -12,6 +12,7 @@ import {
   TextInput,
   View
 } from 'react-native';
+import db from '../../database/database';
 
 import { buscarPictograma } from "../../services/arasaac";
 
@@ -33,6 +34,11 @@ export default function Home() {
   const [titulo, setTitulo] = useState("");
   const [pictogramId, setPictogramId] = useState<number | null>(null);
 
+//===== FUNCIONES =====
+useEffect(() => {
+  const rows = db.getAllSync('SELECT * FROM tareas') as any[];
+  setTasks(rows.map(r => ({ ...r, completed: r.completed === 1 })));
+}, []);
 
 
   // ===== BUSCAR PICTOGRAMA =====
@@ -265,20 +271,21 @@ export default function Home() {
               </View>
 
               <Pressable
-               onPress={() => {
+                onPress={() => {
                   if (titulo.trim() !== '') {
-
-                    setTasks(prev => [
-                      ...prev,
-                      {
-                        id: Date.now().toString(),
-                        title: titulo,
-                        pictogramId: pictogramId,
-                        hora: selectedTime ?? "Sin hora",
-                        completed: false
-                      }
-                    ]);
-
+                    const newTask = {
+                      id: Date.now().toString(),
+                      title: titulo,
+                      pictogramId: pictogramId ?? null,
+                      hora: selectedTime ?? 'Sin hora',
+                      completed: false,
+                    };
+                    // Guardar en SQLite
+                    db.runSync(
+                      'INSERT INTO tareas (id, title, pictogramId, hora, completed) VALUES (?,?,?,?,?)',
+                      [newTask.id, newTask.title, newTask.pictogramId, newTask.hora, 0]
+                    );
+                    setTasks(prev => [...prev, newTask]);
                     setTitulo('');
                     setSelectedTime(null);
                     setPictogramId(null);
@@ -357,9 +364,8 @@ export default function Home() {
 
             <Pressable
               onPress={() => {
-                setTasks(prev =>
-                  prev.filter(task => task.id !== selectedTask?.id)
-                );
+                db.runSync('DELETE FROM tareas WHERE id = ?', [selectedTask?.id]);
+                setTasks(prev => prev.filter(task => task.id !== selectedTask?.id));
                 setTaskModalVisible(false);
               }}
               style={{
