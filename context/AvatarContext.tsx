@@ -1,9 +1,9 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import db, { initDB } from '../database/database';
+import { getUsuario, initDB, updateUsuario } from '../database/database';
 
 type AvatarType = {
   cara: number;
-  eyes: number;
+  ojos: number;
   peloCorto: number;
   peloLargo: number;
   shirt: number;
@@ -19,23 +19,22 @@ const AvatarContext = createContext<AvatarContextType | null>(null);
 export const AvatarProvider = ({ children }: any) => {
   const [avatar, setAvatar] = useState<AvatarType>({
     cara: 0,
-    eyes: 0,
+    ojos: 0,
     peloCorto: 0,
     peloLargo: -1,
     shirt: 0,
   });
 
-
   useEffect(() => {
     initDB();
-    const row = db.getFirstSync('SELECT * FROM usuario WHERE id = 1') as AvatarType | null;
+    const row = getUsuario();
     if (row) {
       setAvatar({
-        cara: row.cara,
-        eyes: row.eyes,
-        peloCorto: row.peloCorto,
-        peloLargo: row.peloLargo,
-        shirt: row.shirt,
+        cara:      row.cara      ?? 0,
+        ojos:      row.ojos      ?? 0,
+        peloCorto: row.peloCorto ?? 0,
+        peloLargo: row.peloLargo ?? -1,
+        shirt:     row.shirt     ?? 0,
       });
     }
   }, []);
@@ -43,11 +42,7 @@ export const AvatarProvider = ({ children }: any) => {
   const updateAvatar = (field: keyof AvatarType, value: number) => {
     setAvatar(prev => {
       const next = { ...prev, [field]: value };
-
-      db.runSync(
-        `UPDATE usuario SET cara=?, eyes=?, peloCorto=?, peloLargo=?, shirt=? WHERE id=1`,
-        [next.cara, next.eyes, next.peloCorto, next.peloLargo, next.shirt]
-      );
+      updateUsuario(next);
       return next;
     });
   };

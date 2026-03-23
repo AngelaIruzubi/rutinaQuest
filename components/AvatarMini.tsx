@@ -4,20 +4,20 @@ import { useAvatar } from '../context/AvatarContext';
 export default function AvatarMini() {
 
   const { avatar } = useAvatar();
-  const { cara, eyes, peloCorto,peloLargo, shirt } = avatar;
+  const { cara, ojos, peloCorto,peloLargo, shirt } = avatar;
 
 const avatarConfig = {
   cara: { top: -85, left: -85, zIndex: 1, scale: 0.15 },
-  eyes: { top: -6, left: 7, width: 22, zIndex: 3 },
+  ojos: { top: -6, left: 7, width: 22, zIndex: 3 },
   peloCorto: { top: -73, left: -72, scale: 0.17, zIndex: 2 },
   peloLargo: { top: -110, left: -85, scale: 0.15, zIndex: 4 },
   shirt: { top: -77, left: -13, scale: 0.15, zIndex: 5 },
 };
 
  const faces = [
-    require('../assets/images/avatar/cara1.png'),
-    require('../assets/images/avatar/cara2.png'),
-    require('../assets/images/avatar/cara3.png'),
+    require('../assets/images/avatar/cara1_claro.png'),
+    require('../assets/images/avatar/cara2_claro.png'),
+    require('../assets/images/avatar/cara3_claro.png'),
   ];
 
   const eyesImages = [
@@ -40,8 +40,8 @@ const avatarConfig = {
   ];
 
   const shirtOptions = [
-    require('../assets/images/avatar/camiseta.png'),
-    require('../assets/images/avatar/camiseta1.png'),
+    require('../assets/images/avatar/camiseta1_claro.png'),
+    require('../assets/images/avatar/camiseta2_claro.png'),
     
   ];
 
@@ -108,13 +108,13 @@ const avatarConfig = {
 
 
         <Image
-          source={eyesImages[eyes]}
+          source={eyesImages[ojos]}
           style={{
             position: 'absolute',
-            top: avatarConfig.eyes.top,
-            left: avatarConfig.eyes.left,
-            width: avatarConfig.eyes.width,
-            zIndex: avatarConfig.eyes.zIndex,
+            top: avatarConfig.ojos.top,
+            left: avatarConfig.ojos.left,
+            width: avatarConfig.ojos.width,
+            zIndex: avatarConfig.ojos.zIndex,
           }}
           resizeMode="contain"
         />
