@@ -12,7 +12,7 @@ export default function Perfil() {
 
   const avatarConfig = {
     cara: { top: -100, left: 0, zIndex: 1, scale: 1 },
-    eyes: { top: -37, left: 40, width: 130, zIndex: 3 },
+    ojos: { top: -37, left: 40, width: 130, zIndex: 3 },
     peloCorto: { top: -145, left: 10, scale: 1.05, zIndex: 2 },
     peloLargo: { top: -150, left: 3, scale: 1.05, zIndex: 2 },
     shirt: { top: 75, left: -45, scale: 1, zIndex: 5 },
@@ -22,12 +22,12 @@ export default function Perfil() {
   const isTablet = width >= 768;
 
   const { avatar, updateAvatar } = useAvatar();
-  const { cara, eyes, peloCorto, peloLargo, shirt } = avatar;
+  const { cara, ojos, peloCorto, peloLargo, shirt } = avatar;
 
   const caras = [
-    require('../../assets/images/avatar/cara1.png'),
-    require('../../assets/images/avatar/cara2.png'),
-    require('../../assets/images/avatar/cara3.png'),
+    require('../../assets/images/avatar/cara1_claro.png'),
+    require('../../assets/images/avatar/cara2_claro.png'),
+    require('../../assets/images/avatar/cara3_claro.png'),
   ];
 
   const eyesImages = [
@@ -49,8 +49,8 @@ export default function Perfil() {
   ];
 
   const shirtOptions = [
-    require('../../assets/images/avatar/camiseta.png'),
-    require('../../assets/images/avatar/camiseta1.png'),
+    require('../../assets/images/avatar/camiseta1_claro.png'),
+    require('../../assets/images/avatar/camiseta2_claro.png'),
   ];
 
   const eyeColors = ['#2ECC71', '#4A90E2', '#8E44AD', '#765002'];
@@ -139,15 +139,15 @@ export default function Perfil() {
 
           <Pressable
             key={index}
-            onPress={() => updateAvatar('eyes', index)}
+            onPress={() => updateAvatar('ojos', index)}
             style={{
               width: 36,
               height: 36,
               borderRadius: 8,
               backgroundColor: color,
               marginRight: 15,
-              borderWidth: eyes === index ? 3 : 1,
-              borderColor: eyes === index ? '#A77BBE' : '#DDD',
+              borderWidth: ojos === index ? 3 : 1,
+              borderColor: ojos === index ? '#A77BBE' : '#DDD',
             }}
           />
 
@@ -261,13 +261,13 @@ export default function Perfil() {
             {/* OJOS */}
 
             <Image
-              source={eyesImages[eyes]}
+              source={eyesImages[ojos]}
               style={{
                 position: 'absolute',
-                top: avatarConfig.eyes.top,
-                left: avatarConfig.eyes.left,
-                width: avatarConfig.eyes.width,
-                zIndex: avatarConfig.eyes.zIndex,
+                top: avatarConfig.ojos.top,
+                left: avatarConfig.ojos.left,
+                width: avatarConfig.ojos.width,
+                zIndex: avatarConfig.ojos.zIndex,
               }}
               resizeMode="contain"
             />
