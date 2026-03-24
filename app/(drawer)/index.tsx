@@ -12,8 +12,8 @@ import {
   TextInput,
   View
 } from 'react-native';
-import { deleteTarea, getTareas, initDB, insertTarea } from '../../database/database';
-import { buscarPictograma } from "../../services/arasaac";
+import { deleteTarea, getTareas, initDB, insertTarea } from '../../database/database.js';
+import { buscarPictograma } from "../../services/arasaac.js";
 
 export default function Home() {
 

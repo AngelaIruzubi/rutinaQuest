@@ -1,12 +1,14 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { getUsuario, initDB, updateUsuario } from '../database/database';
 
-type AvatarType = {
-  cara: number;
-  ojos: number;
-  peloCorto: number;
-  peloLargo: number;
-  shirt: number;
+export type AvatarType = {
+  tonoPiel:  number;  // 0 = claro, 1 = oscuro
+  cara:      number;  // 0-2
+  ojos:      number;  // 0-3 color
+  colorPelo: number;  // 0-3 color
+  peloCorto: number;  // índice o -1
+  peloLargo: number;  // índice o -1
+  shirt:     number;  // 0-1
 };
 
 type AvatarContextType = {
@@ -18,20 +20,24 @@ const AvatarContext = createContext<AvatarContextType | null>(null);
 
 export const AvatarProvider = ({ children }: any) => {
   const [avatar, setAvatar] = useState<AvatarType>({
-    cara: 0,
-    ojos: 0,
+    tonoPiel:  0,
+    cara:      0,
+    ojos:      0,
+    colorPelo: 0,
     peloCorto: 0,
     peloLargo: -1,
-    shirt: 0,
+    shirt:     0,
   });
 
   useEffect(() => {
     initDB();
-    const row = getUsuario();
+    const row = getUsuario() as any;
     if (row) {
       setAvatar({
+        tonoPiel:  row.tonoPiel  ?? 0,
         cara:      row.cara      ?? 0,
         ojos:      row.ojos      ?? 0,
+        colorPelo: row.colorPelo ?? 0,
         peloCorto: row.peloCorto ?? 0,
         peloLargo: row.peloLargo ?? -1,
         shirt:     row.shirt     ?? 0,
