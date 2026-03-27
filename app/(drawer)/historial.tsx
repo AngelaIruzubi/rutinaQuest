@@ -1,14 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import {
-    Image,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View
+  Image,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View
 } from 'react-native';
 import { getTareas } from '../../database/database';
 
@@ -108,6 +108,15 @@ const irSemanaAnterior = () => {
   // ── Stats de la semana ─────────────────────────────────────────────────────
   const estrellasSemana = tareasEnSemana.reduce((acc, t) => acc + (t.stars ?? 5), 0);
   const tareasSemana    = tareasEnSemana.length;
+  const GOLD      = '#FFD700';
+  function StarRow({ count = 0, size = 15 }: { count: number; size?: number }) {
+    return (
+      <Text style={{ fontSize: size, color: GOLD, letterSpacing: 1 }}>
+        {'★'.repeat(count)}<Text style={{ color: '#DDD' }}>{'★'.repeat(5 - count)}</Text>
+      </Text>
+    );
+  }
+  
 
 
   return (
@@ -226,6 +235,7 @@ const irSemanaAnterior = () => {
                         )}
                         <View style={{ flex: 1 }}>
                           <Text style={styles.histTitle} numberOfLines={1}>{item.title}</Text>
+                          <StarRow count={item.stars ?? 5} size={14} />
                         </View>
                       </View>
                       <View style={{ alignItems: 'flex-end' }}>

@@ -2,15 +2,12 @@
 // app/(tabs)/historial.tsx  (o screens/Historial.tsx según tu estructura)
 // Muestra todas las tareas completadas con sus estrellas
 // ─────────────────────────────────────────────────────────────────────────────
-import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import {
-  Image,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View
 } from 'react-native';
 import { getTareas } from '../../database/database';
@@ -193,57 +190,6 @@ export default function Progreso() {
           ))}
         </View>
 
-        {/* ── Historial de tareas completadas ── */}
-        <Text style={styles.sectionTitle}>📋 Historial</Text>
-
-        <View style={styles.searchBar}>
-          <TextInput
-            placeholder="Buscar en historial..."
-            value={search}
-            onChangeText={setSearch}
-            style={{ flex: 1, fontSize: 15 }}
-          />
-          <Ionicons name="search" size={18} color="#999" />
-        </View>
-
-        {completadas.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>Aún no has completado ninguna tarea</Text>
-            <Text style={styles.emptySubText}>¡Completa tareas para verlas aquí!</Text>
-          </View>
-        ) : filtradas.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>Sin resultados para "{search}"</Text>
-          </View>
-        ) : (
-          grupos.map(({ fecha, items }) => (
-            <View key={fecha}>
-              <Text style={styles.grupoFecha}>{fecha}</Text>
-              {items.map(item => (
-                <View key={item.id} style={styles.histItem}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                    {item.pictogramId && (
-                      <Image
-                        source={{ uri: `https://static.arasaac.org/pictograms/${item.pictogramId}/${item.pictogramId}_300.png` }}
-                        style={styles.pictogram}
-                      />
-                    )}
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.histTitle} numberOfLines={1}>{item.title}</Text>
-                      <StarRow count={item.stars ?? 5} size={14} />
-                    </View>
-                  </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    {item.hora && item.hora !== 'Sin hora' && (
-                      <Text style={styles.histTime}>{item.hora}</Text>
-                    )}
-                    <Text style={{ fontSize: 10, color: GREEN, fontWeight: '700' }}>✓</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          ))
-        )}
 
       </ScrollView>
     </View>
