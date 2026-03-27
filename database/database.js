@@ -13,8 +13,10 @@ function getDB() {
 export function initDB() {
   if (Platform.OS === 'web') return;
 
-  const database = getDB();
-  database.execSync(`
+  const SQLite = require('expo-sqlite');
+  db = SQLite.openDatabaseSync('taskmanager.db');
+
+  db.execSync(`
     CREATE TABLE IF NOT EXISTS usuario (
       id        INTEGER PRIMARY KEY,
       tonoPiel  INTEGER DEFAULT 0,
@@ -28,23 +30,25 @@ export function initDB() {
       puntos    INTEGER DEFAULT 0
     );
     CREATE TABLE IF NOT EXISTS tareas (
-      id          TEXT PRIMARY KEY,
-      title       TEXT NOT NULL,
-      pictogramId INTEGER,
-      hora        TEXT,
-      completed   INTEGER DEFAULT 0
+      id               TEXT PRIMARY KEY,
+      title            TEXT NOT NULL,
+      pictogramId      INTEGER,
+      hora             TEXT,
+      completed        INTEGER DEFAULT 0,
+      fechaCompletada  TEXT
     );
     INSERT OR IGNORE INTO usuario (id) VALUES (1);
   `);
 
- const migraciones = [
-  `ALTER TABLE usuario ADD COLUMN tonoPiel  INTEGER DEFAULT 0`,
-  `ALTER TABLE usuario ADD COLUMN ojos      INTEGER DEFAULT 0`,
-  `ALTER TABLE usuario ADD COLUMN colorPelo INTEGER DEFAULT 0`, 
+  // Migraciones
+  const migraciones = [
+  `ALTER TABLE usuario ADD COLUMN ojos INTEGER DEFAULT 0`,
+  `ALTER TABLE tareas ADD COLUMN fechaCompletada TEXT`,   
+  `ALTER TABLE tareas ADD COLUMN stars INTEGER DEFAULT 0`, 
 ];
-  for (const sql of migraciones) {
-    try { database.execSync(sql); } catch {}
-  }
+for (const sql of migraciones) {
+  try { db.execSync(sql); } catch {}  
+}
 }
 
 // ── USUARIO ──────────────────────────────────────────────
@@ -84,16 +88,58 @@ export function getTareas() {
   return getDB().getAllSync('SELECT * FROM tareas');
 }
 
+export function getTareasCompletadas() {
+  if (Platform.OS === 'web') {
+    const tareas = getTareas();
+    return tareas.filter(t => t.completed === 1).sort((a, b) => {
+      return new Date(b.fechaCompletada) - new Date(a.fechaCompletada);
+    });
+  }
+  return db.getAllSync('SELECT * FROM tareas WHERE completed = 1 ORDER BY fechaCompletada DESC');
+}
+
 export function insertTarea(tarea) {
   if (Platform.OS === 'web') {
     const tareas = getTareas();
     localStorage.setItem('tareas', JSON.stringify([...tareas, tarea]));
     return;
   }
-  getDB().runSync(
-    'INSERT INTO tareas (id, title, pictogramId, hora, completed) VALUES (?,?,?,?,?)',
-    [tarea.id, tarea.title, tarea.pictogramId, tarea.hora, 0]
+  db.runSync(
+    'INSERT INTO tareas (id, title, pictogramId, hora, completed, stars, fechaCompletada) VALUES (?,?,?,?,?,?,?)',
+    [tarea.id, tarea.title, tarea.pictogramId, tarea.hora, 0, 0, null]
   );
+}
+
+// Ahora guarda también la fecha y las estrellas al completar
+export function updateTareaCompletada(id, completed, stars = 5) {
+  const fecha = completed ? new Date().toISOString().slice(0, 10) : null; // "2025-03-24"
+ 
+  if (Platform.OS === 'web') {
+    const tareas = getTareas().map(t =>
+      t.id === id
+        ? { ...t, completed: completed ? 1 : 0, fechaCompletada: fecha, stars }
+        : t
+    );
+    localStorage.setItem('tareas', JSON.stringify(tareas));
+    return;
+  }
+ 
+  // SQLite nativo
+  db.runSync(
+    'UPDATE tareas SET completed = ?, fechaCompletada = ?, stars = ? WHERE id = ?',
+    [completed ? 1 : 0, fecha, stars, id]
+  );
+}
+
+export function updateTareaHora(id, nuevaHora) {
+  if (Platform.OS === 'web') {
+    const tareas = getTareas().map(t =>
+      t.id === id ? { ...t, hora: nuevaHora } : t
+    );
+    localStorage.setItem('tareas', JSON.stringify(tareas));
+    return;
+  }
+  db.runSync('UPDATE tareas SET hora = ? WHERE id = ?', [nuevaHora, id]);
 }
 
 export function deleteTarea(id) {
