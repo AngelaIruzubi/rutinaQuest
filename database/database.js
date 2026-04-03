@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+const FECHA_SIMULADA = '04/05/2026'; 
 
 let db = null;
 
@@ -8,6 +9,9 @@ function getDB() {
     db = SQLite.openDatabaseSync('taskmanager.db');
   }
   return db;
+}
+function hoySimulado() {
+  return FECHA_SIMULADA ?? new Date().toISOString().slice(0, 10);
 }
 
 export function initDB() {
@@ -35,23 +39,27 @@ export function initDB() {
       pictogramId      INTEGER,
       hora             TEXT,
       completed        INTEGER DEFAULT 0,
-      fechaCompletada  TEXT
+      stars            INTEGER DEFAULT 0,
+      fechaCompletada  TEXT,
+      fechaDia         TEXT,
+      estado           TEXT DEFAULT 'pendiente'
     );
     INSERT OR IGNORE INTO usuario (id) VALUES (1);
   `);
 
-  // Migraciones
   const migraciones = [
-  `ALTER TABLE usuario ADD COLUMN ojos INTEGER DEFAULT 0`,
-  `ALTER TABLE tareas ADD COLUMN fechaCompletada TEXT`,   
-  `ALTER TABLE tareas ADD COLUMN stars INTEGER DEFAULT 0`, 
-];
-for (const sql of migraciones) {
-  try { db.execSync(sql); } catch {}  
-}
+    `ALTER TABLE usuario ADD COLUMN ojos INTEGER DEFAULT 0`,
+    `ALTER TABLE tareas ADD COLUMN fechaCompletada TEXT`,
+    `ALTER TABLE tareas ADD COLUMN stars INTEGER DEFAULT 0`,
+    `ALTER TABLE tareas ADD COLUMN fechaDia TEXT`,
+    `ALTER TABLE tareas ADD COLUMN estado TEXT DEFAULT 'pendiente'`,
+  ];
+  for (const sql of migraciones) {
+    try { db.execSync(sql); } catch {}
+  }
 }
 
-// ── USUARIO ──────────────────────────────────────────────
+// ── USUARIO ───────────────────────────────────────────────────────────────────
 
 const USUARIO_DEFAULT = {
   tonoPiel: 0, cara: 0, ojos: 0,
@@ -78,7 +86,7 @@ export function updateUsuario(fields) {
   getDB().runSync(`UPDATE usuario SET ${keys} WHERE id=1`, values);
 }
 
-// ── TAREAS ───────────────────────────────────────────────
+// ── TAREAS ────────────────────────────────────────────────────────────────────
 
 export function getTareas() {
   if (Platform.OS === 'web') {
@@ -88,46 +96,76 @@ export function getTareas() {
   return getDB().getAllSync('SELECT * FROM tareas');
 }
 
-export function getTareasCompletadas() {
+// Para el historial: devuelve completadas Y canceladas
+export function getTareasHistorial() {
   if (Platform.OS === 'web') {
-    const tareas = getTareas();
-    return tareas.filter(t => t.completed === 1).sort((a, b) => {
-      return new Date(b.fechaCompletada) - new Date(a.fechaCompletada);
-    });
+    return getTareas()
+      .filter(t => t.estado === 'completada' || t.estado === 'cancelada')
+      .sort((a, b) => {
+        const fa = a.fechaCompletada || a.fechaDia || '';
+        const fb = b.fechaCompletada || b.fechaDia || '';
+        return fb.localeCompare(fa);
+      });
   }
-  return db.getAllSync('SELECT * FROM tareas WHERE completed = 1 ORDER BY fechaCompletada DESC');
-}
-
-export function insertTarea(tarea) {
-  if (Platform.OS === 'web') {
-    const tareas = getTareas();
-    localStorage.setItem('tareas', JSON.stringify([...tareas, tarea]));
-    return;
-  }
-  db.runSync(
-    'INSERT INTO tareas (id, title, pictogramId, hora, completed, stars, fechaCompletada) VALUES (?,?,?,?,?,?,?)',
-    [tarea.id, tarea.title, tarea.pictogramId, tarea.hora, 0, 0, null]
+  return getDB().getAllSync(
+    `SELECT * FROM tareas
+     WHERE estado IN ('completada','cancelada')
+     ORDER BY COALESCE(fechaCompletada, fechaDia) DESC`
   );
 }
 
-// Ahora guarda también la fecha y las estrellas al completar
+export function insertTarea(tarea) {
+  const hoy = hoySimulado();
+  if (Platform.OS === 'web') {
+    const tareas = getTareas();
+    localStorage.setItem('tareas', JSON.stringify([
+      ...tareas,
+      { ...tarea, fechaDia: hoy, fechaCompletada: null, stars: 0, estado: 'pendiente' },
+    ]));
+    return;
+  }
+  getDB().runSync(
+    `INSERT INTO tareas
+       (id, title, pictogramId, hora, completed, stars, fechaCompletada, fechaDia, estado)
+     VALUES (?,?,?,?,?,?,?,?,?)`,
+    [tarea.id, tarea.title, tarea.pictogramId ?? null,
+     tarea.hora ?? 'Sin hora', 0, 0, null, hoy, 'pendiente']
+  );
+}
+
+// Marcar completada — estado = 'completada'
 export function updateTareaCompletada(id, completed, stars = 5) {
-  const fecha = completed ? new Date().toISOString().slice(0, 10) : null; // "2025-03-24"
- 
+  const fecha  = completed ? hoySimulado() : null;
+  const estado = completed ? 'completada' : 'pendiente';
+
   if (Platform.OS === 'web') {
     const tareas = getTareas().map(t =>
       t.id === id
-        ? { ...t, completed: completed ? 1 : 0, fechaCompletada: fecha, stars }
+        ? { ...t, completed: completed ? 1 : 0, fechaCompletada: fecha, stars, estado }
         : t
     );
     localStorage.setItem('tareas', JSON.stringify(tareas));
     return;
   }
- 
-  // SQLite nativo
-  db.runSync(
-    'UPDATE tareas SET completed = ?, fechaCompletada = ?, stars = ? WHERE id = ?',
-    [completed ? 1 : 0, fecha, stars, id]
+  getDB().runSync(
+    `UPDATE tareas SET completed=?, fechaCompletada=?, stars=?, estado=? WHERE id=?`,
+    [completed ? 1 : 0, fecha, stars, estado, id]
+  );
+}
+
+// Cancelar tarea — estado = 'cancelada', queda en historial
+export function cancelarTarea(id) {
+  const hoy = hoySimulado();
+  if (Platform.OS === 'web') {
+    const tareas = getTareas().map(t =>
+      t.id === id ? { ...t, estado: 'cancelada', fechaCompletada: hoy } : t
+    );
+    localStorage.setItem('tareas', JSON.stringify(tareas));
+    return;
+  }
+  getDB().runSync(
+    `UPDATE tareas SET estado='cancelada', fechaCompletada=? WHERE id=?`,
+    [hoy, id]
   );
 }
 
@@ -139,7 +177,7 @@ export function updateTareaHora(id, nuevaHora) {
     localStorage.setItem('tareas', JSON.stringify(tareas));
     return;
   }
-  db.runSync('UPDATE tareas SET hora = ? WHERE id = ?', [nuevaHora, id]);
+  getDB().runSync('UPDATE tareas SET hora=? WHERE id=?', [nuevaHora, id]);
 }
 
 export function deleteTarea(id) {
@@ -148,5 +186,33 @@ export function deleteTarea(id) {
     localStorage.setItem('tareas', JSON.stringify(tareas));
     return;
   }
-  getDB().runSync('DELETE FROM tareas WHERE id = ?', [id]);
+  getDB().runSync('DELETE FROM tareas WHERE id=?', [id]);
+}
+
+// Reset diario: pendientes de días anteriores → canceladas
+export function limpiarTareasViejas() {
+  const hoy = hoySimulado();
+
+  if (Platform.OS === 'web') {
+    const todas = getTareas();
+    const actualizadas = todas.map(t => {
+      if (t.fechaDia && t.fechaDia !== hoy && t.estado === 'pendiente') {
+        return { ...t, estado: 'cancelada', fechaCompletada: t.fechaDia };
+      }
+      return t;
+    });
+    localStorage.setItem('tareas', JSON.stringify(actualizadas));
+    return actualizadas.filter(t => !t.fechaDia || t.fechaDia === hoy);
+  }
+
+  getDB().runSync(
+    `UPDATE tareas SET fechaDia=? WHERE fechaDia IS NULL AND estado='pendiente'`,
+    [hoy]
+  );
+  getDB().runSync(
+    `UPDATE tareas SET estado='cancelada', fechaCompletada=fechaDia
+     WHERE fechaDia!=? AND estado='pendiente'`,
+    [hoy]
+  );
+  return getDB().getAllSync(`SELECT * FROM tareas WHERE fechaDia=?`, [hoy]);
 }

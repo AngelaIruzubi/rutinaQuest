@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import {
   Image,
   Platform,
@@ -8,124 +9,134 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View
+  View,
 } from 'react-native';
-import { getTareas } from '../../database/database';
+import { getTareasHistorial } from '../../database/database';
 
 const PURPLE    = '#A77BBE';
 const PURPLE_LT = '#E5D9EE';
 const PURPLE_BG = '#F4F0F6';
+const GREEN     = '#58CC02';
+const GREEN_LT  = '#EDF9EF';
+const RED       = '#FF4444';
+const RED_LT    = '#FFF0F0';
+const GOLD      = '#FFD700';
 
-
-
-function lunesDe(fecha: string | Date): Date {
+// ─── Helpers de fecha ─────────────────────────────────────────────────────────
+function lunesDe(fecha: Date): Date {
   const d = new Date(fecha);
-  const dia = d.getDay(); // 0=dom, 1=lun...
+  const dia = d.getDay();
   const diff = dia === 0 ? -6 : 1 - dia;
   d.setDate(d.getDate() + diff);
   d.setHours(0, 0, 0, 0);
   return d;
+}
+const FECHA_SIMULADA = '04/05/2026'; 
+  function hoySimulado() {
+  return FECHA_SIMULADA ?? new Date().toISOString().slice(0, 10);
 }
 
 function diasDeSemana(lunes: Date): string[] {
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(lunes);
     d.setDate(d.getDate() + i);
-    return d.toISOString().slice(0, 10); // "2025-03-24"
+    return d.toISOString().slice(0, 10);
   });
 }
 
 function etiquetaSemana(lunes: Date): string {
   const domingo = new Date(lunes);
   domingo.setDate(lunes.getDate() + 6);
-  
-  const opciones: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
-  const lunesStr = lunes.toLocaleDateString('es-ES', opciones);
-  const domingoStr = domingo.toLocaleDateString('es-ES', opciones);
-  
-  return `${lunesStr} - ${domingoStr}`;
+  const opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
+  return `${lunes.toLocaleDateString('es-ES', opts)} – ${domingo.toLocaleDateString('es-ES', opts)}`;
 }
 
 const DIAS_CORTOS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
 
-
+// ─── Estrellas ────────────────────────────────────────────────────────────────
+function StarRow({ count = 0, size = 13 }: { count: number; size?: number }) {
+  return (
+    <Text style={{ fontSize: size, color: GOLD, letterSpacing: 1 }}>
+      {'★'.repeat(Math.max(0, count))}
+      <Text style={{ color: '#DDD' }}>{'★'.repeat(Math.max(0, 5 - count))}</Text>
+    </Text>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
-export default function Histroial() {
-  const [search,     setSearch]     = useState('');
-  const [completadas, setCompletadas] = useState<any[]>([]);
-
-
+export default function Historial() {
+  const [search,       setSearch]       = useState('');
+  const [historial,    setHistorial]    = useState<any[]>([]);
   const [semanaActual, setSemanaActual] = useState(() => lunesDe(new Date()));
 
-  
+  const hoy = hoySimulado();
 
-  useEffect(() => {
-    const rows = getTareas();
-    const hechas = rows
-      .filter((r: any) => r.completed === 1)
-      .map((r: any) => ({ ...r }))
-      .reverse(); // más recientes primero
-    setCompletadas(hechas);
-  }, []);
+  // Día seleccionado — por defecto hoy
+  const [diaSeleccionado, setDiaSeleccionado] = useState(hoy);
 
-  const filtradas = completadas.filter(t =>
-    t.title.toLowerCase().includes(search.toLowerCase())
+  // ── Recargar cada vez que el usuario entra en esta pantalla ───────────────
+  useFocusEffect(
+    useCallback(() => {
+      const rows = getTareasHistorial();
+      setHistorial(rows);
+    }, [])
   );
 
-const irSemanaAnterior = () => {
-    setSemanaActual(prev => {
-      const d = new Date(prev);
-      d.setDate(d.getDate() - 7);
-      return d;
-    });
-  };
-  const irSemanaSiguiente = () => {
-    setSemanaActual(prev => {
-      const d = new Date(prev);
-      d.setDate(d.getDate() + 7);
-      return d;
-    });
-  };
+const esMismaSemanaque = (lunes: Date) => {
+  const lunesHoy = lunesDe(new Date());
+  return lunes.toISOString().slice(0, 10) === lunesHoy.toISOString().slice(0, 10);
+};
+ 
+const irAnterior = () => {
+  setSemanaActual(prev => {
+    const d = new Date(prev);
+    d.setDate(d.getDate() - 7);
+    setDiaSeleccionado(d.toISOString().slice(0, 10));
+    return d;
+  });
+};
+ 
+const irSiguiente = () => {
+  setSemanaActual(prev => {
+    // Solo avanzar si la semana actual NO es ya la semana de hoy
+    if (esMismaSemanaque(prev)) return prev;
+    const d = new Date(prev);
+    d.setDate(d.getDate() + 7);
+    // Si la nueva semana ya es la de hoy, seleccionar hoy; si no, el lunes
+    const nuevaEsHoy = esMismaSemanaque(d);
+    setDiaSeleccionado(nuevaEsHoy ? hoy : d.toISOString().slice(0, 10));
+    return d;
+  });
+};
+ 
+// Y sustituye la línea de esEstaSemana por:
+const esEstaSemana = esMismaSemanaque(semanaActual);
 
-  const esEstaSemana = lunesDe(new Date()).toISOString().slice(0, 10) === semanaActual.toISOString().slice(0, 10);
-
-  // ── Días de la semana seleccionada ─────────────────────────────────────────
   const dias = diasDeSemana(semanaActual);
 
-  // ── Tareas filtradas por semana y búsqueda ─────────────────────────────────
-  const tareasEnSemana = completadas.filter(t =>
-    dias.includes(t.fechaCompletada) &&
-    t.title.toLowerCase().includes(search.toLowerCase())
-  );
+  // ── Tareas del día seleccionado ───────────────────────────────────────────
+  const tareasDelDia = historial.filter(t => {
+    const fecha = t.fechaCompletada ?? t.fechaDia ?? '';
+    return fecha === diaSeleccionado &&
+           t.title.toLowerCase().includes(search.toLowerCase());
+  });
 
-  // Agrupar por día
-  const porDia = dias.map(fecha => ({
-    fecha,
-    items: tareasEnSemana.filter(t => t.fechaCompletada === fecha),
-  }));
+  const completadas = tareasDelDia.filter(t => t.estado === 'completada');
+  const canceladas  = tareasDelDia.filter(t => t.estado === 'cancelada');
 
-  // ── Stats de la semana ─────────────────────────────────────────────────────
-  const estrellasSemana = tareasEnSemana.reduce((acc, t) => acc + (t.stars ?? 5), 0);
-  const tareasSemana    = tareasEnSemana.length;
-  const GOLD      = '#FFD700';
-  function StarRow({ count = 0, size = 15 }: { count: number; size?: number }) {
-    return (
-      <Text style={{ fontSize: size, color: GOLD, letterSpacing: 1 }}>
-        {'★'.repeat(count)}<Text style={{ color: '#DDD' }}>{'★'.repeat(5 - count)}</Text>
-      </Text>
-    );
-  }
-  
+  // ── Nombre largo del día seleccionado ─────────────────────────────────────
+  const nombreDiaSeleccionado = new Date(diaSeleccionado + 'T12:00:00')
+    .toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 
-
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <View style={styles.root}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40,
-        flexDirection:'column', gap:20, justifyContent:'center', alignItems:'center'
-       }}>
-
-        <Text style={styles.sectionTitle}>Historial</Text>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 40 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={styles.titulo}>Historial</Text>
 
         {/* Buscador */}
         <View style={styles.searchBar}>
@@ -138,116 +149,146 @@ const irSemanaAnterior = () => {
           <Ionicons name="search" size={18} color="#999" />
         </View>
 
-        {/* Selector de semana */}
+        {/* ── Selector de semana ── */}
         <View style={styles.weekSelector}>
-          <Pressable onPress={irSemanaAnterior} style={styles.weekArrow}>
+          <Pressable onPress={irAnterior} style={styles.weekArrow}>
             <Ionicons name="chevron-back" size={22} color={PURPLE} />
           </Pressable>
-
-          <View style={{ flex: 1, alignItems: 'center', width:'100%', justifyContent:'center' }}>
+          <View style={{ flex: 1, alignItems: 'center' }}>
             <Text style={styles.weekLabel}>{etiquetaSemana(semanaActual)}</Text>
           </View>
-
           <Pressable
-            onPress={irSemanaSiguiente}
-            style={[styles.weekArrow, esEstaSemana && { opacity: 0.3 }]}
+            onPress={irSiguiente}
             disabled={esEstaSemana}
+            style={[styles.weekArrow, esEstaSemana && { opacity: 0.3 }]}
           >
             <Ionicons name="chevron-forward" size={22} color={PURPLE} />
           </Pressable>
         </View>
 
-        {/* Mini resumen de la semana 
-        <View style={styles.weekStats}>
-          <Text style={styles.weekStatText}>
-            {tareasSemana} tarea{tareasSemana !== 1 ? 's' : ''} completada{tareasSemana !== 1 ? 's' : ''}
-          </Text>
-          <Text style={styles.weekStatText}>·</Text>
-          <Text style={styles.weekStatText}>{estrellasSemana} ⭐</Text>
-        </View>*/}
-
-        {/* ── Franja de días de la semana ── */}
+        {/* ── Botones de días L-M-X-J-V-S-D ── */}
         <View style={styles.daysStrip}>
-          {dias.map((fecha, i) => {
-            const count   = completadas.filter(t => t.fechaCompletada === fecha).length;
-            const esHoy   = fecha === new Date().toISOString().slice(0, 10);
-            const tieneTareas = count > 0;
+          {dias.map(fecha => {
+            const seleccionado = fecha === diaSeleccionado;
+            const esHoy        = fecha === hoy;
+            const nombreCorto  = DIAS_CORTOS[new Date(fecha + 'T12:00:00').getDay()];
+
+            // Puntos de actividad
+            const nComp = historial.filter(
+              t => (t.fechaCompletada ?? t.fechaDia) === fecha && t.estado === 'completada'
+            ).length;
+            const nCanc = historial.filter(
+              t => (t.fechaCompletada ?? t.fechaDia) === fecha && t.estado === 'cancelada'
+            ).length;
+
             return (
-              <View key={fecha} style={styles.dayCol}>
-                <Text style={[styles.dayName, esHoy && { color: PURPLE, fontWeight: '700' }]}>
-                  {DIAS_CORTOS[i]}
-                </Text>
-                <View style={[
-                  styles.dayDot,
-                  tieneTareas && { backgroundColor: PURPLE },
-                  esHoy && !tieneTareas && { borderWidth: 2, borderColor: PURPLE },
+              <Pressable
+                key={fecha}
+                onPress={() => setDiaSeleccionado(fecha)}
+                style={[
+                  styles.dayBtn,
+                  seleccionado && styles.dayBtnSelected,
+                  esHoy && !seleccionado && styles.dayBtnHoy,
+                ]}
+              >
+                <Text style={[
+                  styles.dayBtnLabel,
+                  seleccionado && { color: 'white', fontWeight: '700' },
+                  esHoy && !seleccionado && { color: PURPLE, fontWeight: '700' },
                 ]}>
-                  {tieneTareas && (
-                    <Text style={{ fontSize: 10, color: 'white', fontWeight: '700' }}>{count}</Text>
-                  )}
+                  {nombreCorto}
+                </Text>
+                {/* Indicadores de actividad */}
+                <View style={{ flexDirection: 'row', gap: 2, marginTop: 3 }}>
+                  {nComp > 0 && <View style={[styles.dot, { backgroundColor: seleccionado ? 'white' : GREEN }]} />}
+                  {nCanc > 0 && <View style={[styles.dot, { backgroundColor: seleccionado ? '#ffcccc' : RED }]} />}
                 </View>
-              </View>
+              </Pressable>
             );
           })}
         </View>
 
-        {/* ── Lista de tareas agrupadas por día ── */}
-        {porDia.every(d => d.items.length === 0) ? (
+        {/* ── Cabecera del día seleccionado ── */}
+        <View style={styles.diaHeader}>
+          <Text style={styles.diaNombre}>
+            {diaSeleccionado === hoy
+              ? `Hoy · ${nombreDiaSeleccionado}`
+              : nombreDiaSeleccionado.charAt(0).toUpperCase() + nombreDiaSeleccionado.slice(1)}
+          </Text>
+          {tareasDelDia.length > 0 && (
+            <View style={styles.diaBadgesRow}>
+              <View style={[styles.diaBadge, { backgroundColor: GREEN_LT }]}>
+                <Text style={[styles.diaBadgeText, { color: GREEN }]}>✓ {completadas.length}</Text>
+              </View>
+              <View style={[styles.diaBadge, { backgroundColor: RED_LT }]}>
+                <Text style={[styles.diaBadgeText, { color: RED }]}>✕ {canceladas.length}</Text>
+              </View>
+            </View>
+          )}
+        </View>
+
+        {tareasDelDia.length === 0 ? (
           <View style={styles.emptyBox}>
-            {completadas.length === 0 ? (
-              <>
-                <Text style={styles.emptyText}>Aún no has completado ninguna tarea</Text>
-                <Text style={styles.emptySubText}>¡Completa tareas para verlas aquí!</Text>
-              </>
-            ) : (
-              <>
-                <Text style={styles.emptyText}>Sin tareas esta semana</Text>
-                <Text style={styles.emptySubText}>Navega a otras semanas con las flechas</Text>
-              </>
-            )}
+            <Text style={styles.emptyText}>Sin tareas este día</Text>
+            <Text style={styles.emptySubText}>Pulsa otro día para ver su historial</Text>
           </View>
         ) : (
-          porDia
-            .filter(d => d.items.length > 0)
-            .map(({ fecha, items }) => {
-              const fechaObj  = new Date(fecha + 'T00:00:00');
-              const esHoy     = fecha === new Date().toISOString().slice(0, 10);
-              const nombreDia = fechaObj.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' });
+          <View style={styles.columnasRow}>
 
-              return (
-                <View key={fecha} style={{ marginBottom: 16,  width:'50%', alignItems:'center'}}>
-                  {/* Cabecera del día */}
-                  <View style={styles.diaHeader}>
-                    <Text style={[styles.diaLabel, esHoy && { color: PURPLE }]}>
-                      {esHoy ? `Hoy · ${nombreDia}` : nombreDia.charAt(0).toUpperCase() + nombreDia.slice(1)}
-                    </Text>
+            {/* Columna REALIZADAS */}
+            <View style={styles.columna}>
+              <View style={[styles.columnaHeader, { backgroundColor: GREEN_LT, borderColor: GREEN }]}>
+                <Text style={[styles.columnaHeaderText, { color: GREEN }]}>✓ Realizadas</Text>
+              </View>
+              {completadas.length === 0 ? (
+                <Text style={styles.columnEmpty}>Ninguna</Text>
+              ) : (
+                completadas.map(item => (
+                  <View key={item.id} style={[styles.tareaCard, { borderLeftColor: GREEN }]}>
+                    {item.pictogramId && (
+                      <Image
+                        source={{ uri: `https://static.arasaac.org/pictograms/${item.pictogramId}/${item.pictogramId}_300.png` }}
+                        style={styles.pictogram}
+                      />
+                    )}
+                    <Text style={styles.tareaTitle} numberOfLines={2}>{item.title}</Text>
+                    <StarRow count={item.stars ?? 5} size={12} />
+                    {item.hora && item.hora !== 'Sin hora' && (
+                      <Text style={styles.tareaHora}>{item.hora}</Text>
+                    )}
                   </View>
+                ))
+              )}
+            </View>
 
-                  {/* Tareas del día */}
-                  {items.map(item => (
-                    <View key={item.id} style={styles.histItem}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                        {item.pictogramId && (
-                          <Image
-                            source={{ uri: `https://static.arasaac.org/pictograms/${item.pictogramId}/${item.pictogramId}_300.png` }}
-                            style={styles.pictogram}
-                          />
-                        )}
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.histTitle} numberOfLines={1}>{item.title}</Text>
-                          <StarRow count={item.stars ?? 5} size={14} />
-                        </View>
-                      </View>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        {item.hora && item.hora !== 'Sin hora' && (
-                          <Text style={styles.histTime}>{item.hora}</Text>
-                        )}
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              );
-            })
+            {/* Columna CANCELADAS */}
+            <View style={styles.columna}>
+              <View style={[styles.columnaHeader, { backgroundColor: RED_LT, borderColor: RED }]}>
+                <Text style={[styles.columnaHeaderText, { color: RED }]}>✕ Canceladas</Text>
+              </View>
+              {canceladas.length === 0 ? (
+                <Text style={styles.columnEmpty}>Ninguna</Text>
+              ) : (
+                canceladas.map(item => (
+                  <View key={item.id} style={[styles.tareaCard, { borderLeftColor: RED, opacity: 0.75 }]}>
+                    {item.pictogramId && (
+                      <Image
+                        source={{ uri: `https://static.arasaac.org/pictograms/${item.pictogramId}/${item.pictogramId}_300.png` }}
+                        style={styles.pictogram}
+                      />
+                    )}
+                    <Text style={[styles.tareaTitle, { textDecorationLine: 'line-through', color: '#888' }]} numberOfLines={2}>
+                      {item.title}
+                    </Text>
+                    {item.hora && item.hora !== 'Sin hora' && (
+                      <Text style={styles.tareaHora}>{item.hora}</Text>
+                    )}
+                  </View>
+                ))
+              )}
+            </View>
+
+          </View>
         )}
 
       </ScrollView>
@@ -261,7 +302,7 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
     paddingHorizontal: 20,
   },
-  pageTitle: { fontSize: 30, fontWeight: '700', color: PURPLE, marginBottom: 20 },
+  titulo: { fontSize: 30, fontWeight: '700', color: PURPLE, marginBottom: 20 },
   sectionTitle: { fontSize: 30, fontWeight: '700', color: PURPLE, marginBottom: 10 },
 
   // Stats globales
@@ -282,7 +323,7 @@ const styles = StyleSheet.create({
   },
   medalLabel:   { fontWeight: '700', fontSize: 11, marginTop: 4 },
   medalSub:     { fontSize: 9, color: '#AAA', marginTop: 2, textAlign: 'center' },
-  medalBarBg:   { backgroundColor: '#EEE', borderRadius: 4, height: 5, marginTop: 7, width: '100%', overflow: 'hidden' },
+  medalBarBg:   { backgroundColor: '#EEE', borderRadius: 4, height: 5, marginTop: 7, overflow: 'hidden' },
   medalBarFill: { height: '100%', borderRadius: 4 },
   medalCount:   { fontSize: 9, color: '#BBB', marginTop: 4 },
 
@@ -291,15 +332,17 @@ const styles = StyleSheet.create({
   nextText: { fontSize: 11, color: '#888', marginTop: 8, textAlign: 'center' },
 
   // Búsqueda
-  searchBar: {
-    flexDirection: 'row', alignItems: 'center', width:'100%',
-    backgroundColor: '#f3f2f2', borderRadius: 20,
-    paddingHorizontal: 14, paddingVertical: 9, marginBottom: 14,
+
+   searchBar: {
+    flexDirection: 'row', alignItems: 'center', width: '100%',
+    backgroundColor: '#f3f2f2', borderRadius: 25,
+    paddingHorizontal: 15, paddingVertical: 10, marginBottom: 20,
   },
+
 
   // Selector de semana
   weekSelector: {
-    flexDirection: 'row', alignItems: 'center', width:'100%',
+    flexDirection: 'row', alignItems: 'center', width: '100%',
     backgroundColor: PURPLE_BG, borderRadius: 16,
     paddingVertical: 10, paddingHorizontal: 6,
     marginBottom: 12, borderWidth: 1.5, borderColor: PURPLE_LT,
@@ -317,37 +360,53 @@ const styles = StyleSheet.create({
 
   // Franja de días
   daysStrip: {
-    flexDirection: 'row', justifyContent: 'space-between', width:'50%',
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    width: '100%',
     backgroundColor: '#FAFAFA', borderRadius: 14,
     paddingVertical: 12, paddingHorizontal: 8,
     marginBottom: 20, borderWidth: 1, borderColor: '#EEE',
   },
-  dayCol:  { alignItems: 'center', gap: 6 },
-  dayName: { fontSize: 11, color: '#AAA', fontWeight: '600' },
-  dayDot:  {
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: '#EEE',
-    alignItems: 'center', justifyContent: 'center',
+  
+  dayBtn: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 8, borderRadius: 12, marginHorizontal: 2,
   },
+  dayBtnSelected: { backgroundColor: PURPLE },
+  dayBtnHoy:      { backgroundColor: PURPLE_LT },
+  dayBtnLabel:    { fontSize: 11, color: '#AAA', fontWeight: '600' },
+  dot: { width: 5, height: 5, borderRadius: 3 }
+  ,
 
   // Cabecera de día
-  diaHeader: {
+   diaHeader: {
     flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 8,
+    alignItems: 'center', marginBottom: 14,
   },
-  diaLabel:      { fontSize: 13, fontWeight: '700', color: '#555', textTransform: 'capitalize' },
-  diaStarsBadge: { backgroundColor: PURPLE_BG, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
-  diaStarsText:  { fontSize: 11, color: PURPLE, fontWeight: '700' },
+  diaNombre:    { fontSize: 14, fontWeight: '700', color: '#555', flex: 1, textTransform: 'capitalize' },
+  diaBadgesRow: { flexDirection: 'row', gap: 6 },
+  diaBadge:     { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
+  diaBadgeText: { fontSize: 12, fontWeight: '700' },
 
   // Items de historial
-  histItem: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width:'100%',
-    backgroundColor: '#EDF9EF', padding: 13, borderRadius: 13, marginBottom: 8,
+   columnasRow: { flexDirection: 'row', gap: 12 },
+  columna:     { flex: 1 },
+  columnaHeader: {
+    borderRadius: 10, borderWidth: 1.5,
+    paddingVertical: 7, alignItems: 'center',
+    marginBottom: 10,
   },
-  pictogram: { width: 36, height: 36, marginRight: 10, borderRadius: 6 },
-  histTitle: { fontSize: 14, color: '#333', fontWeight: '600', marginBottom: 3 },
-  histTime:  { color: '#888', fontSize: 12, marginBottom: 2 },
+  columnaHeaderText: { fontSize: 13, fontWeight: '700' },
+  columnEmpty:       { fontSize: 12, color: '#CCC', textAlign: 'center', marginTop: 12 },
 
+  // Tarjeta de tarea
+  tareaCard: {
+    backgroundColor: '#FAFAFA', borderRadius: 12,
+    padding: 10, marginBottom: 8,
+    borderLeftWidth: 3,
+  },
+  pictogram:  { width: 36, height: 36, borderRadius: 6, marginBottom: 6 },
+  tareaTitle: { fontSize: 13, color: '#333', fontWeight: '600', marginBottom: 4 },
+  tareaHora:  { fontSize: 11, color: '#AAA', marginTop: 2 },
   // Empty
   emptyBox:     { alignItems: 'center', paddingVertical: 30 },
   emptyText:    { fontSize: 16, color: '#AAA', fontWeight: '600', textAlign: 'center' },

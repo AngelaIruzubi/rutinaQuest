@@ -14,12 +14,16 @@ import {
   TextInput,
   View
 } from 'react-native';
-import { deleteTarea, getTareas, initDB, insertTarea, updateTareaCompletada, updateTareaHora } from '../../database/database';
+import { cancelarTarea, deleteTarea, initDB, insertTarea, limpiarTareasViejas, updateTareaCompletada, updateTareaHora } from '../../database/database';
 import { useGamificacion } from '../../hooks/useGamificacion';
 import { buscarPictograma } from "../../services/arasaac";
 
 
 
+const FECHA_SIMULADA = '04/05/2026'; 
+  function hoySimulado() {
+  return FECHA_SIMULADA ?? new Date().toISOString().slice(0, 10);
+}
 
 
 const PURPLE    = '#A77BBE';
@@ -159,7 +163,6 @@ function ProgressBar({ pct = 0, color = '#A77BBE' }: { pct: number; color?: stri
   return (
     <View style={{
       height: 6,
-      width: '100%',
       backgroundColor: '#E5D9EE',
       borderRadius: 3,
       overflow: 'hidden',
@@ -220,15 +223,11 @@ export default function Home() {
   const gami = useGamificacion();
 
   // ── Carga inicial ─────────────────────────────────────────────────────────
-  useEffect(() => {
-    initDB();
-    const rows = getTareas();
-    setTasks(rows.map((r: any) => ({ ...r, completed: r.completed === 1 })));
-    // Programar notif push de fin de día
-   // programarNotifFinDia();
-    // Pedir permisos al arrancar
-   // pedirPermisoNotificaciones();
-  }, []);
+useEffect(() => {
+  initDB();
+  const rowsLimpias = limpiarTareasViejas();
+  setTasks(rowsLimpias.map((r: any) => ({ ...r, completed: r.completed === 1 })));
+}, []);
 
   // ── Checks periódicos ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -317,7 +316,7 @@ export default function Home() {
   };
 
   // ── Fecha formateada ──────────────────────────────────────────────────────
-  const today      = new Date();
+  const today      = FECHA_SIMULADA ? new Date(FECHA_SIMULADA) : new Date();
   const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
   const formattedToday = `${capitalize(today.toLocaleDateString('es-ES', { weekday: 'long' }))}, ${today.getDate()} de ${capitalize(today.toLocaleDateString('es-ES', { month: 'long' }))} de ${today.getFullYear()}`;
 
@@ -360,18 +359,21 @@ export default function Home() {
   // ── Eliminar tarea ────────────────────────────────────────────────────────
   // NO hay penalización de estrellas al eliminar manualmente
   // Solo se muestra el perezoso llorando/cansado
-  const handleDeleteTask = async (task: any) => {
+ const handleDeleteTask = async (task: any) => {
+  if (!task.completed) {
+    // Guardar en historial como cancelada (NO borra físicamente)
+    cancelarTarea(task.id);
+    saltadasRef.current += 1;
+    if (saltadasRef.current >= 3) disparaNotif('saltadas');
+    else                          disparaNotif('eliminada');
+  } else {
+    // Ya completada: borrado limpio (ya está en historial)
     deleteTarea(task.id);
-    setTasks(prev => prev.filter(t => t.id !== task.id));
-
-    if (!task.completed) {
-      saltadasRef.current += 1;
-      // Solo expresión visual, sin restar estrellas
-      if (saltadasRef.current >= 3) disparaNotif('saltadas');
-      else                          disparaNotif('eliminada');
-    }
-    setTaskModalVisible(false);
-  };
+  }
+  // Quitar del estado local en ambos casos
+  setTasks(prev => prev.filter(t => t.id !== task.id));
+  setTaskModalVisible(false);
+};
 
   // ── Datos ─────────────────────────────────────────────────────────────────
   const pendingTasks = tasks.filter(t =>
@@ -392,35 +394,36 @@ export default function Home() {
   // ══════════════════════════════════════════════════════════════════════════
   return (
     <View style={{ flex: 1, backgroundColor: '#ffffff', paddingHorizontal: 20 }}>
+              
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 120 }}
+        keyboardShouldPersistTaps="handled"
+      >
       <SlothNotif type={notifType} show={showNotif} />
 
       <View style={{ paddingTop: 20, paddingBottom: 20 }}>
         <View style={{ flexDirection: "column", padding: 40, justifyContent: "center", alignItems: "center", gap: 20 }}>
-          <View style={{ width: "50%" }}>
+          <View >
             <Text style={styles.title}>Mis Tareas</Text>
             <Text style={styles.dateText}>{formattedToday}</Text>
           </View>
+
           <View style={styles.progressCard}>
             <View style={styles.progressHeader}>
-              <Text style={styles.progressLabel}>PROGRESO HOY</Text>
+              <Text style={styles.progressLabel}>Mi Progresos</Text>
               <Text style={styles.progressCount}>
                 {doneToday}/{totalToday} tareas · {starsToday} ⭐
               </Text>
             </View>
             <ProgressBar pct={dailyPct} color={dailyPct >= 100 ? PURPLE : PURPLE_LT} />
-            {nextMedal ? (
-              <Text style={[styles.nextMedalText, { color: nextMedal.color }]}>
-                Siguiente: {nextMedal.label} — faltan {nextMedal.req - gami.totalHecho} tareas
-              </Text>
-            ) : (
-              <Text style={[styles.nextMedalText, { color: GOLD }]}>¡Todas las medallas conseguidas!</Text>
-            )}
+            
           </View>
         </View>
 
         <View style={styles.searchBar}>
           <TextInput
-            placeholder="Buscar..."
+            placeholder="Buscar tarea.."
             value={search}
             onChangeText={setSearch}
             style={{ flex: 1, fontSize: 16 }}
@@ -429,11 +432,6 @@ export default function Home() {
         </View>
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 120 }}
-        keyboardShouldPersistTaps="handled"
-      >
         {pendingTasks.length === 0 ? (
           <View style={styles.emptyBox}>
             {totalToday > 0 ? (
@@ -570,12 +568,12 @@ export default function Home() {
         <View style={styles.overlay}>
           <View style={[styles.modalBox, { alignItems: 'center' }]}>
 
-            <View style={[styles.modalTopBar, { width: '100%' }]}>
+            <View style={[styles.modalTopBar]}>
               <Pressable onPress={() => setTaskModalVisible(false)}>
                 <Ionicons name="close" size={26} color={PURPLE} />
               </Pressable>
               <Text style={styles.modalTopTitle}>{selectedTask?.title}</Text>
-              <View style={{ width: 26 }} />
+  
             </View>
 
             {selectedTask?.pictogramId ? (
@@ -654,7 +652,7 @@ export default function Home() {
                 <Text style={{ color: GREEN, fontWeight: '700', marginTop: 8, fontSize: 15 }}>¡Tarea completada!</Text>
               </View>
             ) : (
-              <View style={{ flexDirection: 'row', alignContent: 'center', justifyContent: 'center', gap: 20 }}>
+              <View style={{ flexDirection: 'row', alignContent: 'center', justifyContent: 'center', gap: 5}}>
                 <Pressable onPress={() => handleTareaCompletada(selectedTask)} style={styles.btnPrimary}>
                   <Text style={styles.btnPrimaryText}>Realizada ✓</Text>
                 </Pressable>
@@ -693,8 +691,6 @@ const styles = StyleSheet.create({
   // Notif perezoso
   notif: {
   position: 'absolute',
-  top: '50%',
-  left: '40%',
   transform: [
     { translateX: -100 }, // mitad del ancho aprox
     { translateY: -50 }   // mitad del alto aprox
@@ -718,15 +714,16 @@ const styles = StyleSheet.create({
 
   // Progreso
   progressCard: {
-    backgroundColor: PURPLE_BG, borderRadius: 18, padding: 16, marginBottom: 20,
-    borderWidth: 1.5, borderColor: PURPLE_LT,
+    backgroundColor: PURPLE_BG, borderRadius: 18,  paddingVertical: 12, paddingHorizontal: 10, width: '100%',
+
+    borderWidth: 1.5, borderColor: PURPLE_LT, gap:2,
     shadowColor: PURPLE, shadowOpacity: .08, shadowRadius: 8, elevation: 3,
-    width:"50%"
+
   },
-  progressHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  progressHeader:  { flexDirection: 'column', justifyContent: 'center',alignItems: 'center', marginBottom: 4,gap: 20, paddingVertical: 12, paddingHorizontal: 40, width: '100%' },
   progressLabel:   { fontSize: 20, fontWeight: '700', color: PURPLE },
   progressCount:   { fontSize: 16, color: '#888' },
-  nextMedalText:   { fontSize: 16, fontWeight: '600', marginTop: 8 },
+
 
   // Búsqueda
   searchBar: {
@@ -776,9 +773,9 @@ const styles = StyleSheet.create({
   },
   timeText: { marginTop: 8, textAlign: 'center', color: '#888', fontSize: 13 },
 
-  btnPrimary:     { backgroundColor: PURPLE_LT, padding: 15, borderRadius: 15, alignItems: 'center', marginTop: 16, width: '100%' },
+  btnPrimary:     { backgroundColor: PURPLE_LT, padding: 15, borderRadius: 15, alignItems: 'center', marginTop: 16 },
   btnPrimaryText: { fontSize: 20, color: PURPLE, fontWeight: '600' },
-  btnDelete:      { padding: 12, borderRadius: 15, alignItems: 'center', marginTop: 6, width: '100%' },
+  btnDelete:      { padding: 12, borderRadius: 15, alignItems: 'center', marginTop: 6 },
   btnDeleteText:  { fontSize: 15, color: RED },
 
   detailPicto:      { width: 160, height: 160, marginVertical: 16, borderRadius: 12 },
