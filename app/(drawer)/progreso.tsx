@@ -283,37 +283,7 @@ export default function Progreso() {
             </Text>
           </View>
 
-          {/* A tiempo vs tarde */}
-          <View style={styles.statCard}>
-            <View style={styles.statCardLeft}>
-              <Text style={styles.statCardEmoji}>⏱️</Text>
-              <View>
-                <Text style={styles.statCardTitle}>A tiempo vs tarde</Text>
-                <Text style={styles.statCardSub}>{pctTiempo}% completadas a tiempo</Text>
-              </View>
-            </View>
-            <View style={styles.statCardBadges}>
-              <View style={[styles.statBadge, { backgroundColor: '#E8F8E8' }]}>
-                <Text style={[styles.statBadgeTxt, { color: '#2E7D32' }]}>✓ {aTiempo}</Text>
-              </View>
-              <View style={[styles.statBadge, { backgroundColor: '#FFF3E0' }]}>
-                <Text style={[styles.statBadgeTxt, { color: '#E65100' }]}>⏰ {tarde}</Text>
-              </View>
-            </View>
-          </View>
 
-          {/* Barra a tiempo */}
-          {completadas.length > 0 && (
-            <View style={styles.tiempoBarWrap}>
-              <View style={styles.tiempoBar}>
-                <View style={[styles.tiempoBarFill, { width: `${pctTiempo}%` }]} />
-              </View>
-              <View style={styles.tiempoBarLabels}>
-                <Text style={styles.tiempoBarLabelVerde}>A tiempo {pctTiempo}%</Text>
-                <Text style={styles.tiempoBarLabelNaranja}>Tarde {100 - pctTiempo}%</Text>
-              </View>
-            </View>
-          )}
 
           {completadas.length === 0 && (
             <View style={styles.emptyBox}>

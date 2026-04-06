@@ -126,15 +126,15 @@ export function getTareasHistorial() {
   `);
 }
 
-// ── Insertar tarea ─────────────────────────────────────────────────────────────
-export function insertTarea(tarea) {
-  const hoy = hoyAppStr(); // usa fecha simulada si está activa
+// ── Insertar tarea (hoy o fecha concreta) ────────────────────────────────────
+export function insertTarea(tarea, fechaDiaParam) {
+  const fechaDia = fechaDiaParam ?? hoyAppStr();
 
   if (Platform.OS === 'web') {
     const tareas = getTareas();
     localStorage.setItem('tareas', JSON.stringify([
       ...tareas,
-      { ...tarea, fechaDia: hoy, fechaCompletada: null, stars: 0, estado: 'pendiente' },
+      { ...tarea, fechaDia, fechaCompletada: null, stars: 0, estado: 'pendiente' },
     ]));
     return;
   }
@@ -143,8 +143,41 @@ export function insertTarea(tarea) {
        (id, title, pictogramId, hora, completed, stars, fechaCompletada, fechaDia, estado)
      VALUES (?,?,?,?,?,?,?,?,?)`,
     [tarea.id, tarea.title, tarea.pictogramId ?? null,
-     tarea.hora ?? 'Sin hora', 0, 0, null, hoy, 'pendiente']
+     tarea.hora ?? 'Sin hora', 0, 0, null, fechaDia, 'pendiente']
   );
+}
+
+// ── Obtener tareas de una fecha concreta ──────────────────────────────────────
+export function getTareasPorFecha(fecha) {
+  if (Platform.OS === 'web') {
+    return getTareas().filter(t => t.fechaDia === fecha && t.estado !== 'cancelada');
+  }
+  return getDB().getAllSync(
+    `SELECT * FROM tareas WHERE fechaDia = ? AND estado != 'cancelada' ORDER BY hora ASC`,
+    [fecha]
+  );
+}
+
+// ── Obtener fechas con tareas (para el calendario) ────────────────────────────
+export function getFechasConTareas() {
+  if (Platform.OS === 'web') {
+    const tareas = getTareas().filter(t => t.estado !== 'cancelada' && t.fechaDia);
+    const fechas = {};
+    for (const t of tareas) {
+      if (!fechas[t.fechaDia]) fechas[t.fechaDia] = 0;
+      fechas[t.fechaDia]++;
+    }
+    return fechas; // { 'YYYY-MM-DD': count }
+  }
+  const rows = getDB().getAllSync(
+    `SELECT fechaDia, COUNT(*) as count
+     FROM tareas
+     WHERE estado != 'cancelada' AND fechaDia IS NOT NULL
+     GROUP BY fechaDia`
+  );
+  const fechas = {};
+  for (const r of rows) fechas[r.fechaDia] = r.count;
+  return fechas;
 }
 
 // ── Marcar completada ──────────────────────────────────────────────────────────
@@ -229,7 +262,7 @@ export function limpiarTareasViejas() {
       const fechaDia = t.fechaDia ?? hoy;
       const estado = t.estado ?? (t.completed === 1 ? 'completada' : 'pendiente');
 
-      const esDiaAnterior = fechaDia !== hoy;
+      const esDiaAnterior = fechaDia < hoy; // solo cancelar días PASADOS, no futuros
       const esPendiente = estado === 'pendiente';
 
       if (esDiaAnterior && esPendiente) {
@@ -253,23 +286,10 @@ export function limpiarTareasViejas() {
 
     const tareasHoy = actualizadas.filter(t => t.fechaDia === hoy);
 
-    // Buscar el día anterior más reciente con tareas
-    const diasAnteriores = actualizadas.filter(t => t.fechaDia && t.fechaDia !== hoy);
-    const fechaUltimoDia = diasAnteriores.reduce(
-      (max, t) => (!max || t.fechaDia > max) ? t.fechaDia : max, null
-    );
-    const tareasUltimoDia = fechaUltimoDia
-      ? diasAnteriores.filter(t => t.fechaDia === fechaUltimoDia)
-      : [];
-    // Usar estado ANTES del map para saber si eran pendientes (ahora canceladas)
-    // 'cancelada' incluye las recién canceladas por este reset + las ya canceladas antes
-    // Solo nos interesan las del último día anterior
-    const canceladasAyer  = tareasUltimoDia.filter(t =>
-      t.estado === 'cancelada'
-    ).length;
-    const completadasAyer = tareasUltimoDia.filter(t =>
-      t.estado === 'completada' || t.completed === 1
-    ).length;
+    // Calcular info de ayer para penalización
+    const ayer = actualizadas.filter(t => t.fechaDia !== hoy);
+    const canceladasAyer = ayer.filter(t => t.estado === 'cancelada').length;
+    const completadasAyer = ayer.filter(t => t.estado === 'completada' || t.completed === 1).length;
 
     return { tareasHoy, canceladasAyer, completadasAyer };
   }
@@ -292,29 +312,23 @@ export function limpiarTareasViejas() {
     WHERE estado IS NULL
   `);
 
-  // Encontrar el día anterior más reciente con tareas
-  const ultimoDiaRow = getDB().getFirstSync(
-    `SELECT MAX(fechaDia) as fecha FROM tareas WHERE fechaDia < ?`, [hoy]
-  );
-  const fechaUltimoDia = ultimoDiaRow?.fecha ?? null;
-
-  // Contar pendientes (aún no canceladas), completadas y ya-canceladas de ese día
-  // IMPORTANTE: contar ANTES del UPDATE que cancela pendientes
-  const ayer = fechaUltimoDia ? (getDB().getFirstSync(
+  // Contar canceladas y completadas de AYER antes de cancelar
+  // (para calcular la penalización correcta)
+  const ayer = getDB().getFirstSync(
     `SELECT
-       COUNT(CASE WHEN estado IN ('pendiente','cancelada') THEN 1 END) as canceladas,
-       COUNT(CASE WHEN estado = 'completada'               THEN 1 END) as completadas
-     FROM tareas WHERE fechaDia = ?`,
-    [fechaUltimoDia]
-  ) ?? { canceladas: 0, completadas: 0 }) : { canceladas: 0, completadas: 0 };
+       COUNT(CASE WHEN estado='cancelada' AND fechaDia != ? THEN 1 END) as canceladas,
+       COUNT(CASE WHEN estado='completada' AND fechaDia != ? THEN 1 END) as completadas
+     FROM tareas WHERE fechaDia != ?`,
+    [hoy, hoy, hoy]
+  ) ?? { canceladas: 0, completadas: 0 };
 
-  // Cancelar SOLO pendientes de días anteriores
+  // Cancelar SOLO pendientes de días ANTERIORES a hoy (no futuros)
   getDB().runSync(
     `UPDATE tareas
      SET estado='cancelada',
          completed=0,
          fechaCompletada=fechaDia
-     WHERE fechaDia != ?
+     WHERE fechaDia < ?
        AND estado='pendiente'`,
     [hoy]
   );
