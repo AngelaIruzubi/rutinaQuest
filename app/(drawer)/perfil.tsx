@@ -1,26 +1,40 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import {
   Image, Pressable, ScrollView,
-  Text, useWindowDimensions, View,
+  StyleSheet, Text, useWindowDimensions, View,
 } from 'react-native';
 import { useAvatar } from '../../context/AvatarContext';
 
-const TONOS_PIEL  = ['#F5C89A', '#A0522D'];
-const COLORES_PELO  = ['#1a1a1a', '#8B4513', '#DAA520', '#E8E8E8'];
+// ─── Paletas ──────────────────────────────────────────────────────────────────
+const TONOS_PIEL   = ['#F5C89A',  '#7B3F2C'];
+const COLORES_PELO = ['#1a1a1a', '#3B1F0E', '#8B4513', '#DAA520', '#E8C47A', '#E8E8E8'];
+
+const PURPLE = '#e9d3f5';
+const BG     = '#EEF4FB';
+
+
+
+// ─── Tabs de categorías ───────────────────────────────────────────────────────
+const TABS = [
+  { id: 'piel',      icon: 'palette-outline', title: 'Tono de piel' },
+  { id: 'cara',      icon: 'emoticon-outline',         title: 'Cara' },
+  { id: 'pelo',      icon: 'hair-dryer-outline',           title: 'Pelo' },
+  { id: 'colorPelo', icon: 'brush-outline',         title: 'Color de pelo' },
+  { id: 'camiseta',  icon: 'tshirt-crew-outline',         title: 'Camiseta' },
+];
 
 export default function Perfil() {
   const { width } = useWindowDimensions();
-  const isTablet = width >= 768;
+  const isTablet  = width >= 768;
   const { avatar, updateAvatar } = useAvatar();
-  const { tonoPiel, cara, ojos, colorPelo, peloCorto, peloLargo, shirt } = avatar;
+  const { tonoPiel, cara, colorPelo, peloCorto, peloLargo, shirt } = avatar;
 
-  const avatarConfig = {
-    cara:      { top: -90, left: 0,   zIndex: 1, scale: 1 },
-    peloCorto: { top: -145, left: 15,  scale: 1.05, zIndex: 2 },
-    peloLargo: { top: -140, left: 0,   scale: 1.05, zIndex: 2 },
-    shirt:     { top: 85,   left: -40, scale: 1,    zIndex: 5 },
-  };
+  const [tabActivo, setTabActivo] = (require('react').useState)('piel');
 
-  // Assets — cara y camiseta según tonoPiel
+  // Índice seguro para los assets de piel (0 o 1)
+  const si: 0 | 1 = tonoPiel === 1 ? 1 : 0;
+
+  // ── Assets ────────────────────────────────────────────────────────────────
   const caras = [
     [
       require('../../assets/images/avatar/cara1_claro.png'),
@@ -55,266 +69,298 @@ export default function Perfil() {
     require('../../assets/images/avatar/pelo6.png'),
   ];
 
-  // ── Componentes ────────────────────────────────────────
+  const colorPeloSeguro = COLORES_PELO[colorPelo] ?? COLORES_PELO[0];
 
-  const SectionTitle = ({ label }: { label: string }) => (
-    <Text style={{
-      fontSize: 18, fontWeight: '800', color: '#A77BBE',
-      marginBottom: 12, marginTop: 24, alignSelf: 'center',
-    }}>
-      {label}
-    </Text>
-  );
-
-  // Selector de círculos de color
-  const ColorSelector = ({ colors, selected, field }: {
-    colors: string[], selected: number, field: keyof typeof avatar
-  }) => (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' }}>
-      {colors.map((color, index) => (
-        <Pressable
-          key={index}
-          onPress={() => updateAvatar(field, index)}
-          style={{
-            width: 40, height: 40, borderRadius: 20,
-            backgroundColor: color, margin: 6,
-            borderWidth: selected === index ? 4 : 1.5,
-            borderColor: selected === index ? '#A77BBE' : '#DDD',
-          }}
+  // ── Avatar preview ────────────────────────────────────────────────────────
+  const AvatarPreview = ({ size = 290 }: { size?: number }) => (
+    <View style={{ width: size, height: size * 1.2, position: 'relative' }}>
+      {/* Camiseta */}
+      <Image
+        source={camisetas[si][shirt] ?? camisetas[0][0]}
+        style={{ position: 'absolute', top: size * 0.70, left: -size * 0.12,
+          width: size * 1.3, height: size * 1.3, zIndex: 3 }}
+        resizeMode="contain"
+      />
+      {/* Cara */}
+      <Image
+        source={caras[si][cara] ?? caras[0][0]}
+        style={{ position: 'absolute', top: -size * 0.02, left: 0,
+          width: size, height: size, zIndex: 1 }}
+        resizeMode="contain"
+      />
+      {/* Pelo corto */}
+      {peloCorto >= 0 && peloCortoOptions[peloCorto] && (
+        <Image
+          source={peloCortoOptions[peloCorto]}
+          style={{ position: 'absolute', top: -size * 0.28, left: size * -0.02,
+            width: size * 1.05, height: size * 0.8, zIndex: 4,
+            tintColor: colorPeloSeguro }}
+          resizeMode="contain"
         />
-      ))}
+      )}
+      {/* Pelo largo */}
+      {peloCorto < 0 && peloLargo >= 0 && peloLargoOptions[peloLargo] && (
+        <Image
+          source={peloLargoOptions[peloLargo]}
+          style={{ position: 'absolute', top: -size * 0.22, left: 0,
+            width: size * 1.05, height: size * 1.05, zIndex: 4,
+            tintColor: colorPeloSeguro }}
+          resizeMode="contain"
+        />
+      )}
     </View>
   );
 
-  // Selector de imágenes horizontal con tintColor opcional
-  const ImageSelector = ({ options, selected, field, tint }: {
-    options: any[], selected: number,
-    field: keyof typeof avatar, tint?: string
-  }) => (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ paddingHorizontal: 4 }}>
-      {options.map((img, index) => (
+  // ── Panel de opciones según tab ────────────────────────────────────────────
+  const renderOpciones = () => {
+    switch (tabActivo) {
+
+      case 'piel':
+        return (
+          <>
+            <Text style={s.opcionTitulo}>Tono de piel</Text>
+            <View style={s.gridColores}>
+              {TONOS_PIEL.map((color, i) => (
+                <Pressable
+                  key={i}
+                  onPress={() => updateAvatar('tonoPiel', i)}
+                  style={[s.circleColor, { backgroundColor: color },
+                    tonoPiel === i && s.circleSelected]}
+                />
+              ))}
+            </View>
+          </>
+        );
+
+      case 'cara':
+        return (
+          <>
+            <Text style={s.opcionTitulo}>Cara</Text>
+            <View style={s.gridImagenes}>
+              {caras[si].map((img, i) => (
+                <Pressable
+                  key={i}
+                  onPress={() => updateAvatar('cara', i)}
+                  style={[s.imgCard, cara === i && s.imgCardSelected]}
+                >
+                  <Image source={img} style={s.imgCardImg} resizeMode="contain" />
+                </Pressable>
+              ))}
+            </View>
+          </>
+        );
+
+      case 'pelo':
+        return (
+          <>
+            <Text style={s.opcionTitulo}>Pelo corto</Text>
+            <View style={s.gridImagenes}>
+              {peloCortoOptions.map((img, i) => (
+                <Pressable
+                  key={i}
+                  onPress={() => { updateAvatar('peloCorto', i); updateAvatar('peloLargo', -1); }}
+                  style={[s.imgCard, peloCorto === i && s.imgCardSelected]}
+                >
+                  <Image source={img} style={[s.imgCardImg, { tintColor: colorPeloSeguro }]} resizeMode="contain" />
+                </Pressable>
+              ))}
+            </View>
+            <Text style={[s.opcionTitulo, { marginTop: 20 }]}>Pelo largo</Text>
+            <View style={s.gridImagenes}>
+              {peloLargoOptions.map((img, i) => (
+                <Pressable
+                  key={i}
+                  onPress={() => { updateAvatar('peloLargo', i); updateAvatar('peloCorto', -1); }}
+                  style={[s.imgCard, peloLargo === i && s.imgCardSelected]}
+                >
+                  <Image source={img} style={[s.imgCardImg, { tintColor: colorPeloSeguro }]} resizeMode="contain" />
+                </Pressable>
+              ))}
+            </View>
+          </>
+        );
+
+      case 'colorPelo':
+        return (
+          <>
+            <Text style={s.opcionTitulo}>Color de pelo</Text>
+            <View style={s.gridColores}>
+              {COLORES_PELO.map((color, i) => (
+                <Pressable
+                  key={i}
+                  onPress={() => updateAvatar('colorPelo', i)}
+                  style={[s.circleColor, { backgroundColor: color },
+                    colorPelo === i && s.circleSelected]}
+                />
+              ))}
+            </View>
+          </>
+        );
+
+      case 'camiseta':
+        return (
+          <>
+            <Text style={s.opcionTitulo}>Camiseta</Text>
+            <View style={s.gridImagenes}>
+              {camisetas[si].map((img, i) => (
+                <Pressable
+                  key={i}
+                  onPress={() => updateAvatar('shirt', i)}
+                  style={[s.imgCard, shirt === i && s.imgCardSelected]}
+                >
+                  <Image source={img} style={s.imgCardImg} resizeMode="contain" />
+                </Pressable>
+              ))}
+            </View>
+          </>
+        );
+
+      default: return null;
+    }
+  };
+
+  // ── Tabs ──────────────────────────────────────────────────────────────────
+  const TabBar = () => (
+    <View style={s.tabBar}>
+      {TABS.map(tab => (
         <Pressable
-          key={index}
-          onPress={() => {
-            if (field === 'peloCorto') {
-              updateAvatar('peloCorto', index);
-              updateAvatar('peloLargo', -1);
-            } else if (field === 'peloLargo') {
-              updateAvatar('peloLargo', index);
-              updateAvatar('peloCorto', -1);
-            } else {
-              updateAvatar(field, index);
-            }
-          }}
-          style={{
-            marginRight: 12,
-            borderWidth: selected === index ? 4 : 1.5,
-            borderColor: selected === index ? '#A77BBE' : '#DDD',
-            borderRadius: 14, padding: 6,
-            backgroundColor: '#FAFAFA',
-          }}
+          key={tab.id}
+          onPress={() => setTabActivo(tab.id)}
+          style={[s.tabBtn, tabActivo === tab.id && s.tabBtnActive]}
         >
-          <Image
-            source={img}
-            style={{ width: 64, height: 64, tintColor: tint }}
-            resizeMode="contain"
-          />
+          <Text style={[s.tabEmoji, tabActivo === tab.id && { opacity: 1 }]}>
+            <MaterialCommunityIcons
+              name={tab.icon as any}
+              size={24}
+            />
+          </Text>
+          {tabActivo === tab.id && (
+            <View style={s.tabActiveLine} />
+          )}
         </Pressable>
       ))}
-    </ScrollView>
+    </View>
   );
 
-  // ── Render ─────────────────────────────────────────────
-  return (
-    <ScrollView contentContainerStyle={{
-      padding: 20, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
-     
-    }}>
-      <Text style={{
-        fontSize: 32, marginBottom: 4,
-        color: '#A77BBE', fontWeight: 'bold', textAlign: 'center',
-      }}>
-        Tu Avatar
-      </Text>
-      <Text style={{
-        fontSize: 14, color: '#BBB', marginBottom: 20, textAlign: 'center'
-      }}>
-        Personalízalo a tu gusto
-      </Text>
-
-      <View style={{
-        width: '100%',
-        backgroundColor: '#F9F9F9',
-        borderRadius: 20,
-        flexDirection: isTablet ? 'row' : 'column',
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingVertical: 20,
-        paddingHorizontal: 0,
-        gap: 40,
-      }}>
-
-      {/* ── AVATAR PREVIEW ── */}
-      <View style={{
-        width: isTablet ? 260 : 180,
-        height: isTablet ? 260 : 180,
-        marginBottom: 80, marginTop: 150,
-        marginLeft: 40,
-        alignItems: 'center', justifyContent: 'center' ,
-      }}>
-        <View style={{
-          width: 260, height: 260,
-          transform: [{ scale: isTablet ? 1 : 0.7 }],
-        }}>
-
-          {/* CAMISETA */}
-          <Image
-            source={camisetas[tonoPiel][shirt]}
-            style={{
-              position: 'absolute',
-              top: avatarConfig.shirt.top,
-              left: avatarConfig.shirt.left,
-              transform: [{ scale: avatarConfig.shirt.scale }],
-              zIndex: avatarConfig.shirt.zIndex,
-            }}
-            resizeMode="contain"
-          />
-
-          {/* CARA */}
-          <Image
-            source={caras[tonoPiel][cara]}
-            style={{
-              position: 'absolute',
-              top: avatarConfig.cara.top,
-              left: avatarConfig.cara.left,
-              transform: [{ scale: avatarConfig.cara.scale }],
-              zIndex: avatarConfig.cara.zIndex,
-            }}
-            resizeMode="contain"
-          />
-
-          {/* PELO CORTO */}
-          {peloCorto >= 0 && (
-            <Image
-              source={peloCortoOptions[peloCorto]}
-              style={{
-                position: 'absolute',
-                top: avatarConfig.peloCorto.top,
-                left: avatarConfig.peloCorto.left,
-                transform: [{ scale: avatarConfig.peloCorto.scale }],
-                zIndex: avatarConfig.peloCorto.zIndex,
-                tintColor: COLORES_PELO[colorPelo],
-              }}
-              resizeMode="contain"
-            />
-          )}
-
-          {/* PELO LARGO */}
-          {peloCorto < 0 && peloLargo >= 0 && (
-            <Image
-              source={peloLargoOptions[peloLargo]}
-              style={{
-                position: 'absolute',
-                top: avatarConfig.peloLargo.top,
-                left: avatarConfig.peloLargo.left,
-                transform: [{ scale: avatarConfig.peloLargo.scale }],
-                zIndex: avatarConfig.peloLargo.zIndex,
-                tintColor: COLORES_PELO[colorPelo],
-              }}
-              resizeMode="contain"
-            />
-          )}
+  if (isTablet) {
+    return (
+      <View style={s.rootTablet}>
+        <View style={s.leftPanel}>
+          <View style={s.avatarBgTablet}>
+            <AvatarPreview size={220} />
+          </View>
+        </View>
+        <View style={s.rightPanel}>
+          <TabBar />
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={s.opcionesScroll}
+          >
+            {renderOpciones()}
+          </ScrollView>
         </View>
       </View>
-         <View style={{
-          flex: 1,
-          maxWidth: isTablet ? 500 : '100%',
-          alignSelf: 'stretch',
-        }}>
-      {/* ── SECCIÓN: TONO DE PIEL ── */}
-      <SectionTitle label="🎨 Tono de piel" />
-      <View style={{ flexDirection: 'row', gap: 20, marginBottom: 8, justifyContent: 'center', alignItems: 'center', }}>
-        {TONOS_PIEL.map((color, index) => (
-          <Pressable
-            key={index}
-            onPress={() => updateAvatar('tonoPiel', index)}
-            style={{
-              width: 52, height: 52, borderRadius: 26,
-              backgroundColor: color,
-              borderWidth: tonoPiel === index ? 4 : 1.5,
-              borderColor: tonoPiel === index ? '#A77BBE' : '#DDD',
-            }}
-          />
-        ))}
-      </View>
+    );
+  }
 
-      {/* ── SECCIÓN: CARA ── */}
-      <View style={{
-        alignSelf: 'center', height: 140,
-
-      }}>
-      <SectionTitle label="😊 Cara" />
-      <ImageSelector
-        options={caras[tonoPiel]}
-        selected={cara}
-        field="cara"
-      />
+  return (
+    <View style={s.rootMobile}>
+      <View style={s.avatarBgMobile}>
+        <AvatarPreview size={180}  />
       </View>
-     
-
-      {/* ── SECCIÓN: PELO ── */}
-      <View style={{
-        alignSelf: 'center', height: 140,
-      }}>
-      <SectionTitle label="💇 Pelo corto"  />
-      <ImageSelector 
-        
-        options={peloCortoOptions}
-        selected={peloCorto}
-        field="peloCorto"
-        tint={COLORES_PELO[colorPelo]}
-      />
+      <View style={s.bottomPanel}>
+        <TabBar />
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={s.opcionesScroll}
+          keyboardShouldPersistTaps="handled"
+        >
+          {renderOpciones()}
+        </ScrollView>
       </View>
-
-      {/* ── SECCIÓN: PELO ── */}
-      <View style={{
-        alignSelf: 'center', height: 140,
-      }}>
-      <SectionTitle label="💁 Pelo largo" />
-      <ImageSelector
-        options={peloLargoOptions}
-        selected={peloLargo}
-        field="peloLargo"
-        tint={COLORES_PELO[colorPelo]}
-      />
-      </View>
-
-      {/* ── SECCIÓN: COLOR PELO ── */}
-      <View style={{
-        alignSelf: 'center', 
-      }}>
-      <SectionTitle label="🎨 Color de pelo" />
-      <ColorSelector colors={COLORES_PELO} selected={colorPelo} field="colorPelo" />
-      </View>
-
-      {/* ── SECCIÓN: CAMISETA ── */}
-      <View style={{
-        alignSelf: 'center', height: 140,
-       
-      }}>
-      <SectionTitle label="👕 Camiseta" />
-      <ImageSelector
-        options={camisetas[tonoPiel]}
-        selected={shirt}
-        field="shirt"
-      />
-      </View>
-      </View>
-      
     </View>
-    </ScrollView>
-    
-
   );
 }
+
+// ─── Estilos ──────────────────────────────────────────────────────────────────
+const s = StyleSheet.create({
+  rootTablet: {
+    flex: 1, flexDirection: 'row', backgroundColor: '#fff', borderColor: '#EEE', borderWidth: 2, borderRadius: 14, overflow: 'hidden',
+    width: 700, height: 500, alignSelf: 'center', marginTop: 40,
+  },
+  leftPanel: {
+    width: 320, backgroundColor: PURPLE,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  avatarBgTablet: {
+    width: 280, height: 320,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  avatarHint: {
+    fontSize: 13, color: '#AAA', marginTop: 12, fontWeight: '600',
+  },
+  rightPanel: {
+    flex: 1, backgroundColor: '#fff',
+  },
+  rootMobile: {
+    flex: 1, backgroundColor: '#fff'
+  },
+  avatarBgMobile: {
+   width: '100%', height: 500,backgroundColor: PURPLE, marginTop: -80,
+  paddingBottom: 20, justifyContent: 'center',  alignItems: 'center',
+    
+  },
+  bottomPanel: {
+    flex: 1, backgroundColor: '#fff',
+  },
+  tabBar: {
+    flexDirection: 'row',
+    borderBottomWidth: 1.5, borderBottomColor: '#EEE',
+    backgroundColor: '#fff',
+  },
+  tabBtn: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 12, position: 'relative', opacity: .45,
+  },
+  tabBtnActive: { opacity: 1 },
+  tabEmoji:     { fontSize: 22 },
+  tabActiveLine: {
+    position: 'absolute', bottom: 0, left: 8, right: 8,
+    height: 3, borderRadius: 2, backgroundColor: PURPLE,
+  },
+  opcionesScroll: {
+    padding: 20, paddingBottom: 40,
+  },
+  opcionTitulo: {
+    fontSize: 16, fontWeight: '700', color: '#333', marginBottom: 14,
+  },
+  gridColores: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 10,
+  },
+  circleColor: {
+    width: 48, height: 48, borderRadius: 24,
+    borderWidth: 2, borderColor: '#DDD',
+  },
+  circleSelected: {
+    borderWidth: 4, borderColor: PURPLE,
+    shadowColor: PURPLE, shadowOpacity: .4, shadowRadius: 6, elevation: 4,
+  },
+  gridImagenes: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 10,
+  },
+  imgCard: {
+    width: 88, height: 88, borderRadius: 14,
+    borderWidth: 2, borderColor: '#E5E5E5',
+    backgroundColor: '#FAFAFA',
+    alignItems: 'center', justifyContent: 'center',
+    padding: 6,
+  },
+  imgCardSelected: {
+    borderColor: PURPLE, borderWidth: 3,
+    backgroundColor: '#F0E8F8',
+    shadowColor: PURPLE, shadowOpacity: .3, shadowRadius: 6, elevation: 4,
+  },
+  imgCardImg: {
+    width: 72, height: 72,
+  },
+});

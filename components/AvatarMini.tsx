@@ -1,12 +1,17 @@
 import { Image, View } from 'react-native';
 import { useAvatar } from '../context/AvatarContext';
 
-const COLORES_OJOS = ['#4A90E2', '#2ECC71', '#8E44AD', '#765002'];
-const COLORES_PELO = ['#1a1a1a', '#8B4513', '#DAA520', '#E8E8E8'];
+// ⚠️ Debe coincidir exactamente con COLORES_PELO de perfil.tsx
+const COLORES_PELO = ['#1a1a1a', '#3B1F0E', '#8B4513', '#DAA520', '#E8C47A', '#E8E8E8'];
+
+function skinIndex(tonoPiel: number): 0 | 1 {
+  return tonoPiel >= 3 ? 1 : 0;
+}
 
 export default function AvatarMini() {
   const { avatar } = useAvatar();
-  const { tonoPiel, cara, ojos, colorPelo, peloCorto, peloLargo, shirt } = avatar;
+  const { tonoPiel, cara, colorPelo, peloCorto, peloLargo, shirt } = avatar;
+  const si = skinIndex(tonoPiel);
 
   const avatarConfig = {
     cara:      { top: -85,  left: -85, zIndex: 1, scale: 0.15 },
@@ -45,17 +50,19 @@ export default function AvatarMini() {
   ];
 
   const peloLargoOptions = [
-
     require('../assets/images/avatar/pelo5.png'),
     require('../assets/images/avatar/pelo6.png'),
   ];
+
+  // Fallback seguro: si el índice está fuera de rango, usar el primero
+  const colorPeloSeguro = COLORES_PELO[colorPelo] ?? COLORES_PELO[0];
 
   return (
     <View style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}>
       <View style={{ width: 36, height: 36 }}>
 
         <Image
-          source={camisetas[tonoPiel][shirt]}
+          source={camisetas[si]?.[shirt] ?? camisetas[0][0]}
           style={{
             position: 'absolute',
             top: avatarConfig.shirt.top,
@@ -67,7 +74,7 @@ export default function AvatarMini() {
         />
 
         <Image
-          source={caras[tonoPiel][cara]}
+          source={caras[si]?.[cara] ?? caras[0][0]}
           style={{
             position: 'absolute',
             top: avatarConfig.cara.top,
@@ -78,7 +85,7 @@ export default function AvatarMini() {
           resizeMode="contain"
         />
 
-        {peloCorto >= 0 && (
+        {peloCorto >= 0 && peloCortoOptions[peloCorto] && (
           <Image
             source={peloCortoOptions[peloCorto]}
             style={{
@@ -87,13 +94,13 @@ export default function AvatarMini() {
               left: avatarConfig.peloCorto.left,
               transform: [{ scale: avatarConfig.peloCorto.scale }],
               zIndex: avatarConfig.peloCorto.zIndex,
-              tintColor: COLORES_PELO[colorPelo],
+              tintColor: colorPeloSeguro,
             }}
             resizeMode="contain"
           />
         )}
 
-        {peloCorto < 0 && peloLargo >= 0 && (
+        {peloCorto < 0 && peloLargo >= 0 && peloLargoOptions[peloLargo] && (
           <Image
             source={peloLargoOptions[peloLargo]}
             style={{
@@ -102,13 +109,11 @@ export default function AvatarMini() {
               left: avatarConfig.peloLargo.left,
               transform: [{ scale: avatarConfig.peloLargo.scale }],
               zIndex: avatarConfig.peloLargo.zIndex,
-              tintColor: COLORES_PELO[colorPelo],
+              tintColor: colorPeloSeguro,
             }}
             resizeMode="contain"
           />
         )}
-
-        
 
       </View>
     </View>
