@@ -1,0 +1,53 @@
+// utils/fecha.ts
+
+// ─── Fecha simulada (mutable en runtime para testing) ────────────────────────
+// null = usar fecha real del dispositivo
+// 'YYYY-MM-DD' = usar esa fecha fija
+let _fechaSimulada: string | null = null;
+
+export function getFechaSimulada(): string | null {
+  return _fechaSimulada;
+}
+
+export function setFechaSimulada(fecha: string | null) {
+  _fechaSimulada = fecha;
+}
+
+// Avanza la fecha simulada N días (útil para testing)
+export function avanzarDias(n: number): string {
+  const base = _fechaSimulada
+    ? new Date(_fechaSimulada + 'T12:00:00')
+    : new Date();
+  base.setDate(base.getDate() + n);
+  const y  = base.getFullYear();
+  const mo = String(base.getMonth() + 1).padStart(2, '0');
+  const d  = String(base.getDate()).padStart(2, '0');
+  _fechaSimulada = `${y}-${mo}-${d}`;
+  return _fechaSimulada;
+}
+
+// ─── API pública (igual que antes, el resto de la app no cambia) ──────────────
+
+export function ahoraApp(): Date {
+  if (_fechaSimulada) {
+    return new Date(_fechaSimulada + 'T12:00:00');
+  }
+  return new Date();
+}
+
+export function hoyAppStr(): string {
+  const d   = ahoraApp();
+  const y   = d.getFullYear();
+  const m   = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+export function fechaAppDate(fecha?: string): Date {
+  if (fecha) return new Date(fecha + 'T12:00:00');
+  return ahoraApp();
+}
+
+export function ahoraAppMs(): number {
+  return ahoraApp().getTime();
+}

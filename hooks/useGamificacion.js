@@ -1,26 +1,24 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
-
-
+import { hoyAppStr } from '../utils/fecha';
+ 
 let SQLite = null;
 if (Platform.OS !== 'web') {
   SQLite = require('expo-sqlite');
 }
-
-const DB_NAME  = 'juego.db';
+ 
+const DB_NAME   = 'juego.db';
 const STATE_KEY = 'juego_state';
 const TABLE_SQL = `CREATE TABLE IF NOT EXISTS juego (key TEXT PRIMARY KEY, value TEXT NOT NULL)`;
-
+ 
 const storage = {
   _db: null,
-
   async _getDB() {
     if (this._db) return this._db;
     this._db = await SQLite.openDatabaseAsync(DB_NAME);
     await this._db.execAsync(TABLE_SQL);
     return this._db;
   },
-
   async get(key) {
     try {
       if (Platform.OS === 'web') {
@@ -35,7 +33,6 @@ const storage = {
       return null;
     }
   },
-
   async set(key, value) {
     try {
       if (Platform.OS === 'web') {
@@ -52,147 +49,190 @@ const storage = {
     }
   },
 };
-
-//FECHAS
-
-const hoy = () => new Date().toISOString().slice(0,10);
-const diasDif = (a, b) => Math.round((new Date(a) - new Date(b)) / 86_400_000);
-
+ 
+// Usa siempre la misma fuente de fecha que el resto de la app (incluyendo fecha simulada)
+const hoy = () => hoyAppStr();
+ 
+// Parsea YYYY-MM-DD en hora local para evitar offset UTC
+const parseLocal = (str) => { const [y, m, d] = str.split('-').map(Number); return new Date(y, m - 1, d).getTime(); };
+const diasDif = (a, b) => Math.round((parseLocal(a) - parseLocal(b)) / 86_400_000);
+ 
 const ESTADO_INICIAL = {
-  estrellas: 0,
-  totalHecho: 0,
-  racha: 0,
-  ultimaFecha: null,
-  tareasCompletasHoy: 0,
-  fechaHoy: null,
+  estrellas:               0,
+  totalHecho:              0,
+  racha:                   0,
+  ultimaFecha:             null,
+  tareasCompletasHoy:      0,
+  fechaHoy:                null,
+  penalizacionAplicada:    false,
+  historialPenalizaciones: [], // [{ fecha, puntos, motivo }]
 };
-
-
+ 
 export function useGamificacion() {
-    const [estado, setEstado] = useState(ESTADO_INICIAL);
-    const [cargando, setCargando] = useState(true);
+  const [estado,   setEstado]   = useState(ESTADO_INICIAL);
+  const [cargando, setCargando] = useState(true);
+  const [esDiaNuevo, setEsDiaNuevo] = useState(false);
+ 
+  useEffect(() => {
+    (async () => {
+      const guardado = await storage.get(STATE_KEY);
+      if (guardado) {
+        const hoyStr = hoy();
 
+        if (guardado.fechaHoy !== hoyStr) {
+          // Día nuevo: resetear contador y racha si corresponde
+          // La penalización la aplica index.tsx con la info de la BD
+          if (guardado.ultimaFecha) {
+            const diff = diasDif(hoyStr, guardado.ultimaFecha);
+            if (diff !== 1) guardado.racha = 0; // saltó días → racha rota
+          }
+          guardado.tareasCompletasHoy   = 0;
+          guardado.fechaHoy             = hoyStr;
+          guardado.penalizacionAplicada = false; // reset para el nuevo día
+          await storage.set(STATE_KEY, guardado);
+          setEsDiaNuevo(true);
+        }
 
-    //Carga inicial
-    useEffect(() => {
-        (async () => {
-            const guardado = await storage.get(STATE_KEY);
-            if (guardado) {
-                if(guardado.fechaHoy === hoy()) {
-                   guardado.tareasCompletasHoy = 0; // Reinicia tareas del día
-                   guardado.fechaHoy = hoy(); // Actualiza fechaHoy
-                }
-                setEstado({ ...ESTADO_INICIAL, ...guardado });
-            }
-            setCargando(true);
-        })();
-    }, []);
-
-
-//Guardar en storage
-
-const persist = useCallback(async (siguiente) => {
+        setEstado({ ...ESTADO_INICIAL, ...guardado });
+      }
+      setCargando(false);
+    })();
+  }, []);
+ 
+  const persist = useCallback(async (siguiente) => {
     await storage.set(STATE_KEY, siguiente);
-}, []);
-
-
-const completarTarea = useCallback( async (onTime = true) => {
-    const pts = onTime ? 5 : 3; // Puntos por completar a tiempo o tarde
+  }, []);
+ 
+  // ── completarTarea: devuelve el nuevoEstado completo para que index.tsx
+  //    pueda leer totalHecho actualizado SIN depender del estado stale
+  const completarTarea = useCallback(async (onTime = true) => {
+    const pts    = onTime ? 5 : 3;
     const hoyStr = hoy();
-
-    setEstado((prev) => {
+ 
+    return new Promise((resolve) => {
+      setEstado((prev) => {
         let nuevaRacha = prev.racha;
         if (!prev.ultimaFecha) {
-        nuevaRacha = 1;
+          nuevaRacha = 1;
         } else {
-            const diff = diasDif(hoyStr, prev.ultimaFecha);
-            if (diff === 0)      nuevaRacha = prev.racha;
-            else if (diff === 1) nuevaRacha = prev.racha + 1;
-            else                 nuevaRacha = 1;
+          const diff = diasDif(hoyStr, prev.ultimaFecha);
+          if      (diff === 0) nuevaRacha = prev.racha;
+          else if (diff === 1) nuevaRacha = prev.racha + 1;
+          else                 nuevaRacha = 1;
         }
+ 
+        const nuevasEstrellas = (prev.estrellas ?? 0) + pts;
         const nuevoEstado = {
-            ...prev,
-            estrellas: prev.estrellas + pts,
-            totalHecho: prev.totalHecho + 1,
-            racha: nuevaRacha,
-            ultimaFecha: hoyStr,
-            tareasCompletasHoy: (prev.fechaHoy === hoyStr ? prev.tareasCompletasHoy + 1 : 1),
-            fechaHoy: hoyStr,
+          ...prev,
+          estrellas:          nuevasEstrellas,
+          totalHecho:         nuevasEstrellas, // totalHecho = estrellas
+          racha:              nuevaRacha,
+          ultimaFecha:        hoyStr,
+          tareasCompletasHoy: prev.fechaHoy === hoyStr ? prev.tareasCompletasHoy + 1 : 1,
+          fechaHoy:           hoyStr,
         };
-        persist(nuevoEstado); 
+        persist(nuevoEstado);
+        // Resolvemos con el estado nuevo para que index.tsx lo use directamente
+        resolve({ pts, nuevoEstado });
         return nuevoEstado;
-    });    
-    
-    const nuevoTotal = estado.totalHecho + 1;
-    const medalla = getMedalla(nuevoTotal);
-    return {pts, medalla};
-}, [estado.totalHecho, persist]);
-
-
-const tareaPerdida = useCallback(async () => {
+      });
+    });
+  }, [persist]);
+ 
+  const tareaPerdida = useCallback(async () => {
     setEstado((prev) => {
-    const noTareasHoy = prev.tareasCompletasHoy === 0 || prev.fechaHoy !== hoy();
-    const nuevoEstado = {
+      const noTareasHoy = prev.tareasCompletasHoy === 0 || prev.fechaHoy !== hoy();
+      const nuevoEstado = {
         ...prev,
         totalHecho: noTareasHoy ? Math.max(0, prev.totalHecho - 1) : prev.totalHecho,
         racha:      noTareasHoy ? 0 : prev.racha,
-    };
-    persist(nuevoEstado);
-    return nuevoEstado;
+      };
+      persist(nuevoEstado);
+      return nuevoEstado;
     });
-}, [persist]);
-
-const penalizarFinDia = useCallback(async (tareasNoHechas) => {
-  setEstado((prev) => {
-    const penalizacion = tareasNoHechas * 5;
-    const nuevoEstado = {
-      ...prev,
-      estrellas: Math.max(0, prev.estrellas - penalizacion),
-      racha: 0,   // también rompe la racha
-    };
-    persist(nuevoEstado);
-    return nuevoEstado;
-  });
-}, [persist]);
-
-
-const resetearDia = useCallback(async () => {
+  }, [persist]);
+ 
+  // tareasHechasHoy: cuántas completó ese día
+  // Si 0 → no hizo nada → -20 y racha rota
+  // Si >0 → dejó algunas → -10, racha intacta
+  const penalizarFinDia = useCallback(async (tareasNoHechas, tareasHechasHoy = 0) => {
+    return new Promise((resolve) => {
+      setEstado((prev) => {
+        if (prev.penalizacionAplicada) {
+          resolve({ penalizacion: 0, nuevoEstado: prev });
+          return prev; // ya se penalizó hoy, no repetir
+        }
+        const penalizacion    = tareasHechasHoy === 0 ? 20 : 10;
+        const motivo          = tareasHechasHoy === 0 ? 'Sin tareas' : 'Tareas sin completar';
+        const nuevasEstrellas = Math.max(0, (prev.estrellas ?? 0) - penalizacion);
+        const historial = [...(prev.historialPenalizaciones ?? [])];
+        const hoyStr2 = hoy();
+        if (!historial.find(h => h.fecha === hoyStr2)) {
+          historial.unshift({ fecha: hoyStr2, puntos: -penalizacion, motivo });
+          if (historial.length > 30) historial.pop();
+        }
+        const nuevoEstado = {
+          ...prev,
+          estrellas:               nuevasEstrellas,
+          totalHecho:              nuevasEstrellas,
+          racha:                   tareasHechasHoy === 0 ? 0 : prev.racha,
+          penalizacionAplicada:    true,
+          historialPenalizaciones: historial,
+        };
+        persist(nuevoEstado);
+        resolve({ penalizacion, nuevoEstado });
+        return nuevoEstado;
+      });
+    });
+  }, [persist]);
+ 
+  const resetearDia = useCallback(async () => {
     setEstado((prev) => {
-        const next = { ...prev, tareasCompletasHoy: 0, fechaHoy: hoy() };
+      const next = { ...prev, tareasCompletasHoy: 0, fechaHoy: hoy() };
       persist(next);
       return next;
     });
-}, [persist]);
-
-return{
-    estrellas: estado.estrellas,
-    totalHecho: estado.totalHecho,
-    racha: estado.racha,
-    tareasCompletasHoy: estado.tareasCompletasHoy,
+  }, [persist]);
+ 
+  return {
+    estrellas:               estado.estrellas ?? 0,
+    totalHecho:              estado.totalHecho ?? 0,
+    racha:                   estado.racha,
+    tareasCompletasHoy:      estado.tareasCompletasHoy,
+    penalizacionAplicada:    estado.penalizacionAplicada ?? false,
+    historialPenalizaciones: estado.historialPenalizaciones ?? [],
+    fechaHoy:                estado.fechaHoy,
+    ultimaFecha:             estado.ultimaFecha,
     cargando,
-    medallas: getMedallas(estado.totalHecho),
-    medalla: getMedalla(estado.totalHecho),
+    esDiaNuevo,
+    medallas:                getMedallas(estado.estrellas ?? 0),
+    medalla:                 getMedalla(estado.estrellas ?? 0),
     completarTarea,
     tareaPerdida,
     resetearDia,
     penalizarFinDia,
-};
-
-
+  };
+}
+ 
+// Medallas por estrellas: Bronce 100⭐ · Plata 300⭐ · Oro 600⭐
+export function getMedalla(estrellas) {
+  if (estrellas >= 600) return 'oro';
+  if (estrellas >= 300) return 'plata';
+  if (estrellas >= 100) return 'bronce';
+  return null;
 }
 
-export function getMedalla(totalHecho){
-    if (totalHecho >= 400) return 'oro';
-    if (totalHecho >= 200) return 'plata';
-    if (totalHecho >= 50)  return 'bronce';
-    return null;
+export function getMedallas(estrellas) {
+  return {
+    bronce: estrellas >= 100,
+    plata:  estrellas >= 300,
+    oro:    estrellas >= 600,
+  };
 }
 
-export function getMedallas(totalDone) {
-    return {
-        bronce: totalDone >= 50,
-        plata: totalDone >= 200,
-        oro: totalDone >= 400,
-    };
+export function calcularProgresos(estrellas) {
+  const progresBronce = Math.min(estrellas, 100);
+  const progresPlata  = estrellas >= 100 ? Math.min(estrellas - 100, 200) : 0;
+  const progresOro    = estrellas >= 300 ? Math.min(estrellas - 300, 300) : 0;
+  return { progresBronce, progresPlata, progresOro };
 }
-
