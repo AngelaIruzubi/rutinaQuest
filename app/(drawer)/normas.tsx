@@ -41,10 +41,10 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   return <Text style={s.sectionTitle}>{children}</Text>;
 }
 
-function Badge({ label, color }: { label: string; color: ColorPair }) {
+function Badge({ label }: { label: string }) {
   return (
-    <View style={[s.badge, { backgroundColor: color.bg }]}>
-      <Text style={[s.badgeText, { color: color.text }]}>{label}</Text>
+    <View style={[s.badge]}>
+      <Text style={[s.badgeText]}>{label}</Text>
     </View>
   );
 }
@@ -54,12 +54,10 @@ type RuleRowProps = {
   title: string;
   badge: string;
   last?: boolean;
-  color: ColorPair;
-
   subtitle?: string;
 };
 
-function RuleRow({  title, badge, color, subtitle, last= false }: RuleRowProps) {
+function RuleRow({  title, badge, subtitle, last= false }: RuleRowProps) {
   return (
     <View style={[s.row, last && s.rowLast]}>
       <View style={s.rowContent}>
@@ -67,7 +65,7 @@ function RuleRow({  title, badge, color, subtitle, last= false }: RuleRowProps) 
         <Text style={s.rowTitle}>{title}</Text>
         {subtitle && <Text style={s.rowSubtitle}>{subtitle}</Text>}
       </View>
-      <Badge label={badge} color={color} />
+      <Badge label={badge}  />
     </View>
   );
 }
@@ -107,13 +105,12 @@ export default function NormasJuego() {
           <RuleRow
             title="Tarea completada a tiempo"
             badge="+5 ⭐"
-            color={C.purple}
+
           />
           <RuleRow
 
             title="Tarea completada tarde"
             badge="+3 ⭐"
-            color={C.purple}
             last
           />
         </Card>
@@ -126,22 +123,12 @@ export default function NormasJuego() {
             title="Sin ninguna tarea hecha"
             subtitle="No se completó nada ese día"
             badge="−20 ⭐"
-            color={C.red}
           />
           <RuleRow
 
             title="Tareas sin completar"
             subtitle="Se hizo algo, pero quedaron pendientes"
             badge="−10 ⭐"
-            color={C.red}
-          />
-          <RuleRow
-
-            title="Solo una penalización por día"
-            subtitle="No se acumulan aunque queden varias tareas"
-            badge="Máx. 1/día"
-            color={C.amber}
-            last
           />
         </Card>
 
@@ -153,14 +140,12 @@ export default function NormasJuego() {
             title="Racha activa"
             subtitle="Completas tareas días consecutivos"
             badge="+1 por día"
-            color={C.teal}
           />
           <RuleRow
 
             title="Racha rota"
             subtitle="Saltas un día sin completar nada"
             badge="Vuelve a 0"
-            color={C.red}
             last
           />
         </Card>

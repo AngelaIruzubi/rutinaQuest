@@ -253,7 +253,7 @@ export default function Calendario() {
 
   return (
     <View style={s.root}>
-
+      <Text style={s.headerTitle}>Calendario</Text>
       {/* ── Cabecera mes ── */}
       <View style={s.mesHeader}>
         <Pressable onPress={mesAnterior} style={s.mesBtn}>
@@ -340,13 +340,21 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
   },
 
+   headerTitle: {
+    fontSize: 30,
+    fontWeight: '600',
+    color: PURPLE,
+    textAlign: 'center',
+    marginBottom: 60,
+  },
+
   // Cabecera mes
-  mesHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  mesBtn:     { padding: 8 },
-  mesTitulo:  { fontSize: 20, fontWeight: '700', color: PURPLE },
+  mesHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
+  mesBtn:     { padding: 20 },
+  mesTitulo:  { fontSize: 26, fontWeight: '700', color: PURPLE },
 
   // Calendario
-  semanaCab:    { flexDirection: 'row', marginBottom: 4 },
+  semanaCab:    { flexDirection: 'row', marginBottom: 10 },
   semanaCabTxt: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '700', color: '#BBB' },
   semanaFila:   { flexDirection: 'row', marginBottom: 4 },
 

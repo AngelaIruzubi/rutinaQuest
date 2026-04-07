@@ -478,7 +478,7 @@ export default function Home() {
 
     saltadasRef.current = 0;
 
-    const prevMedal = gami.medalla;
+    const prevTotal = gami.totalHecho; // capturamos ANTES de sumar
 
     const hoy = hoyAppStr();
     const pendingAntes = tasks.filter(
@@ -497,11 +497,16 @@ export default function Home() {
       notifEnviadasHoy.current.add('rachaHoy');
     }
 
-    if (newTotal >= 600 && prevMedal !== 'oro') {
+    // Detectar si con esta tarea se cruza por primera vez el umbral de medalla
+    const cruzoOro    = newTotal >= 600 && prevTotal < 600;
+    const cruzoPlata  = newTotal >= 300 && prevTotal < 300;
+    const cruzoBronce = newTotal >= 100 && prevTotal < 100;
+
+    if (cruzoOro) {
       disparaNotif('oro');
-    } else if (newTotal >= 300 && prevMedal !== 'plata') {
+    } else if (cruzoPlata) {
       disparaNotif('plata');
-    } else if (newTotal >= 100 && prevMedal !== 'bronce') {
+    } else if (cruzoBronce) {
       disparaNotif('bronce');
     } else if (pendingAntes.length === 0 && totalDeHoy > 0) {
       disparaNotif('goalmet');
