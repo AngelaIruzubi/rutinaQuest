@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -176,8 +177,10 @@ const s = StyleSheet.create({
     flex: 1,
   },
   container: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
+     flex: 1,
+        backgroundColor: '#fff',
+        paddingTop: Platform.OS === 'ios' ? 60 : 40,
+        paddingHorizontal: 20,
   },
 
   headerTitle: {

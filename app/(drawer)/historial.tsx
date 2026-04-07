@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
     paddingHorizontal: 20,
   },
-  titulo:     { fontSize: 36, fontWeight: '700', color: PURPLE, marginBottom: 20, textAlign: 'center' },
+  titulo:     { fontSize: 30, fontWeight: '700', color: PURPLE, marginBottom: 20, textAlign: 'center' },
   debugBadge: { textAlign: 'center', fontSize: 11, color: '#FF6B35', fontWeight: '600', marginBottom: 10 },
 
   sectionTitle: { fontSize: 30, fontWeight: '700', color: PURPLE, marginBottom: 10 },

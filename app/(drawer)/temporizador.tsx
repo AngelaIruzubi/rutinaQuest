@@ -273,6 +273,8 @@ export default function Temporizador() {
     <SafeAreaView style={s.safe}>
       <ScrollView contentContainerStyle={s.container} showsVerticalScrollIndicator={false}>
 
+          <Text style={s.title}>Temporizador</Text>
+
         {/* Selector de modo */}
         <View style={s.modoWrap}>
           {(['countdown', 'cronometro'] as Modo[]).map(m => (
@@ -391,7 +393,8 @@ export default function Temporizador() {
 
 const s = StyleSheet.create({
   safe:      { flex: 1, backgroundColor: C.bg },
-  container: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40, alignItems: 'center' },
+  container: { paddingHorizontal: 20, 
+    paddingTop: Platform.OS === 'ios' ? 60 : 40, alignItems: 'center' },
 
   // Selector modo
   modoWrap: {
@@ -403,6 +406,13 @@ const s = StyleSheet.create({
     padding: 4,
     marginBottom: 36,
     width: '100%',
+  },
+   title: {
+    fontSize: 30,
+    fontWeight: '600',
+    color: C.accentText,
+    textAlign: 'center',
+    marginBottom: 20
   },
   modoBtn: {
     flex: 1,

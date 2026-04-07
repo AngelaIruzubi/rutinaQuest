@@ -197,16 +197,20 @@ export default function Progreso() {
   const [completadas, setCompletadas] = useState<any[]>([]);
   const gami = useGamificacion();
 
-  useFocusEffect(
-    useCallback(() => {
-      const rows = getTareas();
-      const hechas = rows
-        .filter((r: any) => r.completed === 1)
-        .map((r: any) => ({ ...r }))
-        .reverse();
-      setCompletadas(hechas);
-    }, [])
-  );
+ useFocusEffect(
+  useCallback(() => {
+    // Recargar tareas de BD
+    const rows = getTareas();
+    const hechas = rows
+      .filter((r: any) => r.completed === 1)
+      .map((r: any) => ({ ...r }))
+      .reverse();
+    setCompletadas(hechas);
+
+ 
+    gami.recargar();
+  }, [gami.recargar])  // ← dependencia
+);
 
   const totalEstrellas = completadas.reduce((acc, t) => acc + (t.stars ?? 5), 0);
   const grupos = agruparPorFecha(completadas.slice(0, 30));
@@ -237,7 +241,7 @@ export default function Progreso() {
   return (
     <View style={styles.root}>
 
-      <Text style={styles.title}>Tu progreso</Text>
+      <Text style={styles.title}>Progreso</Text>
 
       {/* ── Pestañas ── */}
       <View style={styles.tabRow}>

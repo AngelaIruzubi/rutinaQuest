@@ -39,30 +39,40 @@ const GREEN = '#58CC02';
 const GOLD = '#FFD700';
 const ORANGE = '#FF6B35';
 const RED = '#FF4444';
-
 const PEREZOSO_IMAGENES: Record<string, any> = {
   pulgar: require('../../assets/images/perezoso/perezoso_pulgar.png'),
   llorando: require('../../assets/images/perezoso/perezoso_llorando.png'),
   celebrando: require('../../assets/images/perezoso/perezoso_celebrando.png'),
+  celebrando_gif: require('../../assets/images/perezoso/contento_noti.gif'),
+  llorando_gif: require('../../assets/images/perezoso/triste_noti.gif'),
   enfadado: require('../../assets/images/perezoso/perezoso_enfadado.png'),
   esperando: require('../../assets/images/perezoso/perezoso_esperando.png'),
   cansado: require('../../assets/images/perezoso/perezoso_cansado.png'),
 };
 
-const NOTIF_CFG: Record<string, { asset: string; msg: string; color: string }> = {
+
+const NOTIF_CFG: Record<
+  string,
+  {
+    asset: string;
+    msg: string;
+    color: string;
+
+  }
+> = {
   ontime:   { asset: 'pulgar',     msg: '¡Genial, conseguiste las 5 ⭐!',              color: PURPLE },
-  late:     { asset: 'celebrando', msg: '¡Completada un poco tarde! 3 ⭐',             color: PURPLE },
+  late:     { asset: 'pulgar',     msg: '¡Completada un poco tarde! 3 ⭐',             color: PURPLE },
   sinHora:  { asset: 'pulgar',     msg: '¡Tarea completada! Conseguiste las 5 ⭐',     color: PURPLE },
-  goalmet:  { asset: 'celebrando', msg: '¡Todas las tareas de hoy completadas!',       color: PURPLE },
+  goalmet:  { asset: 'celebrando_gif', msg: '¡Todas las tareas de hoy completadas!',       color: PURPLE },
   bronce:   { asset: 'pulgar',     msg: '¡Medalla de Bronce conseguida! 🥉',           color: '#CD7F32' },
   plata:    { asset: 'pulgar',     msg: '¡Medalla de Plata conseguida! 🥈',            color: '#C0C0C0' },
-  oro:      { asset: 'celebrando', msg: '¡Medalla de Oro conseguida! 🥇',              color: GOLD },
+  oro:      { asset: 'celebrando', msg: '¡Medalla de Oro conseguida! 🥇',              color: GOLD},
   cincoMin: { asset: 'esperando',  msg: '¡Quedan 5 minutos para una tarea!',           color: PURPLE },
-  saltadas: { asset: 'llorando',   msg: 'Has saltado varias tareas...',                color: PURPLE },
+  saltadas: { asset: 'llorando_gif',   msg: 'Has saltado varias tareas...',                color: PURPLE },
   mitadDia: { asset: 'cansado',    msg: 'Es mediodía y aún no has empezado',           color: PURPLE },
   finDia:   { asset: 'enfadado',   msg: '¡Se acaba el día y quedan tareas!',           color: PURPLE },
-  eliminada:{ asset: 'llorando',   msg: '¡Oh no, eliminaste una tarea!',               color: PURPLE },
-  penal10:  { asset: 'llorando',   msg: 'Ayer te quedó alguna tarea sin hacer. -10 ⭐', color: RED },
+  eliminada:{ asset: 'llorando_gif',   msg: '¡Oh no, eliminaste una tarea!',               color: PURPLE },
+  penal10:  { asset: 'llorando_gif',   msg: 'Ayer te quedó alguna tarea sin hacer. -10 ⭐', color: RED },
   penal20:  { asset: 'enfadado',   msg: '¡Ayer no hiciste nada! -20 ⭐',                color: RED },
 };
 
@@ -127,22 +137,24 @@ function SlothNotif({ type, show }: { type: string; show: boolean }) {
         pointerEvents="none"
         style={[
           styles.fullNotifOverlay,
-          {
-            opacity: opacityAnim,
-          },
+          { opacity: opacityAnim },
         ]}
       >
         <Animated.View
           style={[
             styles.fullNotifCard,
-            {
-     
-              transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
-            },
+            { transform: [{ translateY: slideAnim }, { scale: scaleAnim }] },
           ]}
         >
-          <Image source={PEREZOSO_IMAGENES[cfg.asset]} style={styles.fullNotifImg} />
-          <Text style={[styles.fullNotifText, { color: cfg.color }]}>{cfg.msg}</Text>
+          <Image
+            source={PEREZOSO_IMAGENES[cfg.asset]}
+            style={styles.fullNotifImg}
+            resizeMode="contain"
+          />
+
+          <Text style={[styles.fullNotifText, { color: cfg.color }]}>
+            {cfg.msg}
+          </Text>
         </Animated.View>
       </Animated.View>
     </Modal>
@@ -306,7 +318,6 @@ export default function Home() {
   const rachaNotifTimer = useRef<any>(null);
 
   const pendientesPenalRef = useRef<any>({ canceladasAyer: 0, completadasAyer: 0 });
-  const fechaActualRef   = useRef<string>(hoyAppStr()); // para detectar cambio de día
 
   const gami = useGamificacion();
 
@@ -318,23 +329,27 @@ export default function Home() {
     pendientesPenalRef.current = { canceladasAyer, completadasAyer };
   }, []);
 
-  // ── Penalización del día anterior al arrancar ────────────────────────────
+  // ── Penalización del día anterior: solo cuando el hook confirma día nuevo ─
   useEffect(() => {
     if (gami.cargando) return;
+    if (!gami.esDiaNuevo) return; // evita dispararse en recargas del mismo día
+
     const { canceladasAyer, completadasAyer } = pendientesPenalRef.current;
-    const totalAyer = canceladasAyer + completadasAyer;
-    if (totalAyer === 0) return;
+    if (canceladasAyer + completadasAyer === 0) return; // sin tareas ayer
 
-    if (completadasAyer === 0) {
-      gami.penalizarFinDia(canceladasAyer, 0);
-      disparaNotif('penal20');
-    } else if (canceladasAyer > 0) {
-      gami.penalizarFinDia(canceladasAyer, completadasAyer);
-      disparaNotif('penal10');
-    }
-
-    pendientesPenalRef.current = { canceladasAyer: 0, completadasAyer: 0 };
-  }, [gami.cargando]);
+    (async () => {
+      if (completadasAyer === 0) {
+        // No completó ninguna tarea ese día → -20
+        const res = await gami.penalizarFinDia(canceladasAyer, 0) as any;
+        if (res?.penalizacion > 0) disparaNotif('penal20');
+      } else if (canceladasAyer > 0) {
+        // Completó alguna pero dejó otras → -10
+        const res = await gami.penalizarFinDia(canceladasAyer, completadasAyer) as any;
+        if (res?.penalizacion > 0) disparaNotif('penal10');
+      }
+      pendientesPenalRef.current = { canceladasAyer: 0, completadasAyer: 0 };
+    })();
+  }, [gami.cargando, gami.esDiaNuevo]);
 
   // ── Checks periódicos ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -343,22 +358,6 @@ export default function Home() {
       const hora = now.getHours();
       const minutos = now.getMinutes();
       const hoy = hoyAppStr();
-
-      // ── Detectar cambio de día ───────────────────────────────────────────
-      if (fechaActualRef.current !== hoy) {
-        fechaActualRef.current = hoy;
-        // Recargar tareas del nuevo día (incluye las programadas desde el calendario)
-        const resultado = limpiarTareasViejas() as any;
-        const tareasHoy = resultado.tareasHoy ?? resultado;
-        setTasks((Array.isArray(tareasHoy) ? tareasHoy : []).map((r: any) => ({ ...r, completed: r.completed === 1 })));
-        // Resetear notificaciones del día anterior
-        notifEnviadasHoy.current = new Set();
-        // Guardar datos de ayer para penalización
-        pendientesPenalRef.current = {
-          canceladasAyer:  resultado.canceladasAyer  ?? 0,
-          completadasAyer: resultado.completadasAyer ?? 0,
-        };
-      }
 
       const pending = tasks.filter(t => !t.completed && t.fechaDia === hoy);
 
@@ -478,7 +477,7 @@ export default function Home() {
 
     saltadasRef.current = 0;
 
-    const prevTotal = gami.totalHecho; // capturamos ANTES de sumar
+    const prevTotal = gami.totalHecho;
 
     const hoy = hoyAppStr();
     const pendingAntes = tasks.filter(
@@ -497,16 +496,11 @@ export default function Home() {
       notifEnviadasHoy.current.add('rachaHoy');
     }
 
-    // Detectar si con esta tarea se cruza por primera vez el umbral de medalla
-    const cruzoOro    = newTotal >= 600 && prevTotal < 600;
-    const cruzoPlata  = newTotal >= 300 && prevTotal < 300;
-    const cruzoBronce = newTotal >= 100 && prevTotal < 100;
-
-    if (cruzoOro) {
+    if (newTotal >= 600 && prevTotal < 600) {
       disparaNotif('oro');
-    } else if (cruzoPlata) {
+    } else if (newTotal >= 300 && prevTotal < 300) {
       disparaNotif('plata');
-    } else if (cruzoBronce) {
+    } else if (newTotal >= 100 && prevTotal < 100) {
       disparaNotif('bronce');
     } else if (pendingAntes.length === 0 && totalDeHoy > 0) {
       disparaNotif('goalmet');
@@ -965,7 +959,7 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 36,
+    fontSize: 30,
     fontWeight: '600',
     color: PURPLE,
     textAlign: 'center',
@@ -984,34 +978,26 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(26,26,26,0.88)',
+    backgroundColor: '#fff',
     zIndex: 9999,
     elevation: 9999,
   },
 
-  fullNotifCard: {
-    width: '84%',
-    minHeight: 280,
-    backgroundColor: '#fff',
-    borderRadius: 28,
-    borderWidth: 3,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 28,
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 18,
-    elevation: 18,
-  },
+fullNotifCard: {
+  width: '100%',
+  backgroundColor: '#fff',
+  borderRadius: 28,
+  paddingVertical: 28,
+  paddingHorizontal: 24,
+  alignItems: 'center',
+  justifyContent: 'center',
+  elevation: 12,
+},
 
-  fullNotifImg: {
-    width: 150,
-    height: 150,
-    resizeMode: 'contain',
-    marginBottom: 18,
-  },
+fullNotifImg: {
 
+  backgroundColor: '#fff'
+},
   fullNotifText: {
     fontSize: 24,
     fontWeight: '800',
@@ -1030,19 +1016,12 @@ const styles = StyleSheet.create({
   },
 
   rachaNotifCard: {
-    width: '82%',
-    minHeight: 260,
-    borderRadius: 28,
+    width: '100%',
     backgroundColor: '#222',
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 28,
     paddingHorizontal: 24,
-    borderWidth: 2,
-
-    shadowColor: ORANGE,
-    shadowOpacity: 0.35,
-    shadowRadius: 18,
     elevation: 18,
   },
 
