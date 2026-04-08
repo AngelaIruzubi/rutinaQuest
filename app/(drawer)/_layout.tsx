@@ -60,7 +60,6 @@ export default function Layout() {
           ),
         }}
       >
-        {/* Pantalla de testing: visible solo en desarrollo (__DEV__) */}
         <Drawer.Screen
           name="testing"
           options={{

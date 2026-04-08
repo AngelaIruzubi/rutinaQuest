@@ -102,8 +102,8 @@ export default function Perfil() {
       {peloCorto < 0 && peloLargo >= 0 && peloLargoOptions[peloLargo] && (
         <Image
           source={peloLargoOptions[peloLargo]}
-          style={{ position: 'absolute', top: -size * 0.22, left: 0,
-            width: size * 1.05, height: size * 1.05, zIndex: 4,
+          style={{ position: 'absolute', top: -size * 0.27, left: size * -0.1,
+            width: size * 1.20, height: size * 1.20, zIndex: 4,
             tintColor: colorPeloSeguro }}
           resizeMode="contain"
         />

@@ -477,7 +477,7 @@ export default function Home() {
 
     saltadasRef.current = 0;
 
-    const prevMedal = gami.medalla;
+    const prevTotal = gami.totalHecho;
 
     const hoy = hoyAppStr();
     const pendingAntes = tasks.filter(
@@ -496,11 +496,11 @@ export default function Home() {
       notifEnviadasHoy.current.add('rachaHoy');
     }
 
-    if (newTotal >= 600 && prevMedal !== 'oro') {
+    if (newTotal >= 600 && prevTotal < 600) {
       disparaNotif('oro');
-    } else if (newTotal >= 300 && prevMedal !== 'plata') {
+    } else if (newTotal >= 300 && prevTotal < 300) {
       disparaNotif('plata');
-    } else if (newTotal >= 100 && prevMedal !== 'bronce') {
+    } else if (newTotal >= 100 && prevTotal < 100) {
       disparaNotif('bronce');
     } else if (pendingAntes.length === 0 && totalDeHoy > 0) {
       disparaNotif('goalmet');
@@ -959,7 +959,7 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 36,
+    fontSize: 30,
     fontWeight: '600',
     color: PURPLE,
     textAlign: 'center',

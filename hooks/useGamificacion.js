@@ -72,6 +72,31 @@ export function useGamificacion() {
   const [estado,   setEstado]   = useState(ESTADO_INICIAL);
   const [cargando, setCargando] = useState(true);
   const [esDiaNuevo, setEsDiaNuevo] = useState(false);
+
+  const cargarEstado = useCallback(async () => {
+  const guardado = await storage.get(STATE_KEY);
+  if (guardado) {
+    const hoyStr = hoy();
+    if (guardado.fechaHoy !== hoyStr) {
+      if (guardado.ultimaFecha) {
+        const diff = diasDif(hoyStr, guardado.ultimaFecha);
+        if (diff !== 1) guardado.racha = 0;
+      }
+      guardado.tareasCompletasHoy   = 0;
+      guardado.fechaHoy             = hoyStr;
+      guardado.penalizacionAplicada = false;
+      await storage.set(STATE_KEY, guardado);
+      setEsDiaNuevo(true);
+    }
+    setEstado({ ...ESTADO_INICIAL, ...guardado });
+  }
+  setCargando(false);
+}, []);
+
+
+  useEffect(() => {
+    cargarEstado();
+  }, []);
  
   useEffect(() => {
     (async () => {
@@ -211,6 +236,7 @@ export function useGamificacion() {
     tareaPerdida,
     resetearDia,
     penalizarFinDia,
+    recargar: cargarEstado,
   };
 }
  
