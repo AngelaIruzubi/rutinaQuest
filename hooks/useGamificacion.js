@@ -187,8 +187,14 @@ export function useGamificacion() {
           resolve({ penalizacion: 0, nuevoEstado: prev });
           return prev; // ya se penalizó hoy, no repetir
         }
-        const penalizacion    = tareasHechasHoy === 0 ? 20 : 10;
-        const motivo          = tareasHechasHoy === 0 ? 'Sin tareas' : 'Tareas sin completar';
+        // Sin penalización si no hizo nada (solo se pierde la racha)
+        // Penalización -10 solo si hizo algo pero dejó tareas sin completar
+        if (tareasHechasHoy === 0) {
+          resolve({ penalizacion: 0, nuevoEstado: prev });
+          return prev;
+        }
+        const penalizacion = 10;
+        const motivo       = 'Tareas sin completar';
         const nuevasEstrellas = Math.max(0, (prev.estrellas ?? 0) - penalizacion);
         const historial = [...(prev.historialPenalizaciones ?? [])];
         const hoyStr2 = hoy();
@@ -200,7 +206,7 @@ export function useGamificacion() {
           ...prev,
           estrellas:               nuevasEstrellas,
           totalHecho:              nuevasEstrellas,
-          racha:                   tareasHechasHoy === 0 ? 0 : prev.racha,
+          racha:                   prev.racha, // racha intacta si completó algo
           penalizacionAplicada:    true,
           historialPenalizaciones: historial,
         };

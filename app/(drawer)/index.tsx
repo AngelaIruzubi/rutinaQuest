@@ -46,7 +46,9 @@ const PEREZOSO_IMAGENES: Record<string, any> = {
   celebrando_gif: require('../../assets/images/perezoso/contento_noti.gif'),
   llorando_gif: require('../../assets/images/perezoso/triste_noti.gif'),
   enfadado: require('../../assets/images/perezoso/perezoso_enfadado.png'),
+  enfadado_gif: require('../../assets/images/perezoso/enfadado_noti.gif'),
   esperando: require('../../assets/images/perezoso/perezoso_esperando.png'),
+  esperando_gif: require('../../assets/images/perezoso/aburrido_noti.gif'),
   cansado: require('../../assets/images/perezoso/perezoso_cansado.png'),
 };
 
@@ -66,14 +68,13 @@ const NOTIF_CFG: Record<
   goalmet:  { asset: 'celebrando_gif', msg: '¡Todas las tareas de hoy completadas!',       color: PURPLE },
   bronce:   { asset: 'pulgar',     msg: '¡Medalla de Bronce conseguida! 🥉',           color: '#CD7F32' },
   plata:    { asset: 'pulgar',     msg: '¡Medalla de Plata conseguida! 🥈',            color: '#C0C0C0' },
-  oro:      { asset: 'celebrando', msg: '¡Medalla de Oro conseguida! 🥇',              color: GOLD},
-  cincoMin: { asset: 'esperando',  msg: '¡Quedan 5 minutos para una tarea!',           color: PURPLE },
-  saltadas: { asset: 'llorando_gif',   msg: 'Has saltado varias tareas...',                color: PURPLE },
-  mitadDia: { asset: 'cansado',    msg: 'Es mediodía y aún no has empezado',           color: PURPLE },
-  finDia:   { asset: 'enfadado',   msg: '¡Se acaba el día y quedan tareas!',           color: PURPLE },
+  oro:      { asset: 'celebrando_gif', msg: '¡Medalla de Oro conseguida! 🥇',              color: GOLD},
+  cincoMin: { asset: 'esperando_gif',  msg: '¡Quedan 5 minutos para una tarea!',           color: PURPLE },
+  saltadas: { asset: 'enfadado_gif',   msg: 'Has saltado varias tareas...',                color: PURPLE },
+  mitadDia: { asset: 'esperando_gif',    msg: 'Es mediodía y aún no has empezado',           color: PURPLE },
+  finDia:   { asset: 'enfadado_gif',   msg: '¡Se acaba el día y quedan tareas!',           color: PURPLE },
   eliminada:{ asset: 'llorando_gif',   msg: '¡Oh no, eliminaste una tarea!',               color: PURPLE },
-  penal10:  { asset: 'llorando_gif',   msg: 'Ayer te quedó alguna tarea sin hacer. -10 ⭐', color: RED },
-  penal20:  { asset: 'enfadado',   msg: '¡Ayer no hiciste nada! -20 ⭐',                color: RED },
+  penal10:  { asset: 'enfadado_gif',   msg: 'Ayer te quedó alguna tarea sin hacer. -10 ⭐', color: RED },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -339,11 +340,10 @@ export default function Home() {
 
     (async () => {
       if (completadasAyer === 0) {
-        // No completó ninguna tarea ese día → -20
-        const res = await gami.penalizarFinDia(canceladasAyer, 0) as any;
-        if (res?.penalizacion > 0) disparaNotif('penal20');
+        // No hizo nada ayer → solo pierde la racha (ya gestionado en el hook)
+        // Sin penalización de estrellas ni notificación
       } else if (canceladasAyer > 0) {
-        // Completó alguna pero dejó otras → -10
+        // Hizo algo pero dejó tareas sin completar → -10 ⭐
         const res = await gami.penalizarFinDia(canceladasAyer, completadasAyer) as any;
         if (res?.penalizacion > 0) disparaNotif('penal10');
       }
@@ -392,7 +392,11 @@ export default function Home() {
       ) {
         notifEnviadasHoy.current.add('finDia');
         disparaNotif('finDia');
-        gami.penalizarFinDia(pending.length, gami.tareasCompletasHoy);
+        // Solo penalizar si hizo algo hoy pero quedaron pendientes
+        if (gami.tareasCompletasHoy > 0) {
+          gami.penalizarFinDia(pending.length, gami.tareasCompletasHoy);
+        }
+        // Si no hizo nada: la racha se romperá al día siguiente al arrancar
       }
     }, 60000);
 
@@ -953,7 +957,7 @@ function parseTiempoLim(hora: string | undefined | null): Date | null {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F9FBF8',
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
     paddingHorizontal: 20,
   },
@@ -978,14 +982,14 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#F9FBF8',
     zIndex: 9999,
     elevation: 9999,
   },
 
 fullNotifCard: {
   width: '100%',
-  backgroundColor: '#fff',
+  backgroundColor: '#F9FBF8',
   borderRadius: 28,
   paddingVertical: 28,
   paddingHorizontal: 24,
@@ -996,7 +1000,7 @@ fullNotifCard: {
 
 fullNotifImg: {
 
-  backgroundColor: '#fff'
+  backgroundColor: '#F9FBF8'
 },
   fullNotifText: {
     fontSize: 24,
