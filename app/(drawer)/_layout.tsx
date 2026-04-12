@@ -1,30 +1,81 @@
+// app/(drawer)/_layout.tsx
 import { Ionicons } from '@expo/vector-icons';
+import { DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawer';
 import { useRouter } from 'expo-router';
 import { Drawer } from 'expo-router/drawer';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-import { Pressable } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../constants/theme';
+import { AjustesProvider } from '../../context/AjustesContext';
 import { AvatarProvider } from '../../context/AvatarContext';
 import { initDB, limpiarTareasViejas } from '../../database/database';
 
-// Evita que la splash desaparezca sola antes de que estemos listos
 SplashScreen.preventAutoHideAsync();
 
-export default function Layout() {
-  const WHITE  = '#ffffff';
-  const router = useRouter();
+const PURPLE = '#A77BBE';
+const WHITE  = '#ffffff';
 
+// ─── CLAVE: todas las funciones de label y header se definen FUERA del
+//     componente Layout, así React las trata como referencias estables y
+//     no desmonta/remonta las pantallas del drawer cuando cambia el contexto
+// ─────────────────────────────────────────────────────────────────────────────
+
+function DL({ icono, label, color = '#333' }: { icono: string; label: string; color?: string }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+      <Ionicons name={icono as any} size={20} color={PURPLE} />
+      <Text style={{ fontSize: 15, fontWeight: '600', color }}>{label}</Text>
+    </View>
+  );
+}
+function CustomDrawerContent(props: any) {
+  const insets = useSafeAreaInsets();
+  return (
+    <DrawerContentScrollView
+      {...props}
+      contentContainerStyle={{ paddingTop: -insets.top + 40 }}
+    >
+      <DrawerItemList {...props} />
+    </DrawerContentScrollView>
+  );
+}
+
+// Componentes de label estables (no se recrean en cada render de Layout)
+const LabelInicio       = () => <DL icono="home-outline"      label="Inicio"       />;
+const LabelCalendario   = () => <DL icono="calendar-outline"  label="Calendario"   />;
+const LabelTemporizador = () => <DL icono="timer-outline"     label="Temporizador" />;
+const LabelProgreso     = () => <DL icono="bar-chart-outline" label="Progreso"     />;
+const LabelAjustes      = () => <DL icono="settings-outline"  label="Ajustes"      />;
+const LabelTesting      = () => <DL icono="flask-outline"     label="Testing" color="#E67E22" />;
+const LabelHistorial    = () => <DL icono="time-outline"      label="Historial"     />;
+const LabelNormas      = () => <DL icono="document-text-outline" label="Normas" />;
+
+// Header derecho estable
+function HeaderPerfilBtn() {
+  const router = useRouter();
+  return (
+    <Pressable
+      onPress={() => router.push('/perfil')}
+      style={{ width: 46, height: 44, alignItems: 'center', justifyContent: 'center', marginRight: 6 }}
+    >
+      <Ionicons name="person-circle-outline" size={32} color={WHITE} />
+    </Pressable>
+  );
+}
+const HeaderRight = () => <HeaderPerfilBtn />;
+
+// ═════════════════════════════════════════════════════════════════════════════
+export default function Layout() {
   useEffect(() => {
     async function prepare() {
       try {
-        // Inicializa la base de datos antes de mostrar la app
-        initDB();
+      initDB();
         limpiarTareasViejas();
       } catch (e) {
         console.warn('Error en carga inicial:', e);
       } finally {
-        // Siempre oculta la splash al terminar (aunque haya error)
         await SplashScreen.hideAsync();
       }
     }
@@ -32,43 +83,65 @@ export default function Layout() {
   }, []);
 
   return (
-    <AvatarProvider>
-      <Drawer
-        screenOptions={{
-          headerStyle: {
-            backgroundColor: Colors.light.primary,
-          },
-          headerTintColor: 'white',
-          headerTitleAlign: 'center',
-          headerTitle: 'RutinaQuest',
-          headerTitleStyle: {
-            fontSize: 34,
-            fontWeight: 'bold',
-          },
-          headerRight: () => (
-            <Pressable
-              onPress={() => router.push('/perfil')}
-              style={{
-                width: 50,
-                height: 40,
-                overflow: 'hidden',
-              }}
-            >
-              {/* <AvatarMini /> */}
-              <Ionicons name="person-outline" size={35} color={WHITE} />
-            </Pressable>
-          ),
-        }}
-      >
-        <Drawer.Screen
-          name="testing"
-          options={{
-            drawerLabel: '🧪 Testing',
-            drawerItemStyle: { display: __DEV__ ? 'flex' : 'none' },
-            headerTitle: '🧪 Testing Gamificación',
+    <AjustesProvider>
+      <AvatarProvider>
+        <Drawer
+         drawerContent={CustomDrawerContent}
+          screenOptions={{
+            // quita drawerContentContainerStyle
+            headerStyle:                 { backgroundColor: Colors.light.primary, height: 100, shadowColor: 'transparent', alignItems: 'center', justifyContent: 'center'},
+            headerTintColor:             WHITE,
+            headerTitleAlign:            'center',
+            headerTitleStyle:            { fontSize: 36, fontWeight: 'bold' },
+            headerRight:                 HeaderRight,
+            drawerStyle:                 { backgroundColor: '#fff'  },
+            drawerActiveTintColor:       PURPLE,
+            drawerInactiveTintColor:     '#555',
+            drawerActiveBackgroundColor: PURPLE + '15',
           }}
-        />
-      </Drawer>
-    </AvatarProvider>
+        >
+          <Drawer.Screen
+            name="index"
+            options={{ drawerLabel: LabelInicio, headerTitle: 'RutinaQuest' }}
+          />
+          <Drawer.Screen
+            name="calendario"
+            options={{ drawerLabel: LabelCalendario, headerTitle: 'RutinaQuest' }}
+          />
+          <Drawer.Screen
+            name="temporizador"
+            options={{ drawerLabel: LabelTemporizador, headerTitle: 'RutinaQuest' }}
+          />
+          <Drawer.Screen
+            name="progreso"
+            options={{ drawerLabel: LabelProgreso, headerTitle: 'RutinaQuest' }}
+          />
+          <Drawer.Screen
+            name="ajustes"
+            options={{ drawerItemStyle: { display: 'none' }, headerTitle: 'RutinaQuest' }}
+          />
+          <Drawer.Screen
+            name="historial"
+            options={{ drawerLabel: LabelHistorial, headerTitle: 'RutinaQuest' }}
+          />
+          <Drawer.Screen
+            name="perfil"
+            options={{ drawerItemStyle: { display: 'none' }, headerTitle: 'RutinaQuest' }}
+          />
+          <Drawer.Screen
+            name="normas"
+            options={{drawerLabel: LabelNormas , headerTitle: 'RutinaQuest' }}
+          />
+          <Drawer.Screen
+            name="testing"
+            options={{
+             drawerItemStyle: { display: 'none' },
+         
+              headerTitle:     '🧪 Testing Gamificación',
+            }}
+          />
+        </Drawer>
+      </AvatarProvider>
+    </AjustesProvider>
   );
 }

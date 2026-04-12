@@ -1,6 +1,9 @@
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import React from 'react';
 import {
   Platform,
+  Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -10,8 +13,7 @@ import {
 
 // ── Colores base (ajusta a tu tema si tienes ThemeContext) ──────────────────
 type ColorPair = { bg: string; text: string };
-
-
+const PURPLE    = '#A77BBE';
 const C: {
   bg: string;
   surface: string;
@@ -98,7 +100,14 @@ export default function NormasJuego() {
         {/* Cabecera */}
 
           <Text style={s.headerTitle}>Normas del juego</Text>
-
+           <Pressable
+              onPress={() => router.replace('/')}
+              style={s.btnInicio}
+            >
+              <Ionicons name="home-outline" size={16} color={PURPLE} />
+              <Text style={s.btnInicioTxt}>Inicio</Text>
+            </Pressable>
+      
 
         {/* ── Ganar estrellas ── */}
         <SectionTitle>Cómo ganar estrellas</SectionTitle>
@@ -217,6 +226,14 @@ const s = StyleSheet.create({
     borderColor: C.border,
     overflow: 'hidden',
   },
+  btnInicio: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 12, paddingVertical: 7,
+    backgroundColor: PURPLE + '18', borderRadius: 20,
+    alignSelf: 'flex-start', marginBottom: 8,
+  },
+  btnInicioTxt: { color: PURPLE, fontWeight: '600', fontSize: 13 },
+
 
   // Fila dentro de card
   row: {

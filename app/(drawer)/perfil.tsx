@@ -5,6 +5,9 @@ import {
 } from 'react-native';
 import { useAvatar } from '../../context/AvatarContext';
 
+// Y dentro del return, como primer hijo del View raíz:
+
+
 // ─── Paletas ──────────────────────────────────────────────────────────────────
 const TONOS_PIEL   = ['#F5C89A',  '#7B3F2C'];
 const COLORES_PELO = ['#1a1a1a', '#3B1F0E', '#8B4513', '#DAA520', '#E8C47A', '#E8E8E8'];
@@ -73,6 +76,7 @@ export default function Perfil() {
 
   // ── Avatar preview ────────────────────────────────────────────────────────
   const AvatarPreview = ({ size = 290 }: { size?: number }) => (
+    
     <View style={{ width: size, height: size * 1.2, position: 'relative' }}>
       {/* Camiseta */}
       <Image
@@ -117,6 +121,7 @@ export default function Perfil() {
 
       case 'piel':
         return (
+          
           <>
             <Text style={s.opcionTitulo}>Tono de piel</Text>
             <View style={s.gridColores}>
@@ -244,6 +249,7 @@ export default function Perfil() {
 
   if (isTablet) {
     return (
+      
       <View style={s.rootTablet}>
         <View style={s.leftPanel}>
           <View style={s.avatarBgTablet}>

@@ -253,89 +253,56 @@ export function deleteTarea(id) {
 // - Tareas de HOY (pendientes o completadas) → NO se tocan
 // - Devuelve SOLO las tareas de hoy (para mostrar en index)
 export function limpiarTareasViejas() {
-  const hoy = hoyAppStr(); // usa fecha simulada si está activa
+  const hoy = hoyAppStr();
 
   if (Platform.OS === 'web') {
     const todas = getTareas();
-
     const actualizadas = todas.map(t => {
       const fechaDia = t.fechaDia ?? hoy;
       const estado = t.estado ?? (t.completed === 1 ? 'completada' : 'pendiente');
-
-      const esDiaAnterior = fechaDia < hoy; // solo cancelar días PASADOS, no futuros
+      const esDiaAnterior = fechaDia < hoy;
       const esPendiente = estado === 'pendiente';
-
       if (esDiaAnterior && esPendiente) {
-        return {
-          ...t,
-          fechaDia,
-          estado: 'cancelada',
-          completed: 0,
-          fechaCompletada: fechaDia,
-        };
+        return { ...t, fechaDia, estado: 'cancelada', completed: 0, fechaCompletada: fechaDia };
       }
-
-      return {
-        ...t,
-        fechaDia,
-        estado,
-      };
+      return { ...t, fechaDia, estado };
     });
-
     localStorage.setItem('tareas', JSON.stringify(actualizadas));
-
     const tareasHoy = actualizadas.filter(t => t.fechaDia === hoy);
-
-    // Calcular info de ayer para penalización
-    const ayer = actualizadas.filter(t => t.fechaDia !== hoy);
-    const canceladasAyer = ayer.filter(t => t.estado === 'cancelada').length;
-    const completadasAyer = ayer.filter(t => t.estado === 'completada' || t.completed === 1).length;
-
+    // Contar DESPUÉS de cancelar para incluir las recién canceladas
+    const anteriores = actualizadas.filter(t => t.fechaDia < hoy);
+    const canceladasAyer = anteriores.filter(t => t.estado === 'cancelada').length;
+    const completadasAyer = anteriores.filter(t => t.estado === 'completada' || t.completed === 1).length;
     return { tareasHoy, canceladasAyer, completadasAyer };
   }
 
-  // ── SQLite nativo ────────────────────────────────────────────────────────
-
-  // Rellenar tareas antiguas sin fechaDia
-  getDB().runSync(
-    `UPDATE tareas SET fechaDia=? WHERE fechaDia IS NULL`,
-    [hoy]
-  );
-
-  // Si alguna tarea antigua no tiene estado, reconstruirlo
+  // SQLite nativo
+  getDB().runSync(`UPDATE tareas SET fechaDia=? WHERE fechaDia IS NULL`, [hoy]);
   getDB().runSync(`
     UPDATE tareas
-    SET estado = CASE
-      WHEN completed = 1 THEN 'completada'
-      ELSE 'pendiente'
-    END
+    SET estado = CASE WHEN completed = 1 THEN 'completada' ELSE 'pendiente' END
     WHERE estado IS NULL
   `);
 
-  // Contar canceladas y completadas de AYER antes de cancelar
-  // (para calcular la penalización correcta)
-  const ayer = getDB().getFirstSync(
-    `SELECT
-       COUNT(CASE WHEN estado='cancelada' AND fechaDia != ? THEN 1 END) as canceladas,
-       COUNT(CASE WHEN estado='completada' AND fechaDia != ? THEN 1 END) as completadas
-     FROM tareas WHERE fechaDia != ?`,
-    [hoy, hoy, hoy]
-  ) ?? { canceladas: 0, completadas: 0 };
-
-  // Cancelar SOLO pendientes de días ANTERIORES a hoy (no futuros)
+  // 1. Cancelar primero
   getDB().runSync(
     `UPDATE tareas
-     SET estado='cancelada',
-         completed=0,
-         fechaCompletada=fechaDia
-     WHERE fechaDia < ?
-       AND estado='pendiente'`,
+     SET estado='cancelada', completed=0, fechaCompletada=fechaDia
+     WHERE fechaDia < ? AND estado='pendiente'`,
     [hoy]
   );
 
+  // 2. Contar DESPUÉS (ya incluye las recién canceladas)
+  const ayer = getDB().getFirstSync(
+    `SELECT
+       COUNT(CASE WHEN estado='cancelada'  AND fechaDia < ? THEN 1 END) as canceladas,
+       COUNT(CASE WHEN estado='completada' AND fechaDia < ? THEN 1 END) as completadas
+     FROM tareas`,
+    [hoy, hoy]
+  ) ?? { canceladas: 0, completadas: 0 };
+
   const tareasHoy = getDB().getAllSync(
-    `SELECT * FROM tareas WHERE fechaDia = ? ORDER BY id DESC`,
-    [hoy]
+    `SELECT * FROM tareas WHERE fechaDia = ? ORDER BY id DESC`, [hoy]
   );
 
   return {

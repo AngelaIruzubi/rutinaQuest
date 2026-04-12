@@ -1,3 +1,5 @@
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Modal,
@@ -12,6 +14,7 @@ import {
   View,
 } from 'react-native';
 
+
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
 type Modo = 'countdown' | 'cronometro';
@@ -25,7 +28,7 @@ type ConfigTiempo = {
 };
 
 // ── Colores ──────────────────────────────────────────────────────────────────
-
+const PURPLE    = '#A77BBE';
 const C = {
   bg:          '#F5F4F0',
   surface:     '#FFFFFF',
@@ -274,6 +277,14 @@ export default function Temporizador() {
       <ScrollView contentContainerStyle={s.container} showsVerticalScrollIndicator={false}>
 
           <Text style={s.title}>Temporizador</Text>
+           <Pressable
+              onPress={() => router.replace('/')}
+              style={s.btnInicio}
+            >
+              <Ionicons name="home-outline" size={16} color={PURPLE} />
+              <Text style={s.btnInicioTxt}>Inicio</Text>
+            </Pressable>
+      
 
         {/* Selector de modo */}
         <View style={s.modoWrap}>
@@ -457,6 +468,14 @@ const s = StyleSheet.create({
   clockContent: {
     alignItems: 'center',
   },
+  btnInicio: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 12, paddingVertical: 7,
+    backgroundColor: PURPLE + '18', borderRadius: 20,
+    alignSelf: 'flex-start', marginBottom: 8,
+  },
+  btnInicioTxt: { color: PURPLE, fontWeight: '600', fontSize: 13 },
+
   timeText: {
     fontSize: 52,
     fontWeight: '300',

@@ -4,7 +4,7 @@
     "slug": "gestor-tareas-gamificado",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icono.png",
+    "icon": "./assets/images/icono.gif",
     "scheme": "gestortareasgamificado",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -22,20 +22,20 @@
       "predictiveBackGestureEnabled": false
     },
      "splash": {
-      "image": "./assets/images/icono.png",
+      "image": "./assets/images/icono.gif",
       "resizeMode": "contain",
       "backgroundColor": "#F4F0F6"
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/icono.gif"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/icono.png",
+          "image": "./assets/images/icono.gif",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",

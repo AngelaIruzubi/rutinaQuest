@@ -1,8 +1,10 @@
-import { useFocusEffect } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,6 +14,8 @@ import {
 import { getTareas } from '../../database/database';
 import { useGamificacion } from '../../hooks/useGamificacion';
 import { ahoraApp } from '../../utils/fecha';
+
+
 
 const PURPLE    = '#A77BBE';
 const PURPLE_LT = '#E5D9EE';
@@ -196,6 +200,7 @@ export default function Progreso() {
   const [tab, setTab]             = useState(0);
   const [completadas, setCompletadas] = useState<any[]>([]);
   const gami = useGamificacion();
+  const router = useRouter();
 
  useFocusEffect(
   useCallback(() => {
@@ -242,6 +247,15 @@ export default function Progreso() {
     <View style={styles.root}>
 
       <Text style={styles.title}>Progreso</Text>
+       <Pressable
+              onPress={() => router.replace('/')}
+              style={styles.btnInicio}
+            >
+              <Ionicons name="home-outline" size={16} color={PURPLE} />
+              <Text style={styles.btnInicioTxt}>Inicio</Text>
+      </Pressable>
+      
+
 
       {/* ── Pestañas ── */}
       <View style={styles.tabRow}>
@@ -393,6 +407,14 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
     gap: 4,
   },
+  btnInicio: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 12, paddingVertical: 7,
+    backgroundColor: PURPLE + '18', borderRadius: 20,
+    alignSelf: 'flex-start', marginBottom: 8,
+  },
+  btnInicioTxt: { color: PURPLE, fontWeight: '600', fontSize: 13 },
+
   fireEmoji: {
     fontSize: 80,
     lineHeight: 90,

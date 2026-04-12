@@ -51,3 +51,16 @@ export function fechaAppDate(fecha?: string): Date {
 export function ahoraAppMs(): number {
   return ahoraApp().getTime();
 }
+
+export function obtenerFechaAyer(): string {
+  const hoy = new Date(hoyAppStr()); // usa tu fecha simulada si existe
+
+  const ayer = new Date(hoy);
+  ayer.setDate(hoy.getDate() - 1);
+
+  const yyyy = ayer.getFullYear();
+  const mm = String(ayer.getMonth() + 1).padStart(2, '0');
+  const dd = String(ayer.getDate()).padStart(2, '0');
+
+  return `${yyyy}-${mm}-${dd}`;
+}

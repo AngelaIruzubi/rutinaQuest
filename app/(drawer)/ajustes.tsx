@@ -1,27 +1,23 @@
 // app/(drawer)/ajustes.tsx
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'expo-router';
 import {
   Alert,
-  Animated,
   Platform,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   Switch,
   Text,
-  View,
+  View
 } from 'react-native';
 import { useAjustesCtx } from '../../context/AjustesContext';
-import { getTareasHistorial } from '../../database/database';
 import { useGamificacion } from '../../hooks/useGamificacion';
 
 // ─── Colores ──────────────────────────────────────────────────────────────────
 const PURPLE    = '#A77BBE';
 const PURPLE_LT = '#E5D9EE';
 const PURPLE_BG = '#F4F0F6';
-const PURPLE_DK = '#7B5A9A';
 const GREEN     = '#58CC02';
 const RED       = '#FF4444';
 const ORANGE    = '#FF6B35';
@@ -134,111 +130,8 @@ function Sep() {
 // ═════════════════════════════════════════════════════════════════════════════
 export default function Ajustes() {
   const { ajustes, colores, escala, actualizar, reset } = useAjustesCtx();
-  const gami = useGamificacion();
-
-  const [exportando, setExportando] = useState(false);
-  const spinAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (exportando) {
-      Animated.loop(
-        Animated.timing(spinAnim, { toValue: 1, duration: 900, useNativeDriver: true })
-      ).start();
-    } else {
-      spinAnim.setValue(0);
-    }
-  }, [exportando]);
-
-  // ── Exportar historial como texto compartible ─────────────────────────────
-  const exportarHistorial = async () => {
-    setExportando(true);
-    try {
-      const historial = getTareasHistorial() as any[];
-      if (historial.length === 0) {
-        Alert.alert('Sin historial', 'Aún no tienes tareas completadas para exportar.');
-        return;
-      }
-
-      // Agrupar por fecha
-      const grupos: Record<string, any[]> = {};
-      for (const t of historial) {
-        const fecha = t.fechaCompletada ?? t.fechaDia ?? 'Sin fecha';
-        if (!grupos[fecha]) grupos[fecha] = [];
-        grupos[fecha].push(t);
-      }
-
-      const totalEstrellas = historial
-        .filter(t => t.estado === 'completada')
-        .reduce((acc, t) => acc + (t.stars ?? 5), 0);
-
-      const completadas = historial.filter(t => t.estado === 'completada').length;
-      const canceladas  = historial.filter(t => t.estado === 'cancelada').length;
-
-      // Construir texto del historial
-      const lineas: string[] = [
-        '═══════════════════════════════',
-        '       🌟 RutinaQuest 🌟',
-        '     Historial de actividad',
-        '═══════════════════════════════',
-        '',
-        `⭐ Estrellas totales: ${gami.estrellas}`,
-        `🔥 Racha actual: ${gami.racha} días`,
-        `✅ Completadas: ${completadas}`,
-        `❌ Canceladas: ${canceladas}`,
-        '',
-        '───────────────────────────────',
-      ];
-
-      for (const [fecha, tareas] of Object.entries(grupos).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 30)) {
-        lineas.push('');
-        lineas.push(`📅 ${fecha}`);
-        for (const t of tareas) {
-          const estrellitas = '★'.repeat(t.stars ?? 5) + '☆'.repeat(5 - (t.stars ?? 5));
-          const estado = t.estado === 'completada' ? '✅' : '❌';
-          lineas.push(`  ${estado} ${t.title}${t.hora && t.hora !== 'Sin hora' ? ` · ${t.hora}` : ''} ${estrellitas}`);
-        }
-      }
-
-      lineas.push('');
-      lineas.push('═══════════════════════════════');
-      lineas.push(`Exportado desde RutinaQuest`);
-      lineas.push(new Date().toLocaleDateString('es-ES', { dateStyle: 'long' }));
-
-      await Share.share({
-        message: lineas.join('\n'),
-        title: 'Mi historial de RutinaQuest',
-      });
-    } finally {
-      setExportando(false);
-    }
-  };
-
-  // ── Compartir tarjeta de perfil ───────────────────────────────────────────
-  const compartirPerfil = async () => {
-    const medallaEmoji = gami.medalla
-      ? ({ bronce: '🥉', plata: '🥈', oro: '🥇' } as any)[gami.medalla]
-      : '🎮';
-
-    const tarjeta = [
-      '┌─────────────────────────────┐',
-      '│       🌟 RutinaQuest        │',
-      '├─────────────────────────────┤',
-      `│  ${medallaEmoji} Mi perfil              │`,
-      '│                             │',
-      `│  ⭐ Estrellas: ${String(gami.estrellas).padEnd(13)}│`,
-      `│  🔥 Racha:    ${String(gami.racha + ' días').padEnd(13)}│`,
-      `│  ✅ Tareas:   ${String(gami.totalHecho).padEnd(13)}│`,
-      `│  🏅 Medalla:  ${String(gami.medalla ? gami.medalla.charAt(0).toUpperCase() + gami.medalla.slice(1) : 'Sin medalla').padEnd(13)}│`,
-      '│                             │',
-      '│  ¡Jugando con RutinaQuest!  │',
-      '└─────────────────────────────┘',
-    ].join('\n');
-
-    await Share.share({
-      message: tarjeta,
-      title: 'Mi perfil de RutinaQuest',
-    });
-  };
+  const gami   = useGamificacion();
+  const router = useRouter();
 
   // ── Reset ajustes ─────────────────────────────────────────────────────────
   const confirmarReset = () => {
@@ -260,6 +153,14 @@ export default function Ajustes() {
       showsVerticalScrollIndicator={false}
     >
       <Text style={[s.titulo, { fontSize: 30 * escala, color: colores.purple }]}>Ajustes</Text>
+       <Pressable
+                    onPress={() => router.replace('/')}
+                    style={s.btnInicio}
+                  >
+                    <Ionicons name="home-outline" size={16} color={PURPLE} />
+                    <Text style={s.btnInicioTxt}>Inicio</Text>
+                  </Pressable>
+            
 
       {/* ── APARIENCIA ── */}
       <Seccion titulo="🎨  Apariencia">
@@ -350,59 +251,6 @@ export default function Ajustes() {
         )}
       </Seccion>
 
-      {/* ── PRIVACIDAD ── */}
-      <Seccion titulo="🔒  Privacidad">
-        <FilaSwitch
-          icono="share-social-outline"
-          label="Compartir historial"
-          sub="Permite exportar y compartir tu actividad"
-          valor={ajustes.compartirHistorial}
-          onChange={v => actualizar({ compartirHistorial: v })}
-          color={GREEN}
-        />
-      </Seccion>
-
-      {/* ── EXPORTAR Y COMPARTIR ── */}
-      <Seccion titulo="📤  Exportar y compartir">
-        <FilaAccion
-          icono="document-text-outline"
-          label="Exportar historial"
-          sub="Comparte tu actividad como texto"
-          onPress={exportarHistorial}
-          color={PURPLE}
-        />
-        <Sep />
-        <FilaAccion
-          icono="person-circle-outline"
-          label="Compartir mi perfil"
-          sub="Tarjeta con tus estadísticas"
-          onPress={compartirPerfil}
-          color={ORANGE}
-        />
-      </Seccion>
-
-      {/* ── ESTADÍSTICAS RÁPIDAS ── */}
-      <Seccion titulo="📊  Resumen">
-        <View style={s.statsGrid}>
-          <View style={s.statItem}>
-            <Text style={s.statNum}>{gami.estrellas}</Text>
-            <Text style={s.statLbl}>⭐ Estrellas</Text>
-          </View>
-          <View style={s.statItem}>
-            <Text style={s.statNum}>{gami.racha}</Text>
-            <Text style={s.statLbl}>🔥 Racha</Text>
-          </View>
-          <View style={s.statItem}>
-            <Text style={[s.statNum, { color: gami.medalla ? GOLD : '#CCC' }]}>
-              {gami.medalla
-                ? ({ bronce: '🥉', plata: '🥈', oro: '🥇' } as any)[gami.medalla]
-                : '—'}
-            </Text>
-            <Text style={s.statLbl}>Medalla</Text>
-          </View>
-        </View>
-      </Seccion>
-
       {/* ── RESTABLECER ── */}
       <Seccion titulo="⚙️  Avanzado">
         <FilaAccion
@@ -432,6 +280,14 @@ const s = StyleSheet.create({
     fontWeight: '700', color: PURPLE,
     textAlign: 'center', marginBottom: 24,
   },
+  btnInicio: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 12, paddingVertical: 7,
+    backgroundColor: PURPLE + '18', borderRadius: 20,
+    alignSelf: 'flex-start', marginBottom: 8,
+  },
+  btnInicioTxt: { color: PURPLE, fontWeight: '600', fontSize: 13 },
+
 
   seccion:       { marginBottom: 20 },
   seccionTitulo: { fontSize: 11, fontWeight: '700', color: '#BBB', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, marginLeft: 4 },

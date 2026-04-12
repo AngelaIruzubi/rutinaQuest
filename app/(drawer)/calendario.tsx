@@ -1,6 +1,6 @@
 // app/(drawer)/calendario.tsx
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   Modal,
@@ -20,6 +20,7 @@ import {
 } from '../../database/database';
 import { buscarPictograma } from '../../services/arasaac';
 import { ahoraApp, ahoraAppMs, hoyAppStr } from '../../utils/fecha';
+
 
 const PURPLE    = '#A77BBE';
 const PURPLE_LT = '#E5D9EE';
@@ -254,6 +255,14 @@ export default function Calendario() {
   return (
     <View style={s.root}>
       <Text style={s.headerTitle}>Calendario</Text>
+        <Pressable
+              onPress={() => router.replace('/')}
+              style={s.btnInicio}
+            >
+              <Ionicons name="home-outline" size={16} color={PURPLE} />
+              <Text style={s.btnInicioTxt}>Inicio</Text>
+            </Pressable>
+      
       {/* ── Cabecera mes ── */}
       <View style={s.mesHeader}>
         <Pressable onPress={mesAnterior} style={s.mesBtn}>
@@ -339,6 +348,14 @@ const s = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
     paddingHorizontal: 14,
   },
+  btnInicio: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 12, paddingVertical: 7,
+    backgroundColor: PURPLE + '18', borderRadius: 20,
+    alignSelf: 'flex-start', marginBottom: 8,
+  },
+  btnInicioTxt: { color: PURPLE, fontWeight: '600', fontSize: 13 },
+
 
    headerTitle: {
     fontSize: 30,
