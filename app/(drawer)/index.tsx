@@ -32,13 +32,13 @@ import { useAjustesCtx } from '../../context/AjustesContext';
 import { useGamificacion } from '../../hooks/useGamificacion';
 import { buscarPictograma } from "../../services/arasaac";
 
-// ─── FECHA SIMULADA ───────────────────────────────────────────────────────────
+
 import { ahoraApp, ahoraAppMs, fechaAppDate, hoyAppStr } from '../../utils/fecha';
-// ─────────────────────────────────────────────────────────────────────────────
+
 
 import { setFechaSimulada } from '../../utils/fecha';
 
-setFechaSimulada('2026-02-07');
+setFechaSimulada('2026-02-11');
 
 const PURPLE    = '#A77BBE';
 const PURPLE_LT = '#E5D9EE';
@@ -78,7 +78,7 @@ const NOTIF_CFG: Record<string, { asset: string; msg: string; color: string }> =
   penal10:  { asset: 'enfadado_gif',   msg: 'Ayer te quedó alguna tarea sin hacer. Menos 10 estrellas', color: RED },
 };
 
-// ─── Hook: detecta si Reduce Motion está activo ───────────────────────────────
+// ─── Detecta si Reduce Motion está activo ───
 function useReduceMotion() {
   const [reducida, setReducida] = useState(false);
   useEffect(() => {
@@ -89,8 +89,8 @@ function useReduceMotion() {
   return reducida;
 }
 
-// ─── NOTIFICACIÓN DE PEREZOSO FULLSCREEN ─────────────────────────────────────────────
-function SlothNotif({ type, show }: { type: string; show: boolean }) {
+// ─── Notificación del perezoso ───
+function PerezosoNotif({ type, show }: { type: string; show: boolean }) {
   const reduceMotion = useReduceMotion();
   const slideAnim   = useRef(new Animated.Value(80)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
@@ -105,7 +105,6 @@ function SlothNotif({ type, show }: { type: string; show: boolean }) {
       scaleAnim.setValue(reduceMotion ? 1 : 0.85);
 
       if (reduceMotion) {
-        // Sin animación: aparece directamente
         Animated.timing(opacityAnim, { toValue: 1, duration: 150, useNativeDriver: true }).start();
       } else {
         Animated.parallel([
@@ -123,7 +122,7 @@ function SlothNotif({ type, show }: { type: string; show: boolean }) {
     }
   }, [show, type]);
 
-  // Anunciar al VoiceOver cuando aparece la notificación
+  // ─── VoiceOver iOS ───
   useEffect(() => {
     if (show) {
       AccessibilityInfo.announceForAccessibility(cfg.msg);
@@ -165,7 +164,7 @@ function SlothNotif({ type, show }: { type: string; show: boolean }) {
   );
 }
 
-// ─── NOTIFICACIÓN DE RACHA FULLSCREEN ────────────────────────────────────────
+// ─── Notificación de racha ───
 function RachaNotif({ show, racha }: { show: boolean; racha: number }) {
   const reduceMotion = useReduceMotion();
   const slideAnim   = useRef(new Animated.Value(100)).current;
@@ -236,6 +235,7 @@ function RachaNotif({ show, racha }: { show: boolean; racha: number }) {
   );
 }
 
+//Contador animado para la notificación de racha, que incrementa desde el valor anterior hasta el nuevo número de días seguidos
 function AnimatedCounter({ anim, max }: { anim: Animated.Value; max: number }) {
   const [display, setDisplay] = useState(Math.max(0, max - 1));
   useEffect(() => {
@@ -250,12 +250,12 @@ function AnimatedCounter({ anim, max }: { anim: Animated.Value; max: number }) {
   );
 }
 
-// Las estrellas se describen en texto para VoiceOver en lugar de usar símbolos
+
 function StarRow({ count = 0, size = 14 }: { count: number; size?: number }) {
   return (
     <Text
       style={{ fontSize: size, color: GOLD, letterSpacing: 2 }}
-      accessibilityLabel={`${count} de 5 estrellas`}
+      accessibilityLabel={`${count} de 5 estrellas`} //VoiceOver dirá "3 de 5 estrellas" en lugar de leer cada símbolo de estrella individualmente
     >
       {'★'.repeat(count)}
       <Text style={{ color: '#DDD' }}>{'★'.repeat(5 - count)}</Text>
@@ -269,9 +269,9 @@ function minutosRestantes(hora?: string | null): number | null {
   return Math.round((dl.getTime() - ahoraAppMs()) / 60000);
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
+
 export default function Home() {
-  const { width } = useWindowDimensions(); // Dynamic Type / tamaños adaptativos
+  const { width } = useWindowDimensions(); // Tamaños adaptativos
 
   const [modalVisible,     setModalVisible]     = useState(false);
   const [taskModalVisible, setTaskModalVisible] = useState(false);
@@ -302,15 +302,16 @@ export default function Home() {
   const { ajustes }  = useAjustesCtx();
   const reduceMotion = useReduceMotion();
 
-  // ── Carga inicial ─────────────────────────────────────────────────────────
+  
   useEffect(() => {
-    initDB();
+    initDB(); // Se inicia la bbdd y se limpian tareas viejas antes de cargar las de hoy
     const { tareasHoy, canceladasAyer, completadasAyer } = limpiarTareasViejas() as any;
     setTasks(tareasHoy.map((r: any) => ({ ...r, completed: r.completed === 1 })));
     pendientesPenalRef.current = { canceladasAyer, completadasAyer };
   }, []);
 
-  // ── Penalización del día anterior ─────────────────────────────────────────
+  // ── Penalización del día anterior ──
+  // Se ejecuta al cargar la app, si es un nuevo día y hubo tareas sin completar ayer. Penaliza restando estrellas a la puntuación total y muestra una notificación.
   useEffect(() => {
     if (gami.cargando) return;
     if (!gami.esDiaNuevo) return;
@@ -318,24 +319,25 @@ export default function Home() {
     const { canceladasAyer, completadasAyer } = pendientesPenalRef.current;
     if (canceladasAyer + completadasAyer === 0) return;
 
-    (async () => {
+    (async () => { //se usa aync para esperar a que se aplique la penalización antes de mostrar la notificación, evitando que el usuario vea un cambio brusco en su puntuación después de la notificación
       if (canceladasAyer > 0) {
-        const res = await gami.penalizarFinDia(canceladasAyer, completadasAyer) as any;
+        const res = await gami.penalizarFinDia(canceladasAyer, completadasAyer) as any; 
         if (res?.penalizacion > 0) disparaNotif('penal10');
       }
       pendientesPenalRef.current = { canceladasAyer: 0, completadasAyer: 0 };
     })();
   }, [gami.cargando, gami.esDiaNuevo]);
 
-  // ── Checks periódicos ─────────────────────────────────────────────────────
+  // ── Checks periódicos ─── Cambiar para notificaciones fuera app
   useEffect(() => {
     checkTimer.current = setInterval(() => {
       const now     = ahoraApp();
       const hora    = now.getHours();
       const minutos = now.getMinutes();
       const hoy     = hoyAppStr();
-      const pending = tasks.filter(t => !t.completed && t.fechaDia === hoy);
+      const pending = tasks.filter(t => !t.completed && t.fechaDia === hoy); // Solo tareas pendientes de hoy
 
+      // Notificación de 5 minutos restantes para tareas con hora
       for (const t of pending) {
         const mins = minutosRestantes(t.hora);
         if (mins !== null && mins > 0 && mins <= 5) {
@@ -363,10 +365,10 @@ export default function Home() {
   }, [tasks, gami.tareasCompletasHoy]);
 
   const disparaNotif = (type: string) => {
-    if (notifTimer.current) clearTimeout(notifTimer.current);
+    if (notifTimer.current) clearTimeout(notifTimer.current); // Reinicia el timer si ya hay una notificación activa, para que la nueva notificación se muestre durante el tiempo completo
     setNotifType(type);
     setShowNotif(true);
-    notifTimer.current = setTimeout(() => setShowNotif(false), 3000);
+    notifTimer.current = setTimeout(() => setShowNotif(false), 3500);   
   };
 
   const disparaRachaNotif = (racha: number) => {
@@ -404,7 +406,7 @@ export default function Home() {
   const capitalize     = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
   const formattedToday = `${capitalize(today.toLocaleDateString('es-ES', { weekday: 'long' }))}, ${today.getDate()} de ${capitalize(today.toLocaleDateString('es-ES', { month: 'long' }))} de ${today.getFullYear()}`;
 
-  // ── Completar tarea ───────────────────────────────────────────────────────
+  // ── Completar tarea ──
   const handleTareaCompletada = async (task: any) => {
     const tieneHora = task.hora && task.hora !== 'Sin hora';
     const deadline  = parseTiempoLim(task.hora);
@@ -413,7 +415,7 @@ export default function Home() {
 
     updateTareaCompletada(task.id, true, pts);
 
-    // Vibración (respeta ajustes de la app Y el ajuste de vibración del sistema iOS)
+    // Vibración: solo si la vibración está activada en ajustes y no estamos en web (donde la API de vibración es limitada y a menudo ignorada por los navegadores por razones de usabilidad)
     if (ajustes.vibracion && Platform.OS !== 'web') {
       Vibration.vibrate(enTiempo ? [0, 80, 60, 120] : [0, 60]);
     }
@@ -446,7 +448,7 @@ export default function Home() {
     setTaskModalVisible(false);
   };
 
-  // ── Eliminar tarea ────────────────────────────────────────────────────────
+  // ── Eliminar tarea ──
   const handleDeleteTask = async (task: any) => {
     if (!task.completed) {
       cancelarTarea(task.id);
@@ -460,13 +462,11 @@ export default function Home() {
     setTaskModalVisible(false);
   };
 
-  // ── Stats ─────────────────────────────────────────────────────────────────
+
   const hoy          = hoyAppStr();
   const tareasDeHoy  = tasks.filter(t => t.fechaDia === hoy);
   const totalToday   = tareasDeHoy.length;
   const doneToday    = tareasDeHoy.filter(t => t.completed).length;
-  const dailyPct     = totalToday > 0 ? Math.min((doneToday / totalToday) * 100, 100) : 0;
-  const starsToday   = gami.tareasCompletasHoy * 5;
   const pendingTasks = tareasDeHoy.filter(t =>
     !t.completed && t.title.toLowerCase().includes(search.toLowerCase())
   );
@@ -474,8 +474,8 @@ export default function Home() {
   return (
     <View style={{ flex: 1, backgroundColor: '#ffffff', paddingHorizontal: 20 }}>
 
-      {/* Notificaciones fullscreen — ocultas al árbol de accesibilidad */}
-      <SlothNotif type={notifType} show={showNotif} />
+      {/* Notificaciones */}
+      <PerezosoNotif type={notifType} show={showNotif} />
       <RachaNotif show={showRachaNotif} racha={rachaNotifVal} />
 
       <ScrollView
@@ -516,7 +516,7 @@ export default function Home() {
               accessibilityHint="Escribe para filtrar las tareas de hoy"
               clearButtonMode="while-editing"
             />
-            <Ionicons name="search" size={20} color="#999" accessibilityElementsHidden importantForAccessibility="no" />
+            <Ionicons name="search" size={20} color="#999" accessibilityElementsHidden importantForAccessibility="no" /> {/* Icono decorativo, no necesita ser accesible */}
           </View>
         </View>
 
@@ -543,8 +543,8 @@ export default function Home() {
                   accessibilityLabel="Perezoso triste"
                   accessibilityIgnoresInvertColors
                 />
-                <Text style={styles.emptyText}>No tienes tareas para hoy</Text>
-                <Text style={styles.emptySubText}>Pulsa + para añadir una tarea</Text>
+                <Text accessibilityLabel='No tines tareas para hoy' style={styles.emptyText}>No tienes tareas para hoy</Text>
+                <Text  accessibilityLabel='Pulsa + para añadir una tarea' style={styles.emptySubText}>Pulsa + para añadir una tarea</Text>
               </>
             )}
           </View>
@@ -632,7 +632,7 @@ export default function Home() {
         accessible
         accessibilityRole="button"
         accessibilityLabel="Añadir nueva tarea"
-        accessibilityHint="Abre el formulario para crear una nueva tarea de hoy"
+        accessibilityHint="Abre el formulario para crear una nueva tarea  hoy"
       >
         <Ionicons name="add" size={36} color="#FFF" accessibilityElementsHidden importantForAccessibility="no" />
       </Pressable>
@@ -950,7 +950,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
   },
 
-  // ── NOTIFICACIONES FULLSCREEN ─────────────────────────────────────────────
   fullNotifOverlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
