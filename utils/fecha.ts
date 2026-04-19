@@ -4,6 +4,7 @@
 // null = usar fecha real del dispositivo
 // 'YYYY-MM-DD' = usar esa fecha fija
 let _fechaSimulada: string | null = null;
+let horaSimulada: { h: number; m: number } | null = null;
 
 export function getFechaSimulada(): string | null {
   return _fechaSimulada;
@@ -11,6 +12,9 @@ export function getFechaSimulada(): string | null {
 
 export function setFechaSimulada(fecha: string | null) {
   _fechaSimulada = fecha;
+}
+export function setHoraSimulada(h: number | null, m: number | null) {
+  horaSimulada = h !== null && m !== null ? { h, m } : null;
 }
 
 // Avanza la fecha simulada N días (útil para testing)
@@ -29,10 +33,11 @@ export function avanzarDias(n: number): string {
 // ─── API pública (igual que antes, el resto de la app no cambia) ──────────────
 
 export function ahoraApp(): Date {
-  if (_fechaSimulada) {
-    return new Date(_fechaSimulada + 'T12:00:00');
+  const base = _fechaSimulada ? new Date(_fechaSimulada + 'T12:00:00') : new Date();
+  if (horaSimulada) {
+    base.setHours(horaSimulada.h, horaSimulada.m, 0, 0);
   }
-  return new Date();
+  return base;
 }
 
 export function hoyAppStr(): string {

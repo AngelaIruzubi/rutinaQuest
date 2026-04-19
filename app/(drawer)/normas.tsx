@@ -201,7 +201,7 @@ const s = StyleSheet.create({
   },
 
   headerTitle: {
-    fontSize: 30, fontWeight: '600',
+    fontSize: 30, fontWeight: '800',
     color: C.purple.text, textAlign: 'center', marginBottom: 4,
   },
 
