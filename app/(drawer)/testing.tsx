@@ -1,6 +1,7 @@
 // app/(drawer)/testing.tsx
 // Panel de testing de gamificación — solo visible en desarrollo (__DEV__)
 
+import * as Notifications from 'expo-notifications';
 import { useCallback, useState } from 'react';
 import {
   Alert,
@@ -12,22 +13,24 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { limpiarTareasViejas } from '../../database/database';
+import { limpiarTareasViejas, updateUsuario } from '../../database/database';
 import { useGamificacion } from '../../hooks/useGamificacion';
 import {
   avanzarDias,
   getFechaSimulada,
   hoyAppStr,
   setFechaSimulada,
+  setHoraSimulada,
 } from '../../utils/fecha';
 
-const PURPLE = '#A77BBE';
+const PURPLE    = '#A77BBE';
 const PURPLE_LT = '#E5D9EE';
 const PURPLE_BG = '#F4F0F6';
-const GREEN  = '#2E7D32';
-const RED    = '#CC3333';
-const ORANGE = '#FF6B35';
-const GOLD   = '#FFD700';
+const GREEN     = '#2E7D32';
+const RED       = '#CC3333';
+const ORANGE    = '#FF6B35';
+const GOLD      = '#FFD700';
+const BLUE      = '#1565C0';
 
 function localDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -60,13 +63,52 @@ function Divider() {
   return <View style={{ height: 1, backgroundColor: PURPLE_LT, marginVertical: 2 }} />;
 }
 
+// ─── Helpers de notificaciones ────────────────────────────────────────────────
+
+async function pedirPermisos(): Promise<boolean> {
+  const { status: existing } = await Notifications.getPermissionsAsync();
+  if (existing === 'granted') return true;
+  const { status } = await Notifications.requestPermissionsAsync();
+  return status === 'granted';
+}
+
+async function enviarNotificacionInmediata(opts: {
+  title: string;
+  body: string;
+  data?: Record<string, unknown>;
+}): Promise<string | null> {
+  const ok = await pedirPermisos();
+  if (!ok) return null;
+  const id = await Notifications.scheduleNotificationAsync({
+    content: { title: opts.title, body: opts.body, data: opts.data ?? {} },
+    trigger: null, // inmediata
+  });
+  return id;
+}
+
+async function programarNotificacion(opts: {
+  title: string;
+  body: string;
+  segundos: number;
+  data?: Record<string, unknown>;
+}): Promise<string | null> {
+  const ok = await pedirPermisos();
+  if (!ok) return null;
+  const id = await Notifications.scheduleNotificationAsync({
+    content: { title: opts.title, body: opts.body, data: opts.data ?? {} },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: opts.segundos },
+  });
+  return id;
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 export default function Testing() {
   const gami = useGamificacion() as any;
 
-  const [fechaInput, setFechaInput] = useState(hoyAppStr());
-  const [log, setLog]               = useState<string[]>([]);
-  const [_, forceUpdate]            = useState(0);
+  const [fechaInput, setFechaInput]   = useState(hoyAppStr());
+  const [log, setLog]                 = useState<string[]>([]);
+  const [notifIds, setNotifIds]       = useState<string[]>([]);
+  const [_, forceUpdate]              = useState(0);
 
   const refresh = () => forceUpdate(n => n + 1);
 
@@ -74,6 +116,15 @@ export default function Testing() {
     const ts = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     setLog(prev => [`[${ts}] ${msg}`, ...prev].slice(0, 60));
   }, []);
+
+  const registrarId = (id: string | null, nombre: string) => {
+    if (id) {
+      setNotifIds(prev => [...prev, id]);
+      addLog(`🔔 ${nombre} programada — id: ${id.slice(0, 8)}…`);
+    } else {
+      addLog(`❌ ${nombre}: sin permisos o error`);
+    }
+  };
 
   // ── Aplicar fecha ────────────────────────────────────────────────────────
   const aplicarFecha = () => {
@@ -146,6 +197,88 @@ export default function Testing() {
     ]);
   };
 
+  // ── Notificaciones ───────────────────────────────────────────────────────
+
+  const notifRecordatorioTarea = async () => {
+    const id = await enviarNotificacionInmediata({
+      title: '📋 Tarea próxima',
+      body:  'Tienes una tarea programada en 5 minutos. ¡No la olvides!',
+      data:  { tipo: 'recordatorio_tarea' },
+    });
+    registrarId(id, 'Recordatorio tarea (inmediata)');
+  };
+
+  const notifRecordatorioTarea5min = async () => {
+    const id = await programarNotificacion({
+      title:    '📋 Tarea próxima',
+      body:     'Tienes una tarea programada ahora mismo. ¡Empieza!',
+      segundos: 300,
+      data:     { tipo: 'recordatorio_tarea' },
+    });
+    registrarId(id, 'Recordatorio tarea (+5 min)');
+  };
+
+  const notifFinDia = async () => {
+    const id = await enviarNotificacionInmediata({
+      title: '🌙 Fin de día',
+      body:  `Tienes tareas sin completar. Perderás ${gami.racha > 0 ? '10' : '20'} ⭐ si no las terminas.`,
+      data:  { tipo: 'fin_dia' },
+    });
+    registrarId(id, 'Fin de día (inmediata)');
+  };
+
+  const notifPenalizacion = async () => {
+    const id = await enviarNotificacionInmediata({
+      title: '⚠️ Penalización aplicada',
+      body:  'No completaste tus tareas de ayer. Se han descontado estrellas.',
+      data:  { tipo: 'penalizacion' },
+    });
+    registrarId(id, 'Penalización (inmediata)');
+  };
+
+  const notifLogroMedalla = async (medalla: 'bronce' | 'plata' | 'oro') => {
+    const emojis = { bronce: '🥉', plata: '🥈', oro: '🥇' };
+    const nombres = { bronce: 'Bronce', plata: 'Plata', oro: 'Oro' };
+    const id = await enviarNotificacionInmediata({
+      title: `${emojis[medalla]} ¡Medalla de ${nombres[medalla]}!`,
+      body:  `Has conseguido la medalla de ${nombres[medalla]}. ¡Sigue así!`,
+      data:  { tipo: 'logro_medalla', medalla },
+    });
+    registrarId(id, `Logro medalla ${nombres[medalla]}`);
+  };
+
+  const notifRachaEnPeligro = async () => {
+    const racha = gami.racha ?? 0;
+    const id = await enviarNotificacionInmediata({
+      title: '🔥 ¡Tu racha está en peligro!',
+      body:  racha > 0
+        ? `Llevas ${racha} día(s) de racha. Completa alguna tarea hoy para mantenerla.`
+        : 'Completa una tarea hoy para empezar tu racha.',
+      data: { tipo: 'racha_peligro', racha },
+    });
+    registrarId(id, 'Racha en peligro (inmediata)');
+  };
+
+  const cancelarTodasNotifs = async () => {
+    await Notifications.cancelAllScheduledNotificationsAsync();
+    setNotifIds([]);
+    addLog('🗑️ Todas las notificaciones programadas canceladas');
+  };
+
+  const verProgramadas = async () => {
+    const programadas = await Notifications.getAllScheduledNotificationsAsync();
+    if (programadas.length === 0) {
+      addLog('📭 No hay notificaciones programadas');
+    } else {
+      addLog(`📬 ${programadas.length} notificación(es) programada(s):`);
+      programadas.forEach(n => {
+        addLog(`   • ${n.content.title} — id: ${n.identifier.slice(0, 8)}…`);
+      });
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+
   const esSimulada     = getFechaSimulada() !== null;
   const fechaActual    = hoyAppStr();
   const medallaLabel   = gami.medalla
@@ -216,6 +349,58 @@ export default function Testing() {
           <Btn label="+7 días" onPress={() => avanzar(7)} color={PURPLE} small />
         </View>
         <Btn label="🕐 Usar fecha real" onPress={usarReal} color="#555" />
+
+        <Divider />
+        <Text style={s.inputLabel}>Simular hora</Text>
+        <View style={s.btnRow}>
+          <Btn label="🕛 12:00" onPress={() => { setHoraSimulada(12, 0); addLog('🕛 Hora → 12:00'); }} color={PURPLE} small />
+          <Btn label="🕘 21:00" onPress={() => { setHoraSimulada(21, 0); addLog('🕘 Hora → 21:00'); }} color={PURPLE} small />
+          <Btn label="⏱ Real"  onPress={() => { setHoraSimulada(null, null); addLog('⏱ Hora real'); }}  color="#555"   small />
+        </View>
+
+        <Divider />
+        <Text style={s.inputLabel}>Ajustar puntos</Text>
+        <View style={s.btnRow}>
+          <Btn label="🥇 610 pts (Oro)"   onPress={() => { updateUsuario({ puntos: 610 }); addLog('⭐ Puntos → 610 (Oro)');   refresh(); }} color={GOLD}   small />
+          <Btn label="🥈 305 pts (Plata)" onPress={() => { updateUsuario({ puntos: 305 }); addLog('⭐ Puntos → 305 (Plata)'); refresh(); }} color="#AAA"   small />
+        </View>
+      </View>
+
+      {/* ── Notificaciones ── */}
+      <Text style={s.section}>NOTIFICACIONES ({notifIds.length} disparadas)</Text>
+      <View style={s.card}>
+
+        <Text style={s.inputLabel}>📋 Recordatorio de tarea</Text>
+        <View style={s.btnRow}>
+          <Btn label="Inmediata"  onPress={notifRecordatorioTarea}      color={BLUE}  small />
+          <Btn label="+5 min"     onPress={notifRecordatorioTarea5min}  color={BLUE}  small />
+        </View>
+
+        <Divider />
+        <Text style={s.inputLabel}>🌙 Fin de día / penalización</Text>
+        <View style={s.btnRow}>
+          <Btn label="Aviso fin día"   onPress={notifFinDia}       color={ORANGE} small />
+          <Btn label="Penalización"    onPress={notifPenalizacion} color={RED}    small />
+        </View>
+
+        <Divider />
+        <Text style={s.inputLabel}>🏅 Logros y medallas</Text>
+        <View style={s.btnRow}>
+          <Btn label="🥉 Bronce" onPress={() => notifLogroMedalla('bronce')} color="#CD7F32" small />
+          <Btn label="🥈 Plata"  onPress={() => notifLogroMedalla('plata')}  color="#AAA"    small />
+          <Btn label="🥇 Oro"    onPress={() => notifLogroMedalla('oro')}    color={GOLD}    small />
+        </View>
+
+        <Divider />
+        <Text style={s.inputLabel}>🔥 Racha en peligro</Text>
+        <Btn label={`Racha en peligro (actual: ${gami.racha ?? 0} días)`} onPress={notifRachaEnPeligro} color={ORANGE} />
+
+        <Divider />
+        <Text style={s.inputLabel}>Gestión</Text>
+        <View style={s.btnRow}>
+          <Btn label="📬 Ver programadas"  onPress={verProgramadas}      color={PURPLE} small />
+          <Btn label="🗑️ Cancelar todas"   onPress={cancelarTodasNotifs} color={RED}    small />
+        </View>
       </View>
 
       {/* ── Simular arranque ── */}
@@ -249,7 +434,7 @@ export default function Testing() {
 
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 60 : 40 },
+  root:  { flex: 1, backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 60 : 40 },
   title: { fontSize: 26, fontWeight: '800', color: PURPLE, textAlign: 'center' },
   sub:   { fontSize: 13, color: '#AAA', textAlign: 'center', marginBottom: 20 },
 
@@ -277,7 +462,7 @@ const s = StyleSheet.create({
     fontSize: 15, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
 
-  btnRow: { flexDirection: 'row', gap: 8 },
+  btnRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   btn:    { borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
   btnSm:  { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10 },
   btnTxt:   { color: '#fff', fontWeight: '700', fontSize: 14 },

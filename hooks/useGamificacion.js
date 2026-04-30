@@ -82,11 +82,19 @@ export function useGamificacion() {
         const diff = diasDif(hoyStr, guardado.ultimaFecha);
         if (diff !== 1) guardado.racha = 0;
       }
-      guardado.tareasCompletasHoy   = 0;
-      guardado.fechaHoy             = hoyStr;
-      guardado.penalizacionAplicada = false;
+      guardado.tareasCompletasHoy = 0;
+      guardado.fechaHoy           = hoyStr;
+      // Reseteamos penalizacionAplicada SOLO si la última penalización
+      // fue de un día anterior (no de hoy). Así en recargas del mismo
+      // día nuevo no se vuelve a penalizar, pero al día siguiente sí puede.
+      const fechaPenal = guardado.fechaPenalizacion ?? null;
+      if (fechaPenal !== hoyStr) {
+        guardado.penalizacionAplicada = false;
+      }
       await storage.set(STATE_KEY, guardado);
       setEsDiaNuevo(true);
+    } else {
+      setEsDiaNuevo(false);
     }
     setEstado({ ...ESTADO_INICIAL, ...guardado });
   }
@@ -96,32 +104,6 @@ export function useGamificacion() {
 
   useEffect(() => {
     cargarEstado();
-  }, []);
- 
-  useEffect(() => {
-    (async () => {
-      const guardado = await storage.get(STATE_KEY);
-      if (guardado) {
-        const hoyStr = hoy();
-
-        if (guardado.fechaHoy !== hoyStr) {
-          // Día nuevo: resetear contador y racha si corresponde
-          // La penalización la aplica index.tsx con la info de la BD
-          if (guardado.ultimaFecha) {
-            const diff = diasDif(hoyStr, guardado.ultimaFecha);
-            if (diff !== 1) guardado.racha = 0; // saltó días → racha rota
-          }
-          guardado.tareasCompletasHoy   = 0;
-          guardado.fechaHoy             = hoyStr;
-          guardado.penalizacionAplicada = false; // reset para el nuevo día
-          await storage.set(STATE_KEY, guardado);
-          setEsDiaNuevo(true);
-        }
-
-        setEstado({ ...ESTADO_INICIAL, ...guardado });
-      }
-      setCargando(false);
-    })();
   }, []);
  
   const persist = useCallback(async (siguiente) => {
@@ -181,35 +163,39 @@ export function useGamificacion() {
   // Si 0 → no hizo nada → -20 y racha rota
   // Si >0 → dejó algunas → -10, racha intacta
   const penalizarFinDia = useCallback(async (tareasNoHechas, tareasHechasHoy = 0) => {
-    return new Promise((resolve) => {
-      setEstado((prev) => {
-        if (prev.penalizacionAplicada) {
-          resolve({ penalizacion: 0, nuevoEstado: prev });
-          return prev; // ya se penalizó hoy, no repetir
-        }
-        const penalizacion    = tareasHechasHoy === 0 ? 20 : 10;
-        const motivo          = tareasHechasHoy === 0 ? 'Sin tareas' : 'Tareas sin completar';
-        const nuevasEstrellas = Math.max(0, (prev.estrellas ?? 0) - penalizacion);
-        const historial = [...(prev.historialPenalizaciones ?? [])];
-        const hoyStr2 = hoy();
-        if (!historial.find(h => h.fecha === hoyStr2)) {
-          historial.unshift({ fecha: hoyStr2, puntos: -penalizacion, motivo });
-          if (historial.length > 30) historial.pop();
-        }
-        const nuevoEstado = {
-          ...prev,
-          estrellas:               nuevasEstrellas,
-          totalHecho:              nuevasEstrellas,
-          racha:                   tareasHechasHoy === 0 ? 0 : prev.racha,
-          penalizacionAplicada:    true,
-          historialPenalizaciones: historial,
-        };
-        persist(nuevoEstado);
-        resolve({ penalizacion, nuevoEstado });
-        return nuevoEstado;
-      });
+  return new Promise((resolve) => {
+    setEstado((prev) => {
+      if (prev.penalizacionAplicada) {
+        resolve({ penalizacion: 0, nuevoEstado: prev });
+        return prev;
+      }
+
+      const penalizacion    = 10;
+      const motivo          = 'Tareas sin completar';
+      const nuevasEstrellas = Math.max(0, (prev.estrellas ?? 0) - penalizacion);
+
+      const historial = [...(prev.historialPenalizaciones ?? [])];
+      const hoyStr2 = hoy();
+      if (!historial.find(h => h.fecha === hoyStr2)) {
+        historial.unshift({ fecha: hoyStr2, puntos: -penalizacion, motivo });
+        if (historial.length > 30) historial.pop();
+      }
+
+      const nuevoEstado = {
+        ...prev,
+        estrellas:               nuevasEstrellas,
+        totalHecho:              nuevasEstrellas,
+        racha:                   prev.racha,
+        penalizacionAplicada:    true,
+        fechaPenalizacion:       hoyStr2, // día en que se aplicó
+        historialPenalizaciones: historial,
+      };
+      persist(nuevoEstado);
+      resolve({ penalizacion, nuevoEstado });
+      return nuevoEstado;
     });
-  }, [persist]);
+  });
+}, [persist]);
  
   const resetearDia = useCallback(async () => {
     setEstado((prev) => {
@@ -228,6 +214,7 @@ export function useGamificacion() {
     historialPenalizaciones: estado.historialPenalizaciones ?? [],
     fechaHoy:                estado.fechaHoy,
     ultimaFecha:             estado.ultimaFecha,
+    fechaPenalizacion:       estado.fechaPenalizacion ?? null,
     cargando,
     esDiaNuevo,
     medallas:                getMedallas(estado.estrellas ?? 0),
@@ -237,8 +224,17 @@ export function useGamificacion() {
     resetearDia,
     penalizarFinDia,
     recargar: cargarEstado,
-  };
+    forzarEstrellas: useCallback(async (estrellas) => {
+      setEstado(prev => {
+        const next = { ...prev, estrellas, totalHecho: estrellas };
+        persist(next);
+        return next;
+      });
+    }, [persist]),
+      };
+  
 }
+
  
 // Medallas por estrellas: Bronce 100⭐ · Plata 300⭐ · Oro 600⭐
 export function getMedalla(estrellas) {
@@ -255,6 +251,7 @@ export function getMedallas(estrellas) {
     oro:    estrellas >= 600,
   };
 }
+
 
 export function calcularProgresos(estrellas) {
   const progresBronce = Math.min(estrellas, 100);

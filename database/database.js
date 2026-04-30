@@ -3,12 +3,6 @@ import { hoyAppStr } from '../utils/fecha';
 
 let db = null;
 
-// ─── FECHA SIMULADA ───────────────────────────────────────────────────────────
-// Debe ser el mismo valor que en index.tsx e historial.tsx
-// Formato: 'YYYY-MM-DD'  |  null para fecha real
-
-// ─────────────────────────────────────────────────────────────────────────────
-
 function getDB() {
   if (!db) {
     const SQLite = require('expo-sqlite');
@@ -99,18 +93,19 @@ export function getTareas() {
   return getDB().getAllSync('SELECT * FROM tareas');
 }
 
-// ── Historial: completadas Y canceladas ───────────────────────────────────────
-// Compatibilidad con datos viejos:
-//   - estado='completada' o estado='cancelada'  → los nuevos
-//   - completed=1 con estado NULL o 'pendiente' → datos viejos ya completados
-//   - estado='cancelada' ya cubre cancelaciones nuevas
+// ── Historial: completadas, canceladas Y vencidas ─────────────────────────────
+// estados:
+//   'completada'      → tarea realizada ✓
+//   'cancelada'       → eliminada manualmente por el usuario
+//   'vencida'         → se quedó pendiente al pasar el día (genera penalización)
 export function getTareasHistorial() {
   if (Platform.OS === 'web') {
     return getTareas()
       .filter(t =>
         t.estado === 'completada' ||
         t.estado === 'cancelada'  ||
-        t.completed === 1          // compatibilidad con datos viejos
+        t.estado === 'vencida'    ||
+        t.completed === 1
       )
       .sort((a, b) => {
         const fa = a.fechaCompletada || a.fechaDia || '';
@@ -120,13 +115,13 @@ export function getTareasHistorial() {
   }
   return getDB().getAllSync(`
     SELECT * FROM tareas
-    WHERE estado IN ('completada','cancelada')
+    WHERE estado IN ('completada','cancelada','vencida')
        OR completed = 1
     ORDER BY COALESCE(fechaCompletada, fechaDia) DESC
   `);
 }
 
-// ── Insertar tarea (hoy o fecha concreta) ────────────────────────────────────
+// ── Insertar tarea ────────────────────────────────────────────────────────────
 export function insertTarea(tarea, fechaDiaParam) {
   const fechaDia = fechaDiaParam ?? hoyAppStr();
 
@@ -150,10 +145,14 @@ export function insertTarea(tarea, fechaDiaParam) {
 // ── Obtener tareas de una fecha concreta ──────────────────────────────────────
 export function getTareasPorFecha(fecha) {
   if (Platform.OS === 'web') {
-    return getTareas().filter(t => t.fechaDia === fecha && t.estado !== 'cancelada');
+    return getTareas().filter(t =>
+      t.fechaDia === fecha && t.estado !== 'cancelada' && t.estado !== 'vencida'
+    );
   }
   return getDB().getAllSync(
-    `SELECT * FROM tareas WHERE fechaDia = ? AND estado != 'cancelada' ORDER BY hora ASC`,
+    `SELECT * FROM tareas
+     WHERE fechaDia = ? AND estado NOT IN ('cancelada','vencida')
+     ORDER BY hora ASC`,
     [fecha]
   );
 }
@@ -161,18 +160,20 @@ export function getTareasPorFecha(fecha) {
 // ── Obtener fechas con tareas (para el calendario) ────────────────────────────
 export function getFechasConTareas() {
   if (Platform.OS === 'web') {
-    const tareas = getTareas().filter(t => t.estado !== 'cancelada' && t.fechaDia);
+    const tareas = getTareas().filter(t =>
+      t.estado !== 'cancelada' && t.estado !== 'vencida' && t.fechaDia
+    );
     const fechas = {};
     for (const t of tareas) {
       if (!fechas[t.fechaDia]) fechas[t.fechaDia] = 0;
       fechas[t.fechaDia]++;
     }
-    return fechas; // { 'YYYY-MM-DD': count }
+    return fechas;
   }
   const rows = getDB().getAllSync(
     `SELECT fechaDia, COUNT(*) as count
      FROM tareas
-     WHERE estado != 'cancelada' AND fechaDia IS NOT NULL
+     WHERE estado NOT IN ('cancelada','vencida') AND fechaDia IS NOT NULL
      GROUP BY fechaDia`
   );
   const fechas = {};
@@ -180,9 +181,9 @@ export function getFechasConTareas() {
   return fechas;
 }
 
-// ── Marcar completada ──────────────────────────────────────────────────────────
+// ── Marcar completada ─────────────────────────────────────────────────────────
 export function updateTareaCompletada(id, completed, stars = 5) {
-  const fecha  = completed ? hoyAppStr() : null; // usa fecha simulada
+  const fecha  = completed ? hoyAppStr() : null;
   const estado = completed ? 'completada' : 'pendiente';
 
   if (Platform.OS === 'web') {
@@ -200,29 +201,22 @@ export function updateTareaCompletada(id, completed, stars = 5) {
   );
 }
 
-// ── Cancelar tarea (queda en historial, no se borra físicamente) ───────────────
+// ── Cancelar tarea manualmente (NO genera penalización) ──────────────────────
+// El usuario la elimina a propósito → estado 'cancelada'
 export function cancelarTarea(id) {
   const hoy = hoyAppStr();
 
   if (Platform.OS === 'web') {
     const tareas = getTareas().map(t =>
       t.id === id
-        ? {
-            ...t,
-            estado: 'cancelada',
-            completed: 0,
-            fechaCompletada: hoy,
-          }
+        ? { ...t, estado: 'cancelada', completed: 0, fechaCompletada: hoy }
         : t
     );
     localStorage.setItem('tareas', JSON.stringify(tareas));
     return;
   }
-
   getDB().runSync(
-    `UPDATE tareas
-     SET estado='cancelada', completed=0, fechaCompletada=?
-     WHERE id=?`,
+    `UPDATE tareas SET estado='cancelada', completed=0, fechaCompletada=? WHERE id=?`,
     [hoy, id]
   );
 }
@@ -249,98 +243,73 @@ export function deleteTarea(id) {
 
 // ── RESET DIARIO ──────────────────────────────────────────────────────────────
 // Se llama al arrancar la app.
-// - Tareas pendientes de días ANTERIORES → se marcan como canceladas (van al historial)
-// - Tareas de HOY (pendientes o completadas) → NO se tocan
-// - Devuelve SOLO las tareas de hoy (para mostrar en index)
+//
+// ESTADOS resultantes:
+//   'vencida'   → pendiente al terminar el día → SÍ genera penalización de -10
+//   'cancelada' → eliminada manualmente por el usuario → NO genera penalización
+//   'completada'→ realizada → NO genera penalización
+//
+// Devuelve:
+//   tareasHoy       → tareas para mostrar en pantalla principal
+//   vencidasAyer    → tareas que se quedaron sin hacer (para penalizar)
+//   completadasAyer → tareas completadas ayer (info, no penaliza)
 export function limpiarTareasViejas() {
-  const hoy = hoyAppStr(); // usa fecha simulada si está activa
+  const hoy  = hoyAppStr();
+  // Calcular ayer en formato YYYY-MM-DD
+  const [y, m, d] = hoy.split('-').map(Number);
+  const ayerDate  = new Date(y, m - 1, d - 1);
+  const ayer      = `${ayerDate.getFullYear()}-${String(ayerDate.getMonth()+1).padStart(2,'0')}-${String(ayerDate.getDate()).padStart(2,'0')}`;
 
   if (Platform.OS === 'web') {
     const todas = getTareas();
 
+    // Marcar como vencidas las pendientes de días anteriores
     const actualizadas = todas.map(t => {
       const fechaDia = t.fechaDia ?? hoy;
-      const estado = t.estado ?? (t.completed === 1 ? 'completada' : 'pendiente');
-
-      const esDiaAnterior = fechaDia < hoy; // solo cancelar días PASADOS, no futuros
-      const esPendiente = estado === 'pendiente';
-
-      if (esDiaAnterior && esPendiente) {
-        return {
-          ...t,
-          fechaDia,
-          estado: 'cancelada',
-          completed: 0,
-          fechaCompletada: fechaDia,
-        };
+      const estado   = t.estado ?? (t.completed === 1 ? 'completada' : 'pendiente');
+      if (fechaDia < hoy && estado === 'pendiente') {
+        return { ...t, fechaDia, estado: 'vencida', completed: 0, fechaCompletada: fechaDia };
       }
-
-      return {
-        ...t,
-        fechaDia,
-        estado,
-      };
+      return { ...t, fechaDia, estado };
     });
 
     localStorage.setItem('tareas', JSON.stringify(actualizadas));
 
     const tareasHoy = actualizadas.filter(t => t.fechaDia === hoy);
+    // Solo contamos las vencidas de AYER, no de toda la historia
+    const vencidasAyer = actualizadas.filter(t =>
+      t.fechaDia === ayer && t.estado === 'vencida'
+    ).length;
 
-    // Calcular info de ayer para penalización
-    const ayer = actualizadas.filter(t => t.fechaDia !== hoy);
-    const canceladasAyer = ayer.filter(t => t.estado === 'cancelada').length;
-    const completadasAyer = ayer.filter(t => t.estado === 'completada' || t.completed === 1).length;
-
-    return { tareasHoy, canceladasAyer, completadasAyer };
+    return { tareasHoy, vencidasAyer };
   }
 
-  // ── SQLite nativo ────────────────────────────────────────────────────────
-
-  // Rellenar tareas antiguas sin fechaDia
-  getDB().runSync(
-    `UPDATE tareas SET fechaDia=? WHERE fechaDia IS NULL`,
-    [hoy]
-  );
-
-  // Si alguna tarea antigua no tiene estado, reconstruirlo
+  // ── SQLite nativo ─────────────────────────────────────────────────────────
+  getDB().runSync(`UPDATE tareas SET fechaDia=? WHERE fechaDia IS NULL`, [hoy]);
   getDB().runSync(`
     UPDATE tareas
-    SET estado = CASE
-      WHEN completed = 1 THEN 'completada'
-      ELSE 'pendiente'
-    END
+    SET estado = CASE WHEN completed = 1 THEN 'completada' ELSE 'pendiente' END
     WHERE estado IS NULL
   `);
 
-  // Contar canceladas y completadas de AYER antes de cancelar
-  // (para calcular la penalización correcta)
-  const ayer = getDB().getFirstSync(
-    `SELECT
-       COUNT(CASE WHEN estado='cancelada' AND fechaDia != ? THEN 1 END) as canceladas,
-       COUNT(CASE WHEN estado='completada' AND fechaDia != ? THEN 1 END) as completadas
-     FROM tareas WHERE fechaDia != ?`,
-    [hoy, hoy, hoy]
-  ) ?? { canceladas: 0, completadas: 0 };
-
-  // Cancelar SOLO pendientes de días ANTERIORES a hoy (no futuros)
+  // Marcar pendientes de días anteriores como vencidas
   getDB().runSync(
     `UPDATE tareas
-     SET estado='cancelada',
-         completed=0,
-         fechaCompletada=fechaDia
-     WHERE fechaDia < ?
-       AND estado='pendiente'`,
+     SET estado='vencida', completed=0, fechaCompletada=fechaDia
+     WHERE fechaDia < ? AND estado='pendiente'`,
     [hoy]
   );
+
+  // Solo contar vencidas de AYER (no acumula días anteriores)
+  const vencidasAyer = getDB().getFirstSync(
+    `SELECT COUNT(*) as total FROM tareas
+     WHERE fechaDia = ? AND estado = 'vencida'`,
+    [ayer]
+  )?.total ?? 0;
 
   const tareasHoy = getDB().getAllSync(
-    `SELECT * FROM tareas WHERE fechaDia = ? ORDER BY id DESC`,
-    [hoy]
+    `SELECT * FROM tareas WHERE fechaDia = ? ORDER BY id DESC`, [hoy]
   );
 
-  return {
-    tareasHoy,
-    canceladasAyer: ayer.canceladas,
-    completadasAyer: ayer.completadas,
-  };
+  return { tareasHoy, vencidasAyer };
 }
