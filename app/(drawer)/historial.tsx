@@ -9,6 +9,7 @@ import {
   Image,
   Linking,
   Modal,
+  PixelRatio,
   Platform,
   Pressable,
   ScrollView,
@@ -25,6 +26,7 @@ import { useGamificacion } from '../../hooks/useGamificacion';
 import { fechaAppDate, hoyAppStr } from '../../utils/fecha';
 
 const PURPLE    = '#A77BBE';
+const ORANGE    = '#FF6B35';
 const PURPLE_LT = '#E5D9EE';
 const PURPLE_BG = '#F4F0F6';
 const GREEN     = '#58CC02';
@@ -116,7 +118,7 @@ function TarjetaCompartir({ avatar, gami, tareasUltimaSemana }: {
 }) {
   const medallaEmoji = gami.medalla ? ({ bronce: '🥉', plata: '🥈', oro: '🥇' } as any)[gami.medalla] : null;
   const completadas  = tareasUltimaSemana.filter(t => t.estado === 'completada' || (t.completed === 1 && !t.estado));
-  const canceladas   = tareasUltimaSemana.filter(t => t.estado === 'cancelada');
+  const canceladas   = tareasUltimaSemana.filter(t => t.estado === 'cancelada' || t.estado === 'vencida');
 
   return (
     <View style={tc.card} collapsable={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
@@ -215,6 +217,7 @@ export default function Historial() {
   );
   const completadasDia = tareasDelDia.filter(t => t.estado === 'completada' || (t.completed === 1 && !t.estado));
   const canceladasDia  = tareasDelDia.filter(t => t.estado === 'cancelada');
+  const vencidasDia    = tareasDelDia.filter(t => t.estado === 'vencida');
 
   const nombreDia = new Date(diaSeleccionado+'T12:00:00')
     .toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -222,7 +225,7 @@ export default function Historial() {
   // ── Texto para compartir ──────────────────────────────────────────────────
   const buildTextoCompartir = () => {
     const completadas  = tareasUltimaSemana.filter(t => t.estado === 'completada' || (t.completed === 1 && !t.estado));
-    const canceladas   = tareasUltimaSemana.filter(t => t.estado === 'cancelada');
+    const canceladas   = tareasUltimaSemana.filter(t => t.estado === 'cancelada' || t.estado === 'vencida');
     const medallaEmoji = gami.medalla ? ({ bronce: '🥉', plata: '🥈', oro: '🥇' } as any)[gami.medalla] : '';
     return [
       '🌟 RutinaQuest · Mi historial', '',
@@ -335,48 +338,52 @@ export default function Historial() {
       >
         <Text style={styles.titulo} accessibilityRole="header">Historial</Text>
 
-        <Pressable onPress={() => router.replace('/')} style={styles.btnInicio} accessible accessibilityRole="button" accessibilityLabel="Ir a Inicio">
-          <Ionicons name="home-outline" size={16} color={PURPLE} accessibilityElementsHidden importantForAccessibility="no" />
-          <Text style={styles.btnInicioTxt}>Inicio</Text>
-        </Pressable>
+        
 
         {/* Botones compartir */}
         <View style={styles.shareRow} accessible={false}>
-          <Pressable
-            onPress={() => iniciarCompartir('whatsapp')}
-            disabled={compartiendo}
-            style={[styles.shareBtn, { backgroundColor: '#25D366' }, compartiendo && { opacity: 0.5 }]}
-            accessible accessibilityRole="button"
-            accessibilityLabel="Compartir por WhatsApp"
-            accessibilityState={{ disabled: compartiendo }}
-          >
-            <Ionicons name="logo-whatsapp" size={18} color="#fff" accessibilityElementsHidden importantForAccessibility="no" />
-            <Text style={styles.shareBtnTxt}>WhatsApp</Text>
+          <Pressable onPress={() => router.replace('/')} style={styles.btnInicio} accessible accessibilityRole="button" accessibilityLabel="Ir a Inicio">
+            <Ionicons name="home-outline" size={16} color={PURPLE} accessibilityElementsHidden importantForAccessibility="no" />
+            <Text style={styles.btnInicioTxt}>Inicio</Text>
           </Pressable>
 
-          <Pressable
-            onPress={() => iniciarCompartir('gmail')}
-            disabled={compartiendo}
-            style={[styles.shareBtn, { backgroundColor: '#EA4335' }, compartiendo && { opacity: 0.5 }]}
-            accessible accessibilityRole="button"
-            accessibilityLabel="Compartir por Gmail"
-            accessibilityState={{ disabled: compartiendo }}
-          >
-            <Ionicons name="mail-outline" size={18} color="#fff" accessibilityElementsHidden importantForAccessibility="no" />
-            <Text style={styles.shareBtnTxt}>Gmail</Text>
-          </Pressable>
+          <View style={styles.shareBtnsRow} accessible={false}>
+            <Pressable
+              onPress={() => iniciarCompartir('whatsapp')}
+              disabled={compartiendo}
+              style={[styles.shareBtn, { backgroundColor: '#25D366' }, compartiendo && { opacity: 0.5 }]}
+              accessible accessibilityRole="button"
+              accessibilityLabel="Compartir por WhatsApp"
+              accessibilityState={{ disabled: compartiendo }}
+            >
+              <Ionicons name="logo-whatsapp" size={16} color="#fff" accessibilityElementsHidden importantForAccessibility="no" />
+              <Text style={styles.shareBtnTxt} numberOfLines={1}>WhatsApp</Text>
+            </Pressable>
 
-          <Pressable
-            onPress={() => iniciarCompartir('nativo')}
-            disabled={compartiendo}
-            style={[styles.shareBtn, { backgroundColor: PURPLE }, compartiendo && { opacity: 0.5 }]}
-            accessible accessibilityRole="button"
-            accessibilityLabel={compartiendo ? 'Preparando imagen' : 'Más opciones para compartir'}
-            accessibilityState={{ disabled: compartiendo }}
-          >
-            <Ionicons name="share-social-outline" size={18} color="#fff" accessibilityElementsHidden importantForAccessibility="no" />
-            <Text style={styles.shareBtnTxt}>{compartiendo ? '...' : 'Más'}</Text>
-          </Pressable>
+            <Pressable
+              onPress={() => iniciarCompartir('gmail')}
+              disabled={compartiendo}
+              style={[styles.shareBtn, { backgroundColor: '#EA4335' }, compartiendo && { opacity: 0.5 }]}
+              accessible accessibilityRole="button"
+              accessibilityLabel="Compartir por Gmail"
+              accessibilityState={{ disabled: compartiendo }}
+            >
+              <Ionicons name="mail-outline" size={16} color="#fff" accessibilityElementsHidden importantForAccessibility="no" />
+              <Text style={styles.shareBtnTxt} numberOfLines={1}>Gmail</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => iniciarCompartir('nativo')}
+              disabled={compartiendo}
+              style={[styles.shareBtn, { backgroundColor: PURPLE }, compartiendo && { opacity: 0.5 }]}
+              accessible accessibilityRole="button"
+              accessibilityLabel={compartiendo ? 'Preparando imagen' : 'Más opciones para compartir'}
+              accessibilityState={{ disabled: compartiendo }}
+            >
+              <Ionicons name="share-social-outline" size={16} color="#fff" accessibilityElementsHidden importantForAccessibility="no" />
+              <Text style={styles.shareBtnTxt} numberOfLines={1}>{compartiendo ? '...' : 'Más'}</Text>
+            </Pressable>
+          </View>
         </View>
 
         {/* Buscador */}
@@ -434,14 +441,14 @@ export default function Historial() {
             ).length;
             const nX = historial.filter(t =>
               fechaReferencia(t) === fecha &&
-              t.estado === 'cancelada'
+              (t.estado === 'cancelada' || t.estado === 'vencida')
             ).length;
 
             const partes = [DIAS_CORTOS_LARGO[idx]];
             if (esHoy) partes.push('hoy');
             if (sel)   partes.push('seleccionado');
             if (nC > 0) partes.push(`${nC} completada${nC > 1 ? 's' : ''}`);
-            if (nX > 0) partes.push(`${nX} cancelada${nX > 1 ? 's' : ''}`);
+            if (nX > 0) partes.push(`${nX} no realizada${nX > 1 ? 's' : ''}`);
 
             return (
               <Pressable
@@ -478,13 +485,13 @@ export default function Historial() {
             <View
               style={styles.diaBadgesRow}
               accessible
-              accessibilityLabel={`${completadasDia.length} realizadas, ${canceladasDia.length} canceladas`}
+              accessibilityLabel={`${completadasDia.length} realizadas, ${canceladasDia.length + vencidasDia.length} no realizadas`}
             >
               <View style={[styles.diaBadge, { backgroundColor: PURPLE_BG, borderColor: PURPLE, borderWidth: 1 }]}>
                 <Text style={[styles.diaBadgeText, { color: PURPLE }]} accessibilityElementsHidden importantForAccessibility="no">✓ {completadasDia.length}</Text>
               </View>
               <View style={[styles.diaBadge, { backgroundColor: PURPLE_BG, borderColor: PURPLE, borderWidth: 1 }]}>
-                <Text style={[styles.diaBadgeText, { color: PURPLE }]} accessibilityElementsHidden importantForAccessibility="no">✕ {canceladasDia.length}</Text>
+                <Text style={[styles.diaBadgeText, { color: PURPLE }]} accessibilityElementsHidden importantForAccessibility="no">✕ {canceladasDia.length + vencidasDia.length}</Text>
               </View>
             </View>
           )}
@@ -522,29 +529,51 @@ export default function Historial() {
               }
             </View>
 
-            {/* Columna canceladas */}
+            {/* Columna no realizadas: canceladas + vencidas (saltadas) */}
             <View style={styles.columna}>
               <View style={[styles.columnaHeader, { backgroundColor: PURPLE_BG, borderColor: PURPLE }]}>
-                <Text style={[styles.columnaHeaderText, { color: PURPLE }]} accessibilityRole="header" accessibilityLabel={`Canceladas: ${canceladasDia.length}`}>
-                  ✕ Canceladas
+                <Text style={[styles.columnaHeaderText, { color: PURPLE }]} accessibilityRole="header" accessibilityLabel={`No realizadas: ${canceladasDia.length + vencidasDia.length}`}>
+                  ✕ No realizadas
                 </Text>
               </View>
-              {canceladasDia.length === 0
-                ? <Text style={styles.colEmpty} accessibilityLabel="Ninguna tarea cancelada">Ninguna</Text>
-                : canceladasDia.map(item => (
-                  <View key={item.id} style={[styles.tareaCard, { borderLeftColor: RED, opacity: 0.75 }]} accessible accessibilityLabel={`${item.title}, cancelada${item.hora && item.hora !== 'Sin hora' ? `, hora ${item.hora}` : ''}`}>
-                    {item.pictogramId && (
-                      <Image source={{ uri: `https://static.arasaac.org/pictograms/${item.pictogramId}/${item.pictogramId}_300.png` }} style={styles.pictogram} accessibilityElementsHidden importantForAccessibility="no" accessibilityIgnoresInvertColors />
-                    )}
-                    <Text style={[styles.tareaTitle, { textDecorationLine: 'line-through', color: '#888' }]} numberOfLines={2} accessibilityElementsHidden importantForAccessibility="no">
-                      {item.title}
-                    </Text>
-                    {item.hora && item.hora !== 'Sin hora' && (
-                      <Text style={styles.tareaHora} accessibilityElementsHidden importantForAccessibility="no">{item.hora}</Text>
-                    )}
-                  </View>
-                ))
-              }
+
+              {canceladasDia.length === 0 && vencidasDia.length === 0 ? (
+                <Text style={styles.colEmpty} accessibilityLabel="Ninguna tarea sin realizar">Ninguna</Text>
+              ) : (
+                <>
+                  {/* Eliminadas manualmente */}
+                  {canceladasDia.map(item => (
+                    <View key={item.id} style={[styles.tareaCard, { borderLeftColor: RED, opacity: 0.75 }]} accessible accessibilityLabel={`${item.title}, eliminada${item.hora && item.hora !== 'Sin hora' ? `, hora ${item.hora}` : ''}`}>
+                      {item.pictogramId && (
+                        <Image source={{ uri: `https://static.arasaac.org/pictograms/${item.pictogramId}/${item.pictogramId}_300.png` }} style={styles.pictogram} accessibilityElementsHidden importantForAccessibility="no" accessibilityIgnoresInvertColors />
+                      )}
+                      <Text style={[styles.tareaTitle, { textDecorationLine: 'line-through', color: '#888' }]} numberOfLines={2} accessibilityElementsHidden importantForAccessibility="no">
+                        {item.title}
+                      </Text>
+                      <Text style={{ fontSize: 10, color: RED, fontWeight: '600', marginTop: 2 }} accessibilityElementsHidden importantForAccessibility="no">Eliminada</Text>
+                      {item.hora && item.hora !== 'Sin hora' && (
+                        <Text style={styles.tareaHora} accessibilityElementsHidden importantForAccessibility="no">{item.hora}</Text>
+                      )}
+                    </View>
+                  ))}
+
+                  {/* Sin hacer — se quedaron pendientes */}
+                  {vencidasDia.map(item => (
+                    <View key={item.id} style={[styles.tareaCard, { borderLeftColor: ORANGE, opacity: 0.85 }]} accessible accessibilityLabel={`${item.title}, saltada${item.hora && item.hora !== 'Sin hora' ? `, hora ${item.hora}` : ''}`}>
+                      {item.pictogramId && (
+                        <Image source={{ uri: `https://static.arasaac.org/pictograms/${item.pictogramId}/${item.pictogramId}_300.png` }} style={styles.pictogram} accessibilityElementsHidden importantForAccessibility="no" accessibilityIgnoresInvertColors />
+                      )}
+                      <Text style={[styles.tareaTitle, { textDecorationLine: 'line-through', color: '#888' }]} numberOfLines={2} accessibilityElementsHidden importantForAccessibility="no">
+                        {item.title}
+                      </Text>
+                      <Text style={{ fontSize: 10, color: ORANGE, fontWeight: '600', marginTop: 2 }} accessibilityElementsHidden importantForAccessibility="no">Saltada</Text>
+                      {item.hora && item.hora !== 'Sin hora' && (
+                        <Text style={styles.tareaHora} accessibilityElementsHidden importantForAccessibility="no">{item.hora}</Text>
+                      )}
+                    </View>
+                  ))}
+                </>
+              )}
             </View>
           </View>
         )}
@@ -554,52 +583,55 @@ export default function Historial() {
 }
 
 // ─── Estilos ──────────────────────────────────────────────────────────────────
+const fs = (size: number) => Math.round(size * Math.min(PixelRatio.getFontScale(), 1.4));
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#fff', paddingTop: Platform.OS === 'ios' ? 60 : 40, paddingHorizontal: 20 },
 
   modalCapturaOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
   capturaLoading:      { position: 'absolute', bottom: 40, backgroundColor: PURPLE, borderRadius: 20, paddingHorizontal: 20, paddingVertical: 10 },
-  capturaLoadingTxt:   { color: '#fff', fontWeight: '700', fontSize: 14 },
+  capturaLoadingTxt:   { color: '#fff', fontWeight: '700', fontSize: fs(14) },
 
-  btnInicio:    { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: PURPLE + '18', borderRadius: 20, alignSelf: 'flex-start', marginBottom: 8, minHeight: 44 },
-  btnInicioTxt: { color: PURPLE, fontWeight: '600', fontSize: 13 },
-  titulo:       { fontSize: 30, fontWeight: '800', color: PURPLE, marginBottom: 16, textAlign: 'center' },
+  btnInicio:    { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: PURPLE + '18', borderRadius: 20, alignSelf: 'center', minHeight: 40 },
+  btnInicioTxt: { color: PURPLE, fontWeight: '600', fontSize: fs(13) },
+  titulo:       { fontSize: fs(30), fontWeight: '800', color: PURPLE, marginBottom: 16, textAlign: 'center' },
 
-  shareRow:    { flexDirection: 'row', gap: 10, justifyContent: 'center', marginBottom: 20 },
-  shareBtn:    { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 22, elevation: 2, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 4, minHeight: 44 },
-  shareBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  shareRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 8 },
+  shareBtnsRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
+  shareBtn:     { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 22, minHeight: 40, flexShrink: 1 },
+  shareBtnTxt:  { color: '#fff', fontWeight: '700', fontSize: fs(12), flexShrink: 1 },
 
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f3f2f2', borderRadius: 25, paddingHorizontal: 15, paddingVertical: 10, marginBottom: 20, minHeight: 44 },
 
   weekSelector: { flexDirection: 'row', alignItems: 'center', backgroundColor: PURPLE_BG, borderRadius: 16, paddingVertical: 10, paddingHorizontal: 6, marginBottom: 12, borderWidth: 1.5, borderColor: PURPLE_LT },
   weekArrow:    { padding: 6 },
-  weekLabel:    { fontSize: 20, fontWeight: '700', color: PURPLE, textAlign: 'center' },
+  weekLabel:    { fontSize: fs(16), fontWeight: '700', color: PURPLE, textAlign: 'center', flexShrink: 1 },
 
   daysStrip: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FAFAFA', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 8, marginBottom: 20, borderWidth: 1, borderColor: '#EEE' },
   dayBtn:    { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 8, borderRadius: 12, marginHorizontal: 2, minHeight: 50 },
   dayBtnSel: { backgroundColor: PURPLE },
   dayBtnHoy: { backgroundColor: PURPLE_LT },
-  dayBtnLbl: { fontSize: 11, color: '#AAA', fontWeight: '600' },
+  dayBtnLbl: { fontSize: fs(11), color: '#AAA', fontWeight: '600' },
   dot:       { width: 5, height: 5, borderRadius: 3 },
 
   diaHeader:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  diaNombre:    { fontSize: 14, fontWeight: '700', color: '#555', flex: 1, textTransform: 'capitalize' },
+  diaNombre:    { fontSize: fs(13), fontWeight: '700', color: '#555', flex: 1, textTransform: 'capitalize', flexShrink: 1 },
   diaBadgesRow: { flexDirection: 'row', gap: 6 },
   diaBadge:     { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
-  diaBadgeText: { fontSize: 12, fontWeight: '700' },
+  diaBadgeText: { fontSize: fs(12), fontWeight: '700' },
 
   columnasRow:       { flexDirection: 'row', gap: 12 },
   columna:           { flex: 1 },
   columnaHeader:     { borderRadius: 10, borderWidth: 1.5, paddingVertical: 7, alignItems: 'center', marginBottom: 10 },
-  columnaHeaderText: { fontSize: 13, fontWeight: '700' },
-  colEmpty:          { fontSize: 12, color: '#CCC', textAlign: 'center', marginTop: 12 },
+  columnaHeaderText: { fontSize: fs(12), fontWeight: '700' },
+  colEmpty:          { fontSize: fs(12), color: '#CCC', textAlign: 'center', marginTop: 12 },
 
   tareaCard:  { backgroundColor: '#FAFAFA', borderRadius: 12, padding: 10, marginBottom: 8, borderLeftWidth: 3 },
   pictogram:  { width: 36, height: 36, borderRadius: 6, marginBottom: 6 },
-  tareaTitle: { fontSize: 13, color: '#333', fontWeight: '600', marginBottom: 4 },
-  tareaHora:  { fontSize: 11, color: '#AAA', marginTop: 2 },
+  tareaTitle: { fontSize: fs(12), color: '#333', fontWeight: '600', marginBottom: 4, flexShrink: 1 },
+  tareaHora:  { fontSize: fs(11), color: '#AAA', marginTop: 2 },
 
   emptyBox:     { alignItems: 'center', paddingVertical: 30 },
-  emptyText:    { fontSize: 16, color: '#AAA', fontWeight: '600', textAlign: 'center' },
-  emptySubText: { fontSize: 13, color: '#CCC', marginTop: 6 },
+  emptyText:    { fontSize: fs(16), color: '#AAA', fontWeight: '600', textAlign: 'center' },
+  emptySubText: { fontSize: fs(13), color: '#CCC', marginTop: 6 },
 });

@@ -399,7 +399,7 @@ export default function Temporizador() {
             accessibilityRole="button"
             accessibilityLabel="Reiniciar"
           >
-            <Text style={s.btnSecondaryIcon} accessibilityElementsHidden importantForAccessibility="no">↺</Text>
+            <Ionicons name="refresh" size={24} color={C.textMuted} accessibilityElementsHidden importantForAccessibility="no" />
           </TouchableOpacity>
 
           {/* Play / Pause */}
@@ -411,7 +411,7 @@ export default function Temporizador() {
               accessibilityRole="button"
               accessibilityLabel="Pausar"
             >
-              <Text style={s.btnPrimaryText} accessibilityElementsHidden importantForAccessibility="no">⏸</Text>
+              <Ionicons name="pause" size={32} color="#FFF" accessibilityElementsHidden importantForAccessibility="no" />
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
@@ -423,7 +423,7 @@ export default function Temporizador() {
               accessibilityLabel={estado === 'paused' ? 'Reanudar' : 'Iniciar'}
               accessibilityState={{ disabled: estado === 'finished' }}
             >
-              <Text style={s.btnPrimaryText} accessibilityElementsHidden importantForAccessibility="no">▶</Text>
+              <Ionicons name="play" size={32} color="#FFF" accessibilityElementsHidden importantForAccessibility="no" />
             </TouchableOpacity>
           )}
 
@@ -436,7 +436,7 @@ export default function Temporizador() {
               accessibilityRole="button"
               accessibilityLabel="Configurar tiempo"
             >
-              <Text style={s.btnSecondaryIcon} accessibilityElementsHidden importantForAccessibility="no">⚙</Text>
+              <Ionicons name="settings-outline" size={22} color={C.textMuted} accessibilityElementsHidden importantForAccessibility="no" />
             </TouchableOpacity>
           ) : (
             <View style={s.btnSecondaryPlaceholder} accessibilityElementsHidden importantForAccessibility="no" />

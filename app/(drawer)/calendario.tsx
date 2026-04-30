@@ -1,8 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   AccessibilityInfo,
+  Image,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -18,7 +21,7 @@ import {
   getTareasPorFecha,
   insertTarea,
 } from '../../database/database';
-import { buscarPictograma } from '../../services/arasaac';
+import { buscarPictogramas } from '../../services/arasaac';
 import { ahoraApp, ahoraAppMs, hoyAppStr } from '../../utils/fecha';
 
 const PURPLE    = '#A77BBE';
@@ -136,13 +139,48 @@ function ModalNuevaTarea({
   onGuardar: (tarea: any) => void;
 }) {
   const [titulo,      setTitulo]      = useState('');
-  const [hora,        setHora]        = useState('');
+  const [hora,        setHora]        = useState<string | null>(null);
+  const [pictogramas, setPictogramas] = useState<number[]>([]);
   const [pictogramId, setPictogramId] = useState<number | null>(null);
+  const [showPicker,  setShowPicker]  = useState(false);
+  const [tempTime,    setTempTime]    = useState(new Date());
+
+  const PURPLE    = '#A77BBE';
+  const PURPLE_LT = '#E5D9EE';
+  const PURPLE_BG = '#F4F0F6';
 
   const buscar = async (texto: string) => {
     setTitulo(texto);
-    const id = await buscarPictograma(texto);
-    if (id) setPictogramId(id);
+    if (texto.trim().length < 2) {
+      setPictogramas([]);
+      setPictogramId(null);
+      return;
+    }
+    const ids = await buscarPictogramas(texto, 6);
+    if (ids.length > 0) {
+      setPictogramas(ids);
+      setPictogramId(ids[0]);
+    } else {
+      setPictogramas([]);
+      setPictogramId(null);
+    }
+  };
+
+  const handleTimeChange = (event: any, date?: Date) => {
+    // En Android el picker se cierra solo al seleccionar
+    // En iOS con display="spinner" se mantiene abierto hasta pulsar fuera
+    if (Platform.OS === 'android') setShowPicker(false);
+    if (date) {
+      setTempTime(date);
+      setHora(date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    }
+  };
+
+  const cerrar = () => {
+    setTitulo(''); setHora(null);
+    setPictogramId(null); setPictogramas([]);
+    setShowPicker(false);
+    onClose();
   };
 
   const guardar = () => {
@@ -150,10 +188,12 @@ function ModalNuevaTarea({
     onGuardar({
       id: `${fecha}_${ahoraAppMs()}_${Math.random().toString(36).slice(2, 8)}`,
       title: titulo.trim(),
-      hora:  hora.trim() || 'Sin hora',
+      hora:  hora ?? 'Sin hora',
       pictogramId: pictogramId ?? null,
     });
-    setTitulo(''); setHora(''); setPictogramId(null);
+    setTitulo(''); setHora(null);
+    setPictogramId(null); setPictogramas([]);
+    setShowPicker(false);
     onClose();
     AccessibilityInfo.announceForAccessibility(`Tarea ${titulo} añadida para el ${fecha}`);
   };
@@ -163,83 +203,159 @@ function ModalNuevaTarea({
       visible={visible}
       transparent
       animationType="slide"
-      onRequestClose={onClose}
+      onRequestClose={cerrar}
       accessibilityViewIsModal
     >
-      <Pressable
-        style={s.overlay}
-        onPress={onClose}
-        accessible
-        accessibilityRole="button"
-        accessibilityLabel="Cerrar modal"
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1, justifyContent: 'flex-end' }}
       >
-        <Pressable style={s.modalBox} onPress={e => e.stopPropagation()} accessible={false}>
+        {/* overlay: no accesible para que VoiceOver pase directo al contenido */}
+        <Pressable style={s.overlay} onPress={cerrar} accessible={false} importantForAccessibility="no">
+          {/* modalBox: no agrupado para que VoiceOver navegue por hijos */}
+          <Pressable style={s.modalBox} onPress={e => e.stopPropagation()} accessible={false} importantForAccessibility="yes">
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+              accessible={false}
+              importantForAccessibility="yes"
+            >
 
-          {/* ── Cabecera del modal ── */}
-          <View style={s.modalHeader}>
-            <View style={s.modalHeaderTexts}>
+          {/* ── Cabecera ── */}
+          <View style={s.modalHeader} accessible={false}>
+            <View style={s.modalHeaderTexts} accessible={false}>
               <Text style={s.modalTitle} accessibilityRole="header">Nueva tarea</Text>
-              <View style={s.modalFechaChip}>
-                <Ionicons name="calendar-outline" size={13} color={PURPLE} />
-                <Text style={s.modalFechaChipTxt} accessibilityLabel={`Para el ${fechaLegible(fecha)}`}>
+              <View style={s.modalFechaChip} accessible accessibilityLabel={`Para el ${fechaLegible(fecha)}`}>
+                <Ionicons name="calendar-outline" size={13} color={PURPLE} accessibilityElementsHidden importantForAccessibility="no" />
+                <Text style={s.modalFechaChipTxt} accessibilityElementsHidden importantForAccessibility="no">
                   {fechaLegible(fecha)}
                 </Text>
               </View>
             </View>
-            <Pressable
-              onPress={onClose}
-              style={s.modalCloseBtn}
-              accessible
-              accessibilityRole="button"
-              accessibilityLabel="Cerrar"
-            >
-              <Ionicons name="close" size={22} color={PURPLE} />
+            <Pressable onPress={cerrar} style={s.modalCloseBtn} accessible accessibilityRole="button" accessibilityLabel="Cerrar formulario de nueva tarea">
+              <Ionicons name="close" size={22} color={PURPLE} accessibilityElementsHidden importantForAccessibility="no" />
             </Pressable>
           </View>
 
-          {/* ── Separador ── */}
-          <View style={s.modalDivider} />
+          <View style={s.modalDivider} accessible={false} />
 
           {/* ── Título ── */}
-          <Text style={s.modalInputLabel}>Título</Text>
-          <View style={s.inputRow}>
+          <Text style={s.modalInputLabel} accessibilityElementsHidden importantForAccessibility="no">Título</Text>
+          <View style={s.inputRow} accessible={false}>
             <TextInput
               placeholder="¿Qué quieres hacer?"
               value={titulo}
               onChangeText={buscar}
               style={s.input}
               accessibilityLabel="Título de la tarea"
-              accessibilityHint="Escribe el nombre. Se buscará un pictograma automáticamente"
+              accessibilityHint="Escribe el nombre. Se buscarán pictogramas automáticamente"
               returnKeyType="done"
               clearButtonMode="while-editing"
               autoFocus
             />
           </View>
 
+          {/* ── Selector múltiple de pictogramas ── */}
+          {pictogramas.length > 0 && (
+            <View style={{ marginBottom: 16 }} accessible={false}>
+              <Text style={s.modalInputLabel} accessibilityRole="header">Elige un pictograma</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 10, paddingVertical: 4 }}
+                accessible={false}
+              >
+                {pictogramas.map((id, i) => (
+                  <Pressable
+                    key={id}
+                    onPress={() => setPictogramId(id)}
+                    style={[s.pictoOpcion, pictogramId === id && s.pictoOpcionSelec]}
+                    accessible
+                    accessibilityRole="button"
+                    accessibilityLabel={`Pictograma opción ${i + 1}${pictogramId === id ? ', seleccionado' : ''}`}
+                    accessibilityState={{ selected: pictogramId === id }}
+                  >
+                    <Image
+                      source={{ uri: `https://static.arasaac.org/pictograms/${id}/${id}_300.png` }}
+                      style={s.pictoImg}
+                      accessibilityIgnoresInvertColors
+                    />
+                  </Pressable>
+                ))}
+                <Pressable
+                  onPress={() => setPictogramId(null)}
+                  style={[s.pictoOpcion, s.pictoNinguno, pictogramId === null && s.pictoOpcionSelec]}
+                  accessible
+                  accessibilityRole="button"
+                  accessibilityLabel={`Sin pictograma${pictogramId === null ? ', seleccionado' : ''}`}
+                  accessibilityState={{ selected: pictogramId === null }}
+                >
+                  <Ionicons name="close" size={22} color={pictogramId === null ? PURPLE : '#CCC'} accessibilityElementsHidden importantForAccessibility="no" />
+                  <Text style={[s.pictoNingunoTxt, pictogramId === null && { color: PURPLE }]} accessibilityElementsHidden importantForAccessibility="no">Ninguno</Text>
+                </Pressable>
+              </ScrollView>
+            </View>
+          )}
+
           {/* ── Hora ── */}
-          <Text style={s.modalInputLabel}>Hora <Text style={s.modalInputLabelOpc}>(opcional)</Text></Text>
+          <Text style={s.modalInputLabel} accessibilityElementsHidden importantForAccessibility="no">
+            Hora (opcional)
+          </Text>
+
           {Platform.OS === 'web' ? (
             <input
               type="time"
-              onChange={e => setHora(e.target.value)}
+              onChange={e => setHora(e.target.value || null)}
               style={{ padding: 10, fontSize: 15, borderRadius: 10,
                 borderColor: PURPLE_LT, border: `1px solid ${PURPLE_LT}`,
-                width: '100%', backgroundColor: PURPLE_BG }}
+                 backgroundColor: PURPLE_BG, marginBottom: 16 }}
             />
           ) : (
-            <View style={s.inputRow}>
-              <Ionicons name="time-outline" size={18} color={PURPLE} style={{ marginRight: 8 }} />
-              <TextInput
-                placeholder="HH:MM"
-                value={hora}
-                onChangeText={setHora}
-                style={s.input}
-                keyboardType="numeric"
-                maxLength={5}
-                accessibilityLabel="Hora de la tarea, opcional"
-                accessibilityHint="Formato horas y minutos, por ejemplo 09:30"
-              />
-            </View>
+            <>
+              <Pressable
+                onPress={() => setShowPicker(true)}
+                style={[s.inputRow, { marginBottom: showPicker ? 8 : 16 }]}
+                accessible
+                accessibilityRole="button"
+                accessibilityLabel={hora ? `Hora seleccionada: ${hora}. Pulsa para cambiar` : 'Seleccionar hora, opcional'}
+              >
+                <Ionicons name="time-outline" size={18} color={PURPLE}  accessibilityElementsHidden importantForAccessibility="no" />
+                <Text style={[s.input, { color: hora ? '#333' : '#AAA', paddingVertical: 12 }]} accessibilityElementsHidden importantForAccessibility="no">
+                  {hora ?? 'Sin hora seleccionada'}
+                </Text>
+                {hora && (
+                  <Pressable
+                    onPress={() => { setHora(null); setShowPicker(false); }}
+                    accessible accessibilityRole="button" accessibilityLabel="Quitar hora"
+                    style={{ padding: 4 }}
+                  >
+                    <Ionicons name="close-circle" size={18} color="#CCC" accessibilityElementsHidden importantForAccessibility="no" />
+                  </Pressable>
+                )}
+              </Pressable>
+
+              {showPicker && (
+                <View style={{ marginBottom: 16 }} accessible={false}>
+                  <DateTimePicker
+                    value={tempTime}
+                    mode="time"
+                    is24Hour
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleTimeChange}
+                  />
+                  {Platform.OS === 'ios' && (
+                    <Pressable
+                      onPress={() => setShowPicker(false)}
+                      style={{ alignSelf: 'flex-end', paddingHorizontal: 16, paddingVertical: 6 }}
+                      accessible accessibilityRole="button" accessibilityLabel="Confirmar hora seleccionada"
+                    >
+                      <Text style={{ color: PURPLE, fontWeight: '700', fontSize: 15 }}>Listo</Text>
+                    </Pressable>
+                  )}
+                </View>
+              )}
+            </>
           )}
 
           {/* ── Botón guardar ── */}
@@ -248,15 +364,17 @@ function ModalNuevaTarea({
             style={[s.btnGuardar, !titulo.trim() && s.btnGuardarDisabled]}
             accessible
             accessibilityRole="button"
-            accessibilityLabel="Añadir tarea"
-            accessibilityHint={titulo.trim() ? `Guardará la tarea ${titulo}` : 'Escribe un título primero'}
+            accessibilityLabel={titulo.trim() ? `Añadir tarea ${titulo}` : 'Añadir tarea. Escribe un título primero'}
+            accessibilityHint={titulo.trim() ? 'Guarda la tarea y cierra el formulario' : ''}
           >
-            <Ionicons name="checkmark" size={20} color="#fff" />
-            <Text style={s.btnGuardarTxt}>Añadir tarea</Text>
+            <Ionicons name="checkmark" size={20} color="#fff" accessibilityElementsHidden importantForAccessibility="no" />
+            <Text style={s.btnGuardarTxt} accessibilityElementsHidden importantForAccessibility="no">Añadir tarea</Text>
           </Pressable>
 
+            </ScrollView>
+          </Pressable>
         </Pressable>
-      </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -451,28 +569,28 @@ export default function Calendario() {
 const s = StyleSheet.create({
   root: {
     flex: 1, backgroundColor: '#fff',
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingTop: Platform.OS === 'ios' ? 20 : 16,
     paddingHorizontal: 14,
   },
   btnInicio: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 12, paddingVertical: 7,
     backgroundColor: PURPLE + '18', borderRadius: 20,
-    alignSelf: 'flex-start', marginBottom: 8, minHeight: 44,
+    alignSelf: 'flex-start', marginBottom: 4, minHeight: 44,
   },
   btnInicioTxt: { color: PURPLE, fontWeight: '600', fontSize: 13 },
-  headerTitle:  { fontSize: 30, fontWeight: '800', color: PURPLE, textAlign: 'center', marginBottom: 16 },
+  headerTitle:  { fontSize: 30, fontWeight: '800', color: PURPLE, textAlign: 'center', marginBottom: 6 },
 
   // Cabecera mes
-  mesHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
-  mesBtn:    { padding: 20, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  mesHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  mesBtn:    { padding: 10, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   mesTitulo: { fontSize: 26, fontWeight: '700', color: PURPLE },
 
   // Calendario
-  semanaCab:    { flexDirection: 'row', marginBottom: 10 },
+  semanaCab:    { flexDirection: 'row', marginBottom: 6 },
   semanaCabTxt: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '700', color: '#BBB' },
-  semanaFila:   { flexDirection: 'row', marginBottom: 4 },
-  celda:        { flex: 1, alignItems: 'center', paddingVertical: 6, borderRadius: 10, minHeight: 44, justifyContent: 'center' },
+  semanaFila:   { flexDirection: 'row', marginBottom: 2 },
+  celda:        { flex: 1, alignItems: 'center', paddingVertical: 4, borderRadius: 10, minHeight: 36, justifyContent: 'center' },
   celdaTxt:     { fontSize: 14, color: '#333', fontWeight: '500' },
   celdaHoy:     { backgroundColor: PURPLE },
   celdaHoyTxt:  { color: '#fff', fontWeight: '700' },
@@ -535,17 +653,23 @@ modalCloseBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: PURPL
 modalDivider: { height: 1, backgroundColor: PURPLE_LT, marginBottom: 16 },
 
 modalInputLabel:    { fontSize: 12, fontWeight: '700', color: '#999', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 },
-modalInputLabelOpc: { fontSize: 11, fontWeight: '400', color: '#BBB', textTransform: 'none' },
+modalInputLabelOpc: { fontSize: 12, fontWeight: '700', color: '#BBB', textTransform: 'none' },
 
 inputRow: {
   flexDirection: 'row', alignItems: 'center',
   borderWidth: 1.5, borderColor: PURPLE_LT, borderRadius: 14,
-  paddingHorizontal: 14, backgroundColor: PURPLE_BG,
+  paddingHorizontal: 20, backgroundColor: PURPLE_BG,
   minHeight: 48, marginBottom: 16,
 },
-input: { flex: 1, paddingVertical: 12, fontSize: 15, color: '#333' },
+input: { fontSize: 15, color: '#333' },
 
 btnGuardar:         { backgroundColor: PURPLE, borderRadius: 16, padding: 16, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, minHeight: 52, marginTop: 4 },
 btnGuardarDisabled: { opacity: 0.45 },
 btnGuardarTxt:      { color: '#fff', fontWeight: '700', fontSize: 16 },
+
+pictoOpcion:      { width: 76, height: 76, borderRadius: 14, borderWidth: 2, borderColor: '#E5E5E5', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', padding: 4 },
+pictoOpcionSelec: { borderColor: PURPLE, borderWidth: 3, backgroundColor: PURPLE_BG },
+pictoImg:         { width: 64, height: 64, borderRadius: 10 },
+pictoNinguno:     { gap: 2 },
+pictoNingunoTxt:  { fontSize: 10, color: '#CCC', fontWeight: '600' },
 });

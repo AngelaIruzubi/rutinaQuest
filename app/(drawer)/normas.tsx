@@ -143,11 +143,6 @@ export default function NormasJuego() {
         <SectionTitle>Penalizaciones al final del día</SectionTitle>
         <Card>
           <RuleRow
-            title="Sin ninguna tarea hecha"
-            subtitle="No se completó nada ese día"
-            badge="Menos 20 estrellas"
-          />
-          <RuleRow
             title="Tareas sin completar"
             subtitle="Se hizo algo, pero quedaron pendientes"
             badge="Menos 10 estrellas"
@@ -183,7 +178,6 @@ export default function NormasJuego() {
           <MedalCard icon="🥇" name="Oro"    req="600 estrellas" />
         </View>
 
-        <View style={{ height: 32 }} accessibilityElementsHidden importantForAccessibility="no" />
       </ScrollView>
     </SafeAreaView>
   );
@@ -195,9 +189,10 @@ const s = StyleSheet.create({
   safe:      { flex: 1, backgroundColor: C.bg },
   scroll:    { flex: 1 },
   container: {
-    flex: 1, backgroundColor: '#fff',
+    backgroundColor: '#fff',
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
     paddingHorizontal: 20,
+    paddingBottom: 60,
   },
 
   headerTitle: {

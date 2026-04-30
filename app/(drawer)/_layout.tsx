@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { Drawer } from 'expo-router/drawer';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { PixelRatio, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../constants/theme';
 import { AjustesProvider } from '../../context/AjustesContext';
@@ -68,10 +68,15 @@ const HeaderRight = () => <HeaderPerfilBtn />;
 
 // ═════════════════════════════════════════════════════════════════════════════
 export default function Layout() {
+  const { width } = useWindowDimensions();
+  const fontScale = PixelRatio.getFontScale();
+  const clampedScale = Math.min(fontScale, 1.4);
+  const titleSize = Math.max(16, Math.min(30, (width * 0.072) / clampedScale));
+
   useEffect(() => {
     async function prepare() {
       try {
-      initDB();
+        initDB();
         limpiarTareasViejas();
       } catch (e) {
         console.warn('Error en carga inicial:', e);
@@ -88,15 +93,14 @@ export default function Layout() {
         <Drawer
          drawerContent={CustomDrawerContent}
           screenOptions={{
-            // quita drawerContentContainerStyle
-            headerStyle:                 { backgroundColor: Colors.light.primary, height: 100, shadowColor: 'transparent', alignItems: 'center', justifyContent: 'center'},
-            headerTintColor:             WHITE,
-            headerTitleAlign:            'center',
-            headerTitleStyle:            { fontSize: 36, fontWeight: 'bold' },
-            headerRight:                 HeaderRight,
-            drawerStyle:                 { backgroundColor: '#fff'  },
-            drawerActiveTintColor:       PURPLE,
-            drawerInactiveTintColor:     '#555',
+            headerStyle:               { backgroundColor: Colors.light.primary, shadowColor: 'transparent' },
+            headerTintColor:           WHITE,
+            headerTitleAlign:          'center',
+            headerTitleStyle:          { fontSize: titleSize, fontWeight: 'bold' },
+            headerRight:               HeaderRight,
+            drawerStyle:               { backgroundColor: '#fff' },
+            drawerActiveTintColor:     PURPLE,
+            drawerInactiveTintColor:   '#555',
             drawerActiveBackgroundColor: PURPLE + '15',
           }}
         >

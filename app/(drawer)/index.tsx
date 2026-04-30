@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Notifications from 'expo-notifications';
-import { useEffect, useRef, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   AccessibilityInfo,
@@ -22,6 +23,7 @@ import {
 import {
   cancelarTarea,
   deleteTarea,
+  getTareasPorFecha,
   initDB,
   insertTarea,
   limpiarTareasViejas,
@@ -35,18 +37,19 @@ import { buscarPictogramas } from "../../services/arasaac"; // ← ahora devuelv
 
 import { ahoraApp, ahoraAppMs, fechaAppDate, hoyAppStr, setFechaSimulada, setHoraSimulada } from '../../utils/fecha';
 
-setFechaSimulada('2026-03-08');
-setHoraSimulada(21, 0);
+setFechaSimulada('2026-03-29');
+setHoraSimulada(12, 0);
 
-// ─── Notificaciones en primer plano ──────────────────────────────────────────
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
+if (Notifications) {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,   // ← cambiado
+      shouldPlaySound: false,
+      shouldSetBadge: false,
+      // shouldShowBanner y shouldShowList eliminados
+    }),
+  });
+}
 
 const PURPLE    = '#A77BBE';
 const PURPLE_LT = '#E5D9EE';
@@ -68,6 +71,9 @@ const PEREZOSO_IMAGENES: Record<string, any> = {
   esperando:      require('../../assets/images/perezoso/perezoso_esperando.png'),
   esperando_gif:  require('../../assets/images/perezoso/aburrido_noti.gif'),
   cansado:        require('../../assets/images/perezoso/perezoso_cansado.png'),
+  bronce:          require('../../assets/images/medallas/broncebg.png'),
+  plata:           require('../../assets/images/medallas/platabg.png'),
+  oro:             require('../../assets/images/medallas/orobg.png'),
 };
 
 const NOTIF_CFG: Record<string, { asset: string; msg: string; color: string }> = {
@@ -75,9 +81,9 @@ const NOTIF_CFG: Record<string, { asset: string; msg: string; color: string }> =
   late:            { asset: 'contento_gif',   msg: '¡Completada un poco tarde! 3 estrellas',                   color: PURPLE },
   sinHora:         { asset: 'contento_gif',   msg: '¡Tarea completada! Conseguiste las 5 estrellas',            color: PURPLE },
   goalmet:         { asset: 'celebrando_gif', msg: '¡Todas las tareas de hoy completadas!',                    color: PURPLE },
-  bronce:          { asset: 'contento_gif',   msg: '¡Medalla de Bronce conseguida!',                           color: '#CD7F32' },
-  plata:           { asset: 'contento_gif',   msg: '¡Medalla de Plata conseguida!',                            color: '#C0C0C0' },
-  oro:             { asset: 'celebrando_gif', msg: '¡Medalla de Oro conseguida!',                              color: GOLD },
+  bronce:          { asset: 'bronce',   msg: '¡Medalla de Bronce conseguida!',                           color: '#CD7F32' },
+  plata:           { asset: 'plata',   msg: '¡Medalla de Plata conseguida!',                            color: '#C0C0C0' },
+  oro:             { asset: 'oro', msg: '¡Medalla de Oro conseguida!',                              color: GOLD },
   saltadas:        { asset: 'enfadado_gif',   msg: 'Has saltado varias tareas',                                color: PURPLE },
   eliminada:       { asset: 'llorando_gif',   msg: 'Has eliminado una tarea',                                  color: PURPLE },
   penal10:         { asset: 'enfadado_gif',   msg: 'Ayer te quedó alguna tarea sin hacer. Menos 10 estrellas', color: RED },
@@ -149,12 +155,21 @@ function PerezosoNotif({ type, show }: { type: string; show: boolean }) {
 
   return (
     <Modal visible={show} transparent animationType="none" statusBarTranslucent accessibilityViewIsModal={false}>
-      <Animated.View pointerEvents="none" style={[styles.fullNotifOverlay, { opacity: opacityAnim }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-        <Animated.View style={[styles.fullNotifCard, { transform: [{ translateY: slideAnim }, { scale: scaleAnim }] }]}>
-          <Image source={PEREZOSO_IMAGENES[cfg.asset]} style={styles.fullNotifImg} resizeMode="contain" accessibilityIgnoresInvertColors />
-          <Text style={[styles.fullNotifText, { color: cfg.color }]}>{cfg.msg}</Text>
+      {reduceMotion ? (
+        <View pointerEvents="none" style={styles.fullNotifOverlay} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <View style={styles.fullNotifCard}>
+            <Image source={PEREZOSO_IMAGENES[cfg.asset]} style={styles.fullNotifImg} resizeMode="contain" accessibilityIgnoresInvertColors />
+            <Text style={[styles.fullNotifText, { color: cfg.color }]}>{cfg.msg}</Text>
+          </View>
+        </View>
+      ) : (
+        <Animated.View pointerEvents="none" style={[styles.fullNotifOverlay, { opacity: opacityAnim }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <Animated.View style={[styles.fullNotifCard, { transform: [{ translateY: slideAnim }, { scale: scaleAnim }] }]}>
+            <Image source={PEREZOSO_IMAGENES[cfg.asset]} style={styles.fullNotifImg} resizeMode="contain" accessibilityIgnoresInvertColors />
+            <Text style={[styles.fullNotifText, { color: cfg.color }]}>{cfg.msg}</Text>
+          </Animated.View>
         </Animated.View>
-      </Animated.View>
+      )}
     </Modal>
   );
 }
@@ -198,15 +213,30 @@ function RachaNotif({ show, racha }: { show: boolean; racha: number }) {
 
   return (
     <Modal visible={show} transparent animationType="none" statusBarTranslucent accessibilityViewIsModal={false}>
-      <Animated.View pointerEvents="none" style={[styles.rachaNotif, { opacity: opacityAnim }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-        <Animated.View style={[styles.rachaNotifCard, { transform: [{ translateY: slideAnim }, { scale: scaleAnim }] }]}>
-          <Text style={styles.rachaNotifFire}>🔥</Text>
-          <View style={styles.rachaNotifTextCol}>
-            <Text style={styles.rachaNotifLabel}>¡Racha activa!</Text>
-            <AnimatedCounter anim={countAnim} max={racha} />
+      {reduceMotion ? (
+        <View pointerEvents="none" style={styles.rachaNotif} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <View style={styles.rachaNotifCard}>
+            <Text style={styles.rachaNotifFire}>🔥</Text>
+            <View style={styles.rachaNotifTextCol}>
+              <Text style={styles.rachaNotifLabel}>¡Racha activa!</Text>
+              <Text style={styles.rachaNotifCount}>
+                <Text style={styles.rachaNotifNum}>{racha}</Text>
+                <Text>{' días seguidos'}</Text>
+              </Text>
+            </View>
           </View>
+        </View>
+      ) : (
+        <Animated.View pointerEvents="none" style={[styles.rachaNotif, { opacity: opacityAnim }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <Animated.View style={[styles.rachaNotifCard, { transform: [{ translateY: slideAnim }, { scale: scaleAnim }] }]}>
+            <Text style={styles.rachaNotifFire}>🔥</Text>
+            <View style={styles.rachaNotifTextCol}>
+              <Text style={styles.rachaNotifLabel}>¡Racha activa!</Text>
+              <AnimatedCounter anim={countAnim} max={racha} />
+            </View>
+          </Animated.View>
         </Animated.View>
-      </Animated.View>
+      )}
     </Modal>
   );
 }
@@ -219,7 +249,8 @@ function AnimatedCounter({ anim, max }: { anim: Animated.Value; max: number }) {
   }, [anim]);
   return (
     <Text style={styles.rachaNotifCount}>
-      <Text style={styles.rachaNotifNum}>{display}</Text>{' días seguidos'}
+      <Text style={styles.rachaNotifNum}>{display}</Text>
+      <Text>{' días seguidos'}</Text>
     </Text>
   );
 }
@@ -269,57 +300,122 @@ export default function Home() {
   const [rachaNotifVal,  setRachaNotifVal]  = useState(0);
   const rachaNotifTimer  = useRef<any>(null);
 
-  const pendientesPenalRef = useRef<any>({ canceladasAyer: 0, completadasAyer: 0 });
+  const pendientesPenalRef = useRef<any>({ vencidasAyer: 0 });
 
   const gami         = useGamificacion();
   const { ajustes }  = useAjustesCtx();
   const reduceMotion = useReduceMotion();
 
-  // ── Carga inicial ─────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (Platform.OS !== 'web') initDB();
-    const { tareasHoy, canceladasAyer, completadasAyer } = limpiarTareasViejas() as any;
-    setTasks(tareasHoy.map((r: any) => ({ ...r, completed: r.completed === 1 })));
-    pendientesPenalRef.current = { canceladasAyer, completadasAyer };
-  }, []);
+  // ── Carga inicial y recarga al volver de otra pantalla ───────────────────
+  // useFocusEffect recarga las tareas cada vez que index recibe el foco,
+  // lo que hace que las tareas añadidas desde el calendario aparezcan aquí.
+  const yaInicializado = useRef(false);
+  const ultimoDiaNotif = useRef(hoyAppStr()); // rastrea el día para resetear notifs
+  useFocusEffect(
+    useCallback(() => {
+      const hoyStr = hoyAppStr();
+
+      // Si cambió el día, resetea las notificaciones enviadas
+      if (hoyStr !== ultimoDiaNotif.current) {
+        ultimoDiaNotif.current = hoyStr;
+        notifEnviadasHoy.current = new Set();
+      }
+
+      if (!yaInicializado.current) {
+        if (Platform.OS !== 'web') initDB();
+        const { tareasHoy, vencidasAyer } = limpiarTareasViejas() as any;
+        setTasks(tareasHoy.map((r: any) => ({ ...r, completed: r.completed === 1 })));
+        pendientesPenalRef.current = { vencidasAyer };
+        yaInicializado.current = true;
+      } else {
+        const tareasHoy = getTareasPorFecha(hoyAppStr()) as any[];
+        setTasks(tareasHoy.map((r: any) => ({ ...r, completed: r.completed === 1 })));
+      }
+    }, [])
+  );
 
   // ── Testing: forzar puntos (quitar en producción) ─────────────────────────
   useEffect(() => {
     if (!gami.cargando) {
-      gami.forzarEstrellas(605);
+      gami.forzarEstrellas(595);
     }
   }, [gami.cargando]);
 
   // ── Penalización + bajada de medalla ──────────────────────────────────────
+  // Solo salta si:
+  //   1. Es día nuevo (app estuvo cerrada)
+  //   2. No se penalizó ya hoy (penalizacionAplicada guardado en storage)
+  //   3. Hay tareas que se quedaron sin tocar (vencidasAyer > 0)
+  const penalizacionDisparadaRef = useRef(false);
   useEffect(() => {
     if (gami.cargando) return;
     if (!gami.esDiaNuevo) return;
+    if (gami.penalizacionAplicada) return;       // ya se penalizó hoy en storage
+    if (penalizacionDisparadaRef.current) return; // ya se disparó en esta sesión
 
-    const { canceladasAyer, completadasAyer } = pendientesPenalRef.current;
-    if (canceladasAyer + completadasAyer === 0) return;
-    if (canceladasAyer === 0) return;
+    const timer = setTimeout(async () => {
+      const { vencidasAyer } = pendientesPenalRef.current;
+      if (vencidasAyer === 0) return; // no hay pendientes → no penalizar
 
-    (async () => {
+      penalizacionDisparadaRef.current = true;
       const prevEstrellas = gami.estrellas;
-      const res = await gami.penalizarFinDia(canceladasAyer, completadasAyer) as any;
+      const res = await gami.penalizarFinDia(vencidasAyer) as any;
       if (res?.penalizacion > 0) {
         disparaNotif('penal10');
         const nuevasEstrellas = prevEstrellas - res.penalizacion;
         if (prevEstrellas >= 600 && nuevasEstrellas < 600) setTimeout(() => disparaNotif('bajaOroPlata'), 4000);
         else if (prevEstrellas >= 300 && nuevasEstrellas < 300) setTimeout(() => disparaNotif('bajaPlatabronce'), 4000);
       }
-      pendientesPenalRef.current = { canceladasAyer: 0, completadasAyer: 0 };
-    })();
-  }, [gami.cargando, gami.esDiaNuevo]);
+      pendientesPenalRef.current = { vencidasAyer: 0 };
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [gami.cargando, gami.esDiaNuevo, gami.penalizacionAplicada]);
 
   // ── Checks periódicos ─────────────────────────────────────────────────────
+  // ultimoDiaInterval rastrea el día activo para detectar cambio de medianoche
+  const ultimoDiaInterval = useRef(hoyAppStr());
+
   useEffect(() => {
     pedirPermisosNotificaciones();
-    checkTimer.current = setInterval(() => {
+    checkTimer.current = setInterval(async () => {
       const now     = ahoraApp();
       const hora    = now.getHours();
       const minutos = now.getMinutes();
       const hoy     = hoyAppStr();
+
+      // ── Detección de cambio de día en tiempo real ────────────────────────
+      if (hoy !== ultimoDiaInterval.current) {
+        ultimoDiaInterval.current = hoy;
+
+        // 1. Limpia tareas viejas y obtiene las vencidas de ayer
+        const { tareasHoy, vencidasAyer } = limpiarTareasViejas() as any;
+        setTasks(tareasHoy.map((r: any) => ({ ...r, completed: r.completed === 1 })));
+
+        // 2. Resetea notificaciones del día anterior
+        notifEnviadasHoy.current = new Set();
+        penalizacionDisparadaRef.current = false;
+
+        // 3. Penaliza si hubo tareas sin hacer ayer
+        if (vencidasAyer > 0 && !gami.penalizacionAplicada) {
+          const prevEstrellas = gami.estrellas;
+          const res = await gami.penalizarFinDia(vencidasAyer) as any;
+          if (res?.penalizacion > 0) {
+            disparaNotif('penal10');
+            const nuevasEstrellas = prevEstrellas - res.penalizacion;
+            if (prevEstrellas >= 600 && nuevasEstrellas < 600)
+              setTimeout(() => disparaNotif('bajaOroPlata'), 4000);
+            else if (prevEstrellas >= 300 && nuevasEstrellas < 300)
+              setTimeout(() => disparaNotif('bajaPlatabronce'), 4000);
+          }
+        }
+
+      
+        gami.recargar();
+        return;
+      }
+
+
       const pending = tasks.filter(t => !t.completed && t.fechaDia === hoy);
 
       for (const t of pending) {
@@ -342,11 +438,10 @@ export default function Home() {
       if (hora === 21 && minutos === 0 && pending.length > 0 && !notifEnviadasHoy.current.has('finDia')) {
         notifEnviadasHoy.current.add('finDia');
         enviarNotifSistema('🌙 Se acaba el día', `Quedan ${pending.length} tarea${pending.length > 1 ? 's' : ''} sin completar`);
-        if (gami.tareasCompletasHoy > 0) gami.penalizarFinDia(pending.length, gami.tareasCompletasHoy);
       }
     }, __DEV__ ? 2000 : 60000);
     return () => clearInterval(checkTimer.current);
-  }, [tasks, gami.tareasCompletasHoy]);
+  }, [tasks, gami.tareasCompletasHoy, gami.penalizacionAplicada, gami.estrellas]);
 
   const disparaNotif = (type: string) => {
     if (notifTimer.current) clearTimeout(notifTimer.current);
@@ -383,12 +478,13 @@ export default function Home() {
   };
 
   const handleTimeChange = (event: any, date?: Date) => {
+   
+    if (Platform.OS === 'android') setShowPicker(false);
     if (date) setSelectedTime(date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-    setShowPicker(false);
   };
 
   const handleTaskTimeChange = (event: any, date?: Date) => {
-    setShowTaskPicker(false);
+    if (Platform.OS === 'android') setShowTaskPicker(false);
     if (!date || !selectedTask) return;
     const nuevaHora = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     if (Platform.OS !== 'web') updateTareaHora(selectedTask.id, nuevaHora);
@@ -470,29 +566,36 @@ export default function Home() {
     <View style={{ flex: 1, backgroundColor: '#ffffff', paddingHorizontal: 20 }}>
 
       <PerezosoNotif type={notifType} show={showNotif} />
-      <RachaNotif show={showRachaNotif} racha={rachaNotifVal} />
+      {/* RachaNotif solo se monta cuando PerezosoNotif está cerrado
+          En iOS solo puede haber un Modal visible a la vez */}
+      <RachaNotif show={showRachaNotif && !showNotif} racha={rachaNotifVal} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" accessible={false}>
 
         {/* ── Cabecera ── */}
-        <View style={{ paddingTop: 20, paddingBottom: 20 }} accessible accessibilityRole="header" accessibilityLabel={`Mis Tareas. ${formattedToday}`}>
-          <View style={{ flexDirection: 'column', padding: 40, justifyContent: 'center', alignItems: 'center', gap: 20 }}>
-            <View>
-              <Text style={styles.title}>Mis Tareas</Text>
-              <Text style={styles.dateText}>{formattedToday}</Text>
+        <View style={{ paddingTop: 20, paddingBottom: 20 }} accessible={false}>
+          {/* Título y fecha como elemento separado para VoiceOver */}
+          <View style={{ flexDirection: 'column', padding: 40, justifyContent: 'center', alignItems: 'center', gap: 20 }}
+            accessible accessibilityRole="header" accessibilityLabel={`Mis Tareas. ${formattedToday}`}>
+            <View accessible={false}>
+              <Text style={styles.title} accessibilityElementsHidden importantForAccessibility="no">Mis Tareas</Text>
+              <Text style={styles.dateText} accessibilityElementsHidden importantForAccessibility="no">{formattedToday}</Text>
             </View>
           </View>
-          <View style={styles.searchBar} accessible accessibilityRole="search" accessibilityLabel="Buscar tarea">
+          {/* Buscador fuera del header — VoiceOver entra al TextInput directamente */}
+          <View style={styles.searchBar}  accessibilityLabel="Buscar tarea" accessibilityHint="Escribe para filtrar las tareas de hoy" accessibilityRole="search"  >
             <TextInput
               placeholder="Buscar tarea.."
               value={search}
               onChangeText={setSearch}
               style={{ flex: 1, fontSize: 16 }}
               returnKeyType="search"
-              accessibilityLabel="Campo de búsqueda de tareas"
+              accessibilityLabel="Buscar tarea"
               accessibilityHint="Escribe para filtrar las tareas de hoy"
+              accessibilityRole="search"
               clearButtonMode="while-editing"
             />
+            {/* Icono decorativo */}
             <Ionicons name="search" size={20} color="#999" accessibilityElementsHidden importantForAccessibility="no" />
           </View>
         </View>
@@ -600,7 +703,14 @@ export default function Home() {
               </Text>
 
               {showPicker && Platform.OS !== 'web' && (
-                <DateTimePicker value={tempTime} mode="time" is24Hour display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={handleTimeChange} />
+                <View>
+                  <DateTimePicker value={tempTime} mode="time" is24Hour display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={handleTimeChange} />
+                  {Platform.OS === 'ios' && (
+                    <Pressable onPress={() => setShowPicker(false)} style={{ alignSelf: 'flex-end', paddingHorizontal: 16, paddingVertical: 6 }} accessible accessibilityRole="button" accessibilityLabel="Confirmar hora">
+                      <Text style={{ color: '#A77BBE', fontWeight: '700', fontSize: 15 }}>Listo</Text>
+                    </Pressable>
+                  )}
+                </View>
               )}
               {showPicker && Platform.OS === 'web' && (
                 <input type="time" onChange={(e) => { setSelectedTime(e.target.value); setShowPicker(false); }} style={{ marginTop: 10, padding: 8, fontSize: 16 }} />
@@ -675,14 +785,16 @@ export default function Home() {
 
       {/* ── MODAL: DETALLE TAREA ── */}
       <Modal visible={taskModalVisible} transparent animationType="slide" onRequestClose={() => setTaskModalVisible(false)} accessibilityViewIsModal>
-        <Pressable style={styles.overlay} onPress={() => setTaskModalVisible(false)} accessible accessibilityRole="button" accessibilityLabel="Cerrar detalle de tarea">
-          <Pressable style={[styles.modalBox, { alignItems: 'center' }]} onPress={e => e.stopPropagation()} accessible={false}>
+        {/* overlay: solo él mismo invisible, sus hijos sí son accesibles */}
+        <Pressable style={styles.overlay} onPress={() => setTaskModalVisible(false)} accessible={false}>
+          {/* modalBox: no agrupado, VoiceOver navega elemento a elemento */}
+          <Pressable style={[styles.modalBox, { alignItems: 'center' }]} onPress={e => e.stopPropagation()} accessible={false} importantForAccessibility="yes">
 
-            <Pressable onPress={() => setTaskModalVisible(false)} style={{ position: 'absolute', top: 14, right: 14, zIndex: 10, padding: 8 }} accessible accessibilityRole="button" accessibilityLabel="Cerrar">
-              <Ionicons name="close" size={26} color={PURPLE} />
+            <Pressable onPress={() => setTaskModalVisible(false)} style={{ position: 'absolute', top: 14, right: 14, zIndex: 10, padding: 8 }} accessible accessibilityRole="button" accessibilityLabel="Cerrar detalle de tarea">
+              <Ionicons name="close" size={26} color={PURPLE} accessibilityElementsHidden importantForAccessibility="no" />
             </Pressable>
 
-            <View style={[styles.modalTopBar, { justifyContent: 'center' }]}>
+            <View style={[styles.modalTopBar, { justifyContent: 'center' }]} accessible={false}>
               <Text style={styles.modalTopTitle} accessibilityRole="header">{selectedTask?.title}</Text>
             </View>
 
@@ -690,7 +802,7 @@ export default function Home() {
               <Image source={{ uri: `https://static.arasaac.org/pictograms/${selectedTask.pictogramId}/${selectedTask.pictogramId}_300.png` }} style={styles.detailPicto} accessibilityLabel={`Pictograma de ${selectedTask?.title}`} accessibilityIgnoresInvertColors />
             ) : (
               <View style={styles.detailPictoEmpty} accessibilityElementsHidden importantForAccessibility="no">
-                <Ionicons name="document-outline" size={60} color="#CCC" />
+                <Ionicons name="document-outline" size={60} color="#CCC" accessibilityElementsHidden importantForAccessibility="no" />
               </View>
             )}
 
@@ -702,14 +814,21 @@ export default function Home() {
               accessibilityLabel={selectedTask?.hora && selectedTask.hora !== 'Sin hora' ? `Hora: ${selectedTask.hora}${!selectedTask?.completed ? '. Pulsa para cambiar' : ''}` : 'Sin hora asignada'}
               disabled={!!selectedTask?.completed}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 12 }}>
-                <Text style={styles.detailTime}>🕐 {selectedTask?.hora ?? 'Sin hora'}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 12 }} accessible={false}>
+                <Text style={styles.detailTime} accessibilityElementsHidden importantForAccessibility="no">🕐 {selectedTask?.hora ?? 'Sin hora'}</Text>
                 {!selectedTask?.completed && <Ionicons name="pencil" size={20} color={PURPLE} accessibilityElementsHidden importantForAccessibility="no" />}
               </View>
             </Pressable>
 
             {showTaskPicker && Platform.OS !== 'web' && (
-              <DateTimePicker value={taskTempTime} mode="time" is24Hour display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={handleTaskTimeChange} />
+              <View accessible={false}>
+                <DateTimePicker value={taskTempTime} mode="time" is24Hour display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={handleTaskTimeChange} />
+                {Platform.OS === 'ios' && (
+                  <Pressable onPress={() => setShowTaskPicker(false)} style={{ alignSelf: 'flex-end', paddingHorizontal: 16, paddingVertical: 6 }} accessible accessibilityRole="button" accessibilityLabel="Confirmar hora seleccionada">
+                    <Text style={{ color: '#A77BBE', fontWeight: '700', fontSize: 15 }}>Listo</Text>
+                  </Pressable>
+                )}
+              </View>
             )}
             {showTaskPicker && Platform.OS === 'web' && (
               <input type="time" defaultValue={selectedTask?.hora !== 'Sin hora' ? selectedTask?.hora : ''}
@@ -732,15 +851,29 @@ export default function Home() {
             {selectedTask?.completed ? (
               <View style={styles.detailDoneBox} accessible accessibilityLabel={`Tarea completada con ${selectedTask?.stars ?? 5} de 5 estrellas`}>
                 <StarRow count={selectedTask?.stars ?? 5} size={30} />
-                <Text style={{ color: GREEN, fontWeight: '700', marginTop: 8, fontSize: 15 }}>¡Tarea completada!</Text>
+                <Text style={{ color: GREEN, fontWeight: '700', marginTop: 8, fontSize: 15 }} accessibilityElementsHidden importantForAccessibility="no">¡Tarea completada!</Text>
               </View>
             ) : (
-              <View style={{ flexDirection: 'row', alignContent: 'center', justifyContent: 'center', gap: 5 }}>
-                <Pressable onPress={() => handleTareaCompletada(selectedTask)} style={styles.btnPrimary} accessible accessibilityRole="button" accessibilityLabel="Marcar como realizada" accessibilityHint={`Marca la tarea ${selectedTask?.title} como completada`}>
-                  <Text style={styles.btnPrimaryText}>Realizada ✓</Text>
+              <View style={{ flexDirection: 'row', alignContent: 'center', justifyContent: 'center', gap: 5 }} accessible={false}>
+                <Pressable
+                  onPress={() => handleTareaCompletada(selectedTask)}
+                  style={styles.btnPrimary}
+                  accessible
+                  accessibilityRole="button"
+                  accessibilityLabel={`Marcar como realizada la tarea ${selectedTask?.title}`}
+                  accessibilityHint="Marca la tarea como completada y suma estrellas"
+                >
+                  <Text style={styles.btnPrimaryText} accessibilityElementsHidden importantForAccessibility="no">Realizada ✓</Text>
                 </Pressable>
-                <Pressable onPress={() => handleDeleteTask(selectedTask)} style={styles.btnPrimary} accessible accessibilityRole="button" accessibilityLabel="Eliminar tarea" accessibilityHint={`Elimina la tarea ${selectedTask?.title}`}>
-                  <Text style={styles.btnPrimaryText}>Eliminar tarea x</Text>
+                <Pressable
+                  onPress={() => handleDeleteTask(selectedTask)}
+                  style={styles.btnPrimary}
+                  accessible
+                  accessibilityRole="button"
+                  accessibilityLabel={`Eliminar la tarea ${selectedTask?.title}`}
+                  accessibilityHint="Elimina la tarea y la mueve al historial como cancelada"
+                >
+                  <Text style={styles.btnPrimaryText} accessibilityElementsHidden importantForAccessibility="no">Eliminar tarea x</Text>
                 </Pressable>
               </View>
             )}
@@ -766,16 +899,16 @@ const styles = StyleSheet.create({
   dateText: { textAlign: 'center', color: '#888', marginBottom: 20, fontSize: 17 },
 
   fullNotifOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F9FBF8', zIndex: 9999, elevation: 9999 },
-  fullNotifCard:    { width: '100%', backgroundColor: '#F9FBF8', borderRadius: 28, paddingVertical: 28, paddingHorizontal: 24, alignItems: 'center', justifyContent: 'center', elevation: 12 },
-  fullNotifImg:     { backgroundColor: '#F9FBF8' },
-  fullNotifText:    { fontSize: 24, fontWeight: '800', textAlign: 'center', lineHeight: 32 },
+  fullNotifCard:    { width: '100%', backgroundColor: '#F9FBF8', borderRadius: 28, paddingVertical: 28, paddingHorizontal: 24, alignItems: 'center', justifyContent: 'center', elevation: 12, flexShrink: 1 },
+  fullNotifImg:     { width: '70%', aspectRatio: 1, maxHeight: 280, backgroundColor: '#F9FBF8', marginBottom: 16 },
+  fullNotifText:    { fontSize: 24, fontWeight: '800', textAlign: 'center', lineHeight: 32, flexShrink: 1 },
 
   rachaNotif:        { ...StyleSheet.absoluteFillObject, zIndex: 9999, elevation: 9999, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(26,26,26,0.96)' },
-  rachaNotifCard:    { width: '100%', backgroundColor: '#222', justifyContent: 'center', alignItems: 'center', paddingVertical: 28, paddingHorizontal: 24, elevation: 18 },
+  rachaNotifCard:    { width: '100%', backgroundColor: '#222', justifyContent: 'center', alignItems: 'center', paddingVertical: 28, paddingHorizontal: 24, elevation: 18, flexShrink: 1 },
   rachaNotifFire:    { fontSize: 70, marginBottom: 10 },
-  rachaNotifTextCol: { flexDirection: 'column', gap: 2, alignItems: 'center' },
-  rachaNotifLabel:   { fontSize: 24, color: '#FFB085', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, textAlign: 'center' },
-  rachaNotifCount:   { fontSize: 24, color: '#fff', fontWeight: '600', textAlign: 'center' },
+  rachaNotifTextCol: { flexDirection: 'column', gap: 2, alignItems: 'center', flexShrink: 1 },
+  rachaNotifLabel:   { fontSize: 24, color: '#FFB085', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, textAlign: 'center', flexShrink: 1 },
+  rachaNotifCount:   { fontSize: 24, color: '#fff', fontWeight: '600', textAlign: 'center', flexShrink: 1 },
   rachaNotifNum:     { fontSize: 46, color: ORANGE, fontWeight: '800' },
 
   progressCard:   { backgroundColor: PURPLE_BG, borderRadius: 18, paddingVertical: 12, paddingHorizontal: 10, width: '100%', borderWidth: 1.5, borderColor: PURPLE_LT, gap: 2, shadowColor: PURPLE, shadowOpacity: .08, shadowRadius: 8, elevation: 3 },

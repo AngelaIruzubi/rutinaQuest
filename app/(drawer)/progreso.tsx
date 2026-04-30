@@ -4,8 +4,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   Animated,
+  PixelRatio,
   Platform,
   Pressable,
+  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -306,6 +308,7 @@ export default function Progreso() {
   })();
 
   return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
     <View style={styles.root}>
 
       <Text style={styles.title} accessibilityRole="header">Progreso</Text>
@@ -345,7 +348,7 @@ export default function Progreso() {
 
       {/* ══ ESTRELLAS ══ */}
       {tab === 0 && (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }} accessible={false}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 80 }} accessible={false}>
 
           {/* Total estrellas */}
           <View style={styles.bigStatsRow}>
@@ -400,7 +403,7 @@ export default function Progreso() {
 
       {/* ══ RACHA ══ */}
       {tab === 1 && (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }} accessible={false}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 80 }} accessible={false}>
 
           <FireHero racha={gami.racha} />
 
@@ -427,7 +430,7 @@ export default function Progreso() {
 
       {/* ══ MEDALLAS ══ */}
       {tab === 2 && (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }} accessible={false}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 80 }} accessible={false}>
 
           {nextMedal && (
             <View
@@ -462,43 +465,50 @@ export default function Progreso() {
       )}
 
     </View>
+    </SafeAreaView>
   );
 }
 
 // ─── Estilos ──────────────────────────────────────────────────────────────────
+// Escala fuentes respetando accesibilidad pero sin romper layout
+const fs = (size: number) => {
+  const scale = Math.min(PixelRatio.getFontScale(), 1.4);
+  return Math.round(size * scale);
+};
+
 const styles = StyleSheet.create({
-  root:  { flex: 1, backgroundColor: '#fff', paddingTop: Platform.OS === 'ios' ? 60 : 40, paddingHorizontal: 18 },
-  title: { fontSize: 30, fontWeight: '800', color: PURPLE, textAlign: 'center', marginBottom: 16 },
+  root:  { flex: 1, backgroundColor: '#fff', paddingTop: Platform.OS === 'ios' ? 20 : 40, paddingHorizontal: 18 },
+  title: { fontSize: fs(30), fontWeight: '800', color: PURPLE, textAlign: 'center', marginBottom: 16 },
 
   tabRow:       { flexDirection: 'row', backgroundColor: PURPLE_BG, borderRadius: 14, padding: 3, marginBottom: 20 },
   tabBtn:       { flex: 1, paddingVertical: 8, borderRadius: 11, alignItems: 'center', minHeight: 44 },
   tabBtnActive: { backgroundColor: '#fff', borderWidth: 0.5, borderColor: PURPLE_LT },
-  tabLabel:     { fontSize: 20, color: '#999' },
+  tabLabel:     { fontSize: fs(14), color: '#999' },
   tabLabelActive: { color: PURPLE, fontWeight: '600' },
 
   bigStatsRow: { flexDirection: 'column', gap: 10, marginBottom: 18 },
   bigStat:     { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: PURPLE_BG, borderRadius: 16, padding: 18, alignItems: 'center', gap: 4 },
-  bigStatNum:  { fontSize: 26, fontWeight: '700', color: PURPLE, lineHeight: 42 },
-  bigStatLabel:{ fontSize: 20, color: '#888', textAlign: 'center' },
+  bigStatNum:  { fontSize: fs(26), fontWeight: '700', color: PURPLE, lineHeight: fs(42) },
+  bigStatLabel:{ fontSize: fs(14), color: '#888', textAlign: 'center', flexShrink: 1 },
 
-  sectionLabel: { fontSize: 11, color: '#BBB', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10, marginTop: 4 },
-  grupoFecha:   { fontSize: 11, color: '#BBB', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8, marginTop: 4 },
+  sectionLabel: { fontSize: fs(11), color: '#BBB', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10, marginTop: 4 },
+  grupoFecha:   { fontSize: fs(11), color: '#BBB', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8, marginTop: 4 },
   histItem:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#EDF9EF', padding: 13, borderRadius: 14, marginBottom: 8 },
-  histTitle:    { fontSize: 14, color: '#333', fontWeight: '600', marginBottom: 2 },
-  histTime:     { color: '#888', fontSize: 12 },
+  histTitle:    { fontSize: fs(14), color: '#333', fontWeight: '600', marginBottom: 2, flexShrink: 1 },
+  histTime:     { color: '#888', fontSize: fs(12) },
   emptyBox:     { alignItems: 'center', paddingVertical: 30 },
-  emptyText:    { fontSize: 15, color: '#AAA', fontWeight: '600', textAlign: 'center' },
+  emptyText:    { fontSize: fs(15), color: '#AAA', fontWeight: '600', textAlign: 'center' },
 
   barBg:   { height: 5, backgroundColor: '#EEE', borderRadius: 3, marginTop: 8, width: '100%', overflow: 'hidden' },
   barFill: { height: '100%', borderRadius: 3 },
 
   fireHeroWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: 24, gap: 4 },
-  fireEmoji:    { fontSize: 80, lineHeight: 90 },
-  fireNum:      { fontSize: 72, fontWeight: '800', color: ORANGE, lineHeight: 80, letterSpacing: -2 },
-  fireSubLabel: { fontSize: 16, color: '#888', fontWeight: '500', marginTop: 2 },
+  fireEmoji:    { fontSize: fs(80), lineHeight: fs(90) },
+  fireNum:      { fontSize: fs(72), fontWeight: '800', color: ORANGE, lineHeight: fs(80), letterSpacing: -2 },
+  fireSubLabel: { fontSize: fs(16), color: '#888', fontWeight: '500', marginTop: 2 },
 
   btnInicio:    { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: PURPLE + '18', borderRadius: 20, alignSelf: 'flex-start', marginBottom: 8, minHeight: 44 },
-  btnInicioTxt: { color: PURPLE, fontWeight: '600', fontSize: 13 },
+  btnInicioTxt: { color: PURPLE, fontWeight: '600', fontSize: fs(13) },
 
   semanaCard: { backgroundColor: ORANGE_BG, borderRadius: 18, paddingVertical: 16, paddingHorizontal: 8, borderWidth: 1, borderColor: '#FFE0CC', marginBottom: 4 },
   semanaWrap: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-start' },
@@ -506,54 +516,54 @@ const styles = StyleSheet.create({
   diaDot:     { width: 38, height: 38, borderRadius: 19, backgroundColor: '#F0EAEA', alignItems: 'center', justifyContent: 'center' },
   diaDotActivo: { backgroundColor: ORANGE, shadowColor: ORANGE, shadowOpacity: 0.4, shadowRadius: 6, elevation: 4 },
   diaDotHoy:  { borderWidth: 2, borderColor: ORANGE, backgroundColor: ORANGE_LT },
-  diaFire:    { fontSize: 20 },
-  diaLetra:   { fontSize: 12, fontWeight: '700', color: '#BBB' },
-  diaNombreLetra: { fontSize: 10, color: '#AAA', fontWeight: '500' },
+  diaFire:    { fontSize: fs(20) },
+  diaLetra:   { fontSize: fs(12), fontWeight: '700', color: '#BBB' },
+  diaNombreLetra: { fontSize: fs(10), color: '#AAA', fontWeight: '500' },
 
   rachaCard:      { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: ORANGE_BG, padding: 14, borderRadius: 14, marginBottom: 8, borderWidth: 1, borderColor: '#FFE0CC' },
-  rachaCardEmoji: { fontSize: 20, width: 30, textAlign: 'center' },
-  rachaCardTitle: { fontSize: 13, color: '#333', fontWeight: '600' },
-  rachaCardSub:   { fontSize: 11, color: '#AAA', marginTop: 2 },
-  rachaBadge:     { fontSize: 13, fontWeight: '700', color: ORANGE, backgroundColor: ORANGE_LT, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  rachaCardEmoji: { fontSize: fs(20), width: 30, textAlign: 'center' },
+  rachaCardTitle: { fontSize: fs(13), color: '#333', fontWeight: '600', flexShrink: 1 },
+  rachaCardSub:   { fontSize: fs(11), color: '#AAA', marginTop: 2 },
+  rachaBadge:     { fontSize: fs(13), fontWeight: '700', color: ORANGE, backgroundColor: ORANGE_LT, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
 
   rachaVaciaBox:  { alignItems: 'center', paddingVertical: 24, gap: 8, backgroundColor: '#F8F8F8', borderRadius: 16, marginTop: 12 },
-  rachaVaciaEmoji:{ fontSize: 36 },
-  rachaVaciaText: { fontSize: 14, color: '#AAA', textAlign: 'center', lineHeight: 22 },
+  rachaVaciaEmoji:{ fontSize: fs(36) },
+  rachaVaciaText: { fontSize: fs(14), color: '#AAA', textAlign: 'center', lineHeight: fs(22) },
 
   medalsRow:    { flexDirection: 'row', gap: 8, marginBottom: 18 },
   medalCard:    { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: PURPLE_LT, borderRadius: 16, padding: 10, alignItems: 'center' },
-  medalLabel:   { fontWeight: '700', fontSize: 20, marginTop: 4 },
-  medalStatus:  { fontSize: 15, fontWeight: '600', marginTop: 2 },
-  medalPending: { fontSize: 15, color: '#AAA', marginTop: 2, textAlign: 'center' },
-  medalCount:   { fontSize: 15, color: '#BBB', marginTop: 4 },
+  medalLabel:   { fontWeight: '700', fontSize: fs(14), marginTop: 4 },
+  medalStatus:  { fontSize: fs(12), fontWeight: '600', marginTop: 2 },
+  medalPending: { fontSize: fs(11), color: '#AAA', marginTop: 2, textAlign: 'center' },
+  medalCount:   { fontSize: fs(11), color: '#BBB', marginTop: 4 },
 
   nextBox:    { backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 14, borderWidth: 1.5, flexDirection: 'column', alignItems: 'center', gap: 10 },
-  nextTitle:  { fontSize: 20, fontWeight: '700', marginBottom: 8 },
-  nextDetail: { fontSize: 15, color: '#888', marginTop: 6, textAlign: 'center' },
+  nextTitle:  { fontSize: fs(16), fontWeight: '700', marginBottom: 8 },
+  nextDetail: { fontSize: fs(13), color: '#888', marginTop: 6, textAlign: 'center' },
 
   penalBox:   { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FFF0F0', borderRadius: 14, padding: 14, borderWidth: 1.5, borderColor: '#FFCCCC', marginBottom: 14 },
-  penalEmoji: { fontSize: 28 },
-  penalTitle: { fontSize: 13, fontWeight: '700', color: '#CC3333' },
-  penalSub:   { fontSize: 11, color: '#AA4444', marginTop: 2 },
-  penalNum:   { fontSize: 18, fontWeight: '800', color: '#CC3333' },
+  penalEmoji: { fontSize: fs(28) },
+  penalTitle: { fontSize: fs(13), fontWeight: '700', color: '#CC3333', flexShrink: 1 },
+  penalSub:   { fontSize: fs(11), color: '#AA4444', marginTop: 2 },
+  penalNum:   { fontSize: fs(18), fontWeight: '800', color: '#CC3333' },
 
   statCard:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: PURPLE_BG, borderRadius: 16, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: PURPLE_LT },
   statCardLeft:  { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  statCardEmoji: { fontSize: 28 },
-  statCardTitle: { fontSize: 20, fontWeight: '700', color: '#333' },
-  statCardSub:   { fontSize: 14, color: '#AAA', marginTop: 2 },
-  statCardVal:   { fontSize: 26, fontWeight: '800', color: PURPLE },
+  statCardEmoji: { fontSize: fs(28) },
+  statCardTitle: { fontSize: fs(14), fontWeight: '700', color: '#333', flexShrink: 1 },
+  statCardSub:   { fontSize: fs(12), color: '#AAA', marginTop: 2 },
+  statCardVal:   { fontSize: fs(20), fontWeight: '800', color: PURPLE },
   statCardBadges:{ flexDirection: 'row', gap: 6 },
   statBadge:     { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
-  statBadgeTxt:  { fontSize: 13, fontWeight: '700' },
+  statBadgeTxt:  { fontSize: fs(12), fontWeight: '700' },
 
   tiempoBarWrap:        { marginBottom: 16 },
   tiempoBar:            { height: 10, backgroundColor: '#FFD0A8', borderRadius: 6, overflow: 'hidden', marginBottom: 6 },
   tiempoBarFill:        { height: '100%', backgroundColor: PURPLE, borderRadius: 6 },
   tiempoBarLabels:      { flexDirection: 'row', justifyContent: 'space-between' },
-  tiempoBarLabelVerde:  { fontSize: 11, color: PURPLE, fontWeight: '600' },
-  tiempoBarLabelNaranja:{ fontSize: 11, color: '#E65100', fontWeight: '600' },
+  tiempoBarLabelVerde:  { fontSize: fs(11), color: PURPLE, fontWeight: '600' },
+  tiempoBarLabelNaranja:{ fontSize: fs(11), color: '#E65100', fontWeight: '600' },
 
   notaBox:  { backgroundColor: PURPLE_BG, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: PURPLE_LT },
-  notaText: { fontSize: 12, color: '#666', lineHeight: 19 },
+  notaText: { fontSize: fs(12), color: '#666', lineHeight: fs(19) },
 });

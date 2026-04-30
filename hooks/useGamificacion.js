@@ -82,11 +82,19 @@ export function useGamificacion() {
         const diff = diasDif(hoyStr, guardado.ultimaFecha);
         if (diff !== 1) guardado.racha = 0;
       }
-      guardado.tareasCompletasHoy   = 0;
-      guardado.fechaHoy             = hoyStr;
-      guardado.penalizacionAplicada = false;
+      guardado.tareasCompletasHoy = 0;
+      guardado.fechaHoy           = hoyStr;
+      // Reseteamos penalizacionAplicada SOLO si la última penalización
+      // fue de un día anterior (no de hoy). Así en recargas del mismo
+      // día nuevo no se vuelve a penalizar, pero al día siguiente sí puede.
+      const fechaPenal = guardado.fechaPenalizacion ?? null;
+      if (fechaPenal !== hoyStr) {
+        guardado.penalizacionAplicada = false;
+      }
       await storage.set(STATE_KEY, guardado);
       setEsDiaNuevo(true);
+    } else {
+      setEsDiaNuevo(false);
     }
     setEstado({ ...ESTADO_INICIAL, ...guardado });
   }
@@ -96,32 +104,6 @@ export function useGamificacion() {
 
   useEffect(() => {
     cargarEstado();
-  }, []);
- 
-  useEffect(() => {
-    (async () => {
-      const guardado = await storage.get(STATE_KEY);
-      if (guardado) {
-        const hoyStr = hoy();
-
-        if (guardado.fechaHoy !== hoyStr) {
-          // Día nuevo: resetear contador y racha si corresponde
-          // La penalización la aplica index.tsx con la info de la BD
-          if (guardado.ultimaFecha) {
-            const diff = diasDif(hoyStr, guardado.ultimaFecha);
-            if (diff !== 1) guardado.racha = 0; // saltó días → racha rota
-          }
-          guardado.tareasCompletasHoy   = 0;
-          guardado.fechaHoy             = hoyStr;
-          guardado.penalizacionAplicada = false; // reset para el nuevo día
-          await storage.set(STATE_KEY, guardado);
-          setEsDiaNuevo(true);
-        }
-
-        setEstado({ ...ESTADO_INICIAL, ...guardado });
-      }
-      setCargando(false);
-    })();
   }, []);
  
   const persist = useCallback(async (siguiente) => {
@@ -203,8 +185,9 @@ export function useGamificacion() {
         ...prev,
         estrellas:               nuevasEstrellas,
         totalHecho:              nuevasEstrellas,
-        racha:                   prev.racha, // racha intacta
+        racha:                   prev.racha,
         penalizacionAplicada:    true,
+        fechaPenalizacion:       hoyStr2, // día en que se aplicó
         historialPenalizaciones: historial,
       };
       persist(nuevoEstado);
@@ -231,6 +214,7 @@ export function useGamificacion() {
     historialPenalizaciones: estado.historialPenalizaciones ?? [],
     fechaHoy:                estado.fechaHoy,
     ultimaFecha:             estado.ultimaFecha,
+    fechaPenalizacion:       estado.fechaPenalizacion ?? null,
     cargando,
     esDiaNuevo,
     medallas:                getMedallas(estado.estrellas ?? 0),
