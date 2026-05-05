@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   AccessibilityInfo,
+  Alert,
   Animated,
   Image,
   Modal,
@@ -23,12 +24,16 @@ import {
 import {
   cancelarTarea,
   deleteTarea,
+  eliminarTareaYRepetitivas,
+  generarTareasRepetitivas,
   getTareasPorFecha,
   initDB,
   insertTarea,
   limpiarTareasViejas,
+  updateTareaBaseCompleta,
   updateTareaCompletada,
-  updateTareaHora
+  updateTareaHora,
+  updateTareaTituloPicto,
 } from '../../database/database';
 
 import { useAjustesCtx } from '../../context/AjustesContext';
@@ -37,16 +42,16 @@ import { buscarPictogramas } from "../../services/arasaac"; // ← ahora devuelv
 
 import { ahoraApp, ahoraAppMs, fechaAppDate, hoyAppStr, setFechaSimulada, setHoraSimulada } from '../../utils/fecha';
 
-setFechaSimulada('2026-03-29');
+setFechaSimulada('2026-04-29');
 setHoraSimulada(12, 0);
 
 if (Notifications) {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
-      shouldShowAlert: true,   // ← cambiado
+      shouldShowAlert: true,  
       shouldPlaySound: false,
       shouldSetBadge: false,
-      // shouldShowBanner y shouldShowList eliminados
+     
     }),
   });
 }
@@ -269,7 +274,7 @@ function minutosRestantes(hora?: string | null): number | null {
   return Math.round((dl.getTime() - ahoraAppMs()) / 60000);
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
+
 export default function Home() {
   const { width } = useWindowDimensions();
 
@@ -277,15 +282,56 @@ export default function Home() {
   const [taskModalVisible, setTaskModalVisible] = useState(false);
   const [search,           setSearch]           = useState('');
   const [selectedTask,     setSelectedTask]     = useState<any>(null);
+
+ 
+  const [editModalVisible,  setEditModalVisible]  = useState(false);
+  const [editTitulo,        setEditTitulo]        = useState('');
+  const [editPictogramas,   setEditPictogramas]   = useState<number[]>([]);
+  const [editPictogramId,   setEditPictogramId]   = useState<number | null>(null);
+  const [editHora,          setEditHora]          = useState<string | null>(null);
+  const [showEditPicker,    setShowEditPicker]    = useState(false);
+  const [editTempTime,      setEditTempTime]      = useState(fechaAppDate());
+
+ 
+  const [confirmVisible,  setConfirmVisible]  = useState(false);
+  const [confirmConfig,   setConfirmConfig]   = useState<{
+    titulo: string; mensaje: string;
+    opciones: { texto: string; valor: any; destructivo?: boolean }[];
+  } | null>(null);
+  const confirmResolveRef = useRef<((val: any) => void) | null>(null);
+
+  const mostrarConfirm = (
+    titulo: string, mensaje: string,
+    opciones: { texto: string; valor: any; destructivo?: boolean }[]
+  ) => new Promise<any>(resolve => {
+    if (Platform.OS !== 'web') {
+   
+      Alert.alert(titulo, mensaje, [
+        ...opciones.map(op => ({
+          text: op.texto,
+          style: (op.destructivo ? 'destructive' : op.valor === null ? 'cancel' : 'default') as any,
+          onPress: () => resolve(op.valor),
+        })),
+      ], { cancelable: true, onDismiss: () => resolve(null) });
+    } else {
+  
+      confirmResolveRef.current = resolve;
+      setConfirmConfig({ titulo, mensaje, opciones });
+      setConfirmVisible(true);
+    }
+  });
   const [tasks,            setTasks]            = useState<any[]>([]);
   const [showPicker,       setShowPicker]       = useState(false);
   const [selectedTime,     setSelectedTime]     = useState<string | null>(null);
   const [tempTime]                              = useState(fechaAppDate());
   const [titulo,           setTitulo]           = useState('');
 
-  // ── Estado del selector de pictogramas ───────────────────────────────────
-  const [pictogramas,  setPictogramas]  = useState<number[]>([]); // lista de sugerencias
-  const [pictogramId,  setPictogramId]  = useState<number | null>(null); // seleccionado
+ 
+  const [pictogramas,  setPictogramas]  = useState<number[]>([]);
+  const [pictogramId,  setPictogramId]  = useState<number | null>(null);
+
+  // ── Repetición de tarea ─────
+  const [repeticion, setRepeticion] = useState<'ninguna'|'diaria'|'semanal'>('ninguna');
 
   const [showTaskPicker,   setShowTaskPicker]   = useState(false);
   const [taskTempTime,     setTaskTempTime]     = useState(fechaAppDate());
@@ -306,16 +352,13 @@ export default function Home() {
   const { ajustes }  = useAjustesCtx();
   const reduceMotion = useReduceMotion();
 
-  // ── Carga inicial y recarga al volver de otra pantalla ───────────────────
-  // useFocusEffect recarga las tareas cada vez que index recibe el foco,
-  // lo que hace que las tareas añadidas desde el calendario aparezcan aquí.
+
   const yaInicializado = useRef(false);
-  const ultimoDiaNotif = useRef(hoyAppStr()); // rastrea el día para resetear notifs
+  const ultimoDiaNotif = useRef(hoyAppStr()); 
   useFocusEffect(
     useCallback(() => {
       const hoyStr = hoyAppStr();
 
-      // Si cambió el día, resetea las notificaciones enviadas
       if (hoyStr !== ultimoDiaNotif.current) {
         ultimoDiaNotif.current = hoyStr;
         notifEnviadasHoy.current = new Set();
@@ -323,6 +366,7 @@ export default function Home() {
 
       if (!yaInicializado.current) {
         if (Platform.OS !== 'web') initDB();
+        generarTareasRepetitivas(); 
         const { tareasHoy, vencidasAyer } = limpiarTareasViejas() as any;
         setTasks(tareasHoy.map((r: any) => ({ ...r, completed: r.completed === 1 })));
         pendientesPenalRef.current = { vencidasAyer };
@@ -334,28 +378,24 @@ export default function Home() {
     }, [])
   );
 
-  // ── Testing: forzar puntos (quitar en producción) ─────────────────────────
+ 
   useEffect(() => {
     if (!gami.cargando) {
-      gami.forzarEstrellas(595);
+      gami.forzarEstrellas(290);
     }
   }, [gami.cargando]);
 
-  // ── Penalización + bajada de medalla ──────────────────────────────────────
-  // Solo salta si:
-  //   1. Es día nuevo (app estuvo cerrada)
-  //   2. No se penalizó ya hoy (penalizacionAplicada guardado en storage)
-  //   3. Hay tareas que se quedaron sin tocar (vencidasAyer > 0)
+
   const penalizacionDisparadaRef = useRef(false);
   useEffect(() => {
     if (gami.cargando) return;
     if (!gami.esDiaNuevo) return;
-    if (gami.penalizacionAplicada) return;       // ya se penalizó hoy en storage
-    if (penalizacionDisparadaRef.current) return; // ya se disparó en esta sesión
+    if (gami.penalizacionAplicada) return;      
+    if (penalizacionDisparadaRef.current) return; 
 
     const timer = setTimeout(async () => {
       const { vencidasAyer } = pendientesPenalRef.current;
-      if (vencidasAyer === 0) return; // no hay pendientes → no penalizar
+      if (vencidasAyer === 0) return; 
 
       penalizacionDisparadaRef.current = true;
       const prevEstrellas = gami.estrellas;
@@ -372,8 +412,7 @@ export default function Home() {
     return () => clearTimeout(timer);
   }, [gami.cargando, gami.esDiaNuevo, gami.penalizacionAplicada]);
 
-  // ── Checks periódicos ─────────────────────────────────────────────────────
-  // ultimoDiaInterval rastrea el día activo para detectar cambio de medianoche
+
   const ultimoDiaInterval = useRef(hoyAppStr());
 
   useEffect(() => {
@@ -384,19 +423,18 @@ export default function Home() {
       const minutos = now.getMinutes();
       const hoy     = hoyAppStr();
 
-      // ── Detección de cambio de día en tiempo real ────────────────────────
+    
       if (hoy !== ultimoDiaInterval.current) {
         ultimoDiaInterval.current = hoy;
 
-        // 1. Limpia tareas viejas y obtiene las vencidas de ayer
         const { tareasHoy, vencidasAyer } = limpiarTareasViejas() as any;
         setTasks(tareasHoy.map((r: any) => ({ ...r, completed: r.completed === 1 })));
 
-        // 2. Resetea notificaciones del día anterior
+ 
         notifEnviadasHoy.current = new Set();
         penalizacionDisparadaRef.current = false;
 
-        // 3. Penaliza si hubo tareas sin hacer ayer
+
         if (vencidasAyer > 0 && !gami.penalizacionAplicada) {
           const prevEstrellas = gami.estrellas;
           const res = await gami.penalizarFinDia(vencidasAyer) as any;
@@ -459,7 +497,7 @@ export default function Home() {
     setTimeout(() => disparaRachaNotif(racha), delay);
   };
 
-  // ── Buscar pictogramas — ahora devuelve varios ────────────────────────────
+
   const buscarImagen = async (texto: string) => {
     setTitulo(texto);
     if (texto.trim().length < 2) {
@@ -470,7 +508,7 @@ export default function Home() {
     const ids = await buscarPictogramas(texto, 6);
     if (ids.length > 0) {
       setPictogramas(ids);
-      setPictogramId(ids[0]); // preselecciona el primero
+      setPictogramId(ids[0]);
     } else {
       setPictogramas([]);
       setPictogramId(null);
@@ -483,14 +521,7 @@ export default function Home() {
     if (date) setSelectedTime(date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
   };
 
-  const handleTaskTimeChange = (event: any, date?: Date) => {
-    if (Platform.OS === 'android') setShowTaskPicker(false);
-    if (!date || !selectedTask) return;
-    const nuevaHora = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    if (Platform.OS !== 'web') updateTareaHora(selectedTask.id, nuevaHora);
-    setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, hora: nuevaHora } : t));
-    setSelectedTask((prev: any) => ({ ...prev, hora: nuevaHora }));
-  };
+ 
 
   const today          = ahoraApp();
   const capitalize     = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
@@ -532,33 +563,169 @@ export default function Home() {
     setTaskModalVisible(false);
   };
 
-  const handleDeleteTask = async (task: any) => {
-    if (!task.completed) {
-      cancelarTarea(task.id);
-      saltadasRef.current += 1;
-      if (saltadasRef.current >= 3) disparaNotif('saltadas');
-      else disparaNotif('eliminada');
+  // ── Abrir modal de edición ────
+  const handleAbrirEdicion = async () => {
+    setEditTitulo(selectedTask.title);
+    setEditPictogramId(selectedTask.pictogramId ?? null);
+    setEditHora(selectedTask.hora !== 'Sin hora' ? selectedTask.hora : null);
+    const dl = parseTiempoLim(selectedTask.hora);
+    setEditTempTime(dl ?? fechaAppDate());
+    setShowEditPicker(false);
+    if (selectedTask.title.trim().length >= 2) {
+      const ids = await buscarPictogramas(selectedTask.title, 6);
+      setEditPictogramas(ids);
     } else {
-      deleteTarea(task.id);
+      setEditPictogramas(selectedTask.pictogramId ? [selectedTask.pictogramId] : []);
     }
-    setTasks(prev => prev.filter(t => t.id !== task.id));
     setTaskModalVisible(false);
+    setEditModalVisible(true);
+  };
+
+  // ── Guardar edición ──
+  const handleGuardarEdicion = async () => {
+    if (!editTitulo.trim() || !selectedTask) return;
+    const horaFinal = editHora ?? 'Sin hora';
+
+    const esInstanciaRepetitiva = !!selectedTask.tareaBaseId && selectedTask.tareaBaseId !== '';
+    const esTareaBase = selectedTask.repeticion && selectedTask.repeticion !== 'ninguna' && !esInstanciaRepetitiva;
+
+    if (esInstanciaRepetitiva || esTareaBase) {
+      setEditModalVisible(false);
+      await new Promise(r => setTimeout(r, 300));
+      const opcion = await mostrarConfirm(
+        'Editar tarea repetitiva', '¿Qué quieres cambiar?',
+        [
+          { texto: 'Cancelar', valor: null },
+          { texto: 'Solo esta vez', valor: 'esta' },
+          { texto: 'Todas las veces', valor: 'todas' },
+        ]
+      );
+
+      if (!opcion) return;
+
+      if (opcion === 'esta') {
+      
+        updateTareaTituloPicto(selectedTask.id, editTitulo.trim(), editPictogramId);
+        updateTareaHora(selectedTask.id, horaFinal);
+        setTasks(prev => prev.map(t =>
+          t.id === selectedTask.id
+            ? { ...t, title: editTitulo.trim(), pictogramId: editPictogramId, hora: horaFinal }
+            : t
+        ));
+
+      } else {
+     
+        const baseId = esInstanciaRepetitiva ? selectedTask.tareaBaseId : selectedTask.id;
+        updateTareaBaseCompleta(baseId, editTitulo.trim(), editPictogramId, horaFinal);
+    
+        setTasks(prev => prev.map(t =>
+          (t.id === baseId || t.tareaBaseId === baseId)
+            ? { ...t, title: editTitulo.trim(), pictogramId: editPictogramId, hora: horaFinal }
+            : t
+        ));
+      }
+
+    } else {
+  
+      updateTareaTituloPicto(selectedTask.id, editTitulo.trim(), editPictogramId);
+      updateTareaHora(selectedTask.id, horaFinal);
+      setTasks(prev => prev.map(t =>
+        t.id === selectedTask.id
+          ? { ...t, title: editTitulo.trim(), pictogramId: editPictogramId, hora: horaFinal }
+          : t
+      ));
+    }
+
+    setSelectedTask((prev: any) => ({ ...prev, title: editTitulo.trim(), pictogramId: editPictogramId, hora: horaFinal }));
+    AccessibilityInfo.announceForAccessibility(`Tarea actualizada: ${editTitulo}`);
+    setEditModalVisible(false);
+  };
+
+  const handleDeleteTask = async (task: any) => {
+    const esInstanciaRepetitiva = !!task.tareaBaseId && task.tareaBaseId !== '';
+    const esTareaBase = task.repeticion && task.repeticion !== 'ninguna' && !esInstanciaRepetitiva;
+
+    if (esInstanciaRepetitiva || esTareaBase) {
+      setTaskModalVisible(false);
+      await new Promise(r => setTimeout(r, 300));
+      const opcion = await mostrarConfirm(
+        'Eliminar tarea repetitiva',
+        `"${task.title}" se repite ${task.repeticion === 'diaria' || esTareaBase ? 'cada día' : 'cada semana'}. ¿Qué quieres eliminar?`,
+        [
+          { texto: 'Cancelar', valor: null },
+          { texto: 'Solo esta vez', valor: 'esta' },
+          { texto: 'Eliminar todas', valor: 'todas', destructivo: true },
+        ]
+      );
+
+      if (!opcion) return;
+
+      if (opcion === 'esta') {
+        if (!task.completed) {
+          cancelarTarea(task.id);
+          saltadasRef.current += 1;
+          if (saltadasRef.current >= 3) disparaNotif('saltadas');
+          else disparaNotif('eliminada');
+        } else {
+          deleteTarea(task.id);
+        }
+        setTasks(prev => prev.filter(t => t.id !== task.id));
+      } else {
+        const baseId = task.tareaBaseId && task.tareaBaseId !== '' ? task.tareaBaseId : task.id;
+        eliminarTareaYRepetitivas(baseId);
+        setTasks(prev => prev.filter(t => t.id !== baseId && t.tareaBaseId !== baseId));
+        disparaNotif('eliminada');
+      }
+
+    } else {
+      setTaskModalVisible(false);
+      await new Promise(r => setTimeout(r, 300));
+      const confirmado = await mostrarConfirm(
+        'Eliminar tarea',
+        `¿Seguro que quieres eliminar "${task.title}"?`,
+        [
+          { texto: 'Cancelar', valor: false },
+          { texto: 'Eliminar', valor: true, destructivo: true },
+        ]
+      );
+
+      if (!confirmado) return;
+
+      if (!task.completed) {
+        cancelarTarea(task.id);
+        saltadasRef.current += 1;
+        if (saltadasRef.current >= 3) disparaNotif('saltadas');
+        else disparaNotif('eliminada');
+      } else {
+        deleteTarea(task.id);
+      }
+      setTasks(prev => prev.filter(t => t.id !== task.id));
+    }
   };
 
   const hoy          = hoyAppStr();
   const tareasDeHoy  = tasks.filter(t => t.fechaDia === hoy);
   const totalToday   = tareasDeHoy.length;
   const doneToday    = tareasDeHoy.filter(t => t.completed).length;
-  const pendingTasks = tareasDeHoy.filter(t =>
-    !t.completed && t.title.toLowerCase().includes(search.toLowerCase())
-  );
+  const pendingTasks = tareasDeHoy
+    .filter(t => !t.completed && t.title.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => {
+      const tieneHoraA = a.hora && a.hora !== 'Sin hora';
+      const tieneHoraB = b.hora && b.hora !== 'Sin hora';
+   
+      if (tieneHoraA && tieneHoraB) return a.hora.localeCompare(b.hora);
+      if (tieneHoraA) return -1; 
+      if (tieneHoraB) return 1;  
+      return 0; 
+    });
 
-  // ── Reset del modal al cerrarlo ───────────────────────────────────────────
+
   const cerrarModalAnadir = () => {
     setTitulo('');
     setSelectedTime(null);
     setPictogramId(null);
     setPictogramas([]);
+    setRepeticion('ninguna');
     setModalVisible(false);
   };
 
@@ -566,15 +733,14 @@ export default function Home() {
     <View style={{ flex: 1, backgroundColor: '#ffffff', paddingHorizontal: 20 }}>
 
       <PerezosoNotif type={notifType} show={showNotif} />
-      {/* RachaNotif solo se monta cuando PerezosoNotif está cerrado
-          En iOS solo puede haber un Modal visible a la vez */}
+  
       <RachaNotif show={showRachaNotif && !showNotif} racha={rachaNotifVal} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" accessible={false}>
 
         {/* ── Cabecera ── */}
         <View style={{ paddingTop: 20, paddingBottom: 20 }} accessible={false}>
-          {/* Título y fecha como elemento separado para VoiceOver */}
+  
           <View style={{ flexDirection: 'column', padding: 40, justifyContent: 'center', alignItems: 'center', gap: 20 }}
             accessible accessibilityRole="header" accessibilityLabel={`Mis Tareas. ${formattedToday}`}>
             <View accessible={false}>
@@ -582,7 +748,7 @@ export default function Home() {
               <Text style={styles.dateText} accessibilityElementsHidden importantForAccessibility="no">{formattedToday}</Text>
             </View>
           </View>
-          {/* Buscador fuera del header — VoiceOver entra al TextInput directamente */}
+        
           <View style={styles.searchBar}  accessibilityLabel="Buscar tarea" accessibilityHint="Escribe para filtrar las tareas de hoy" accessibilityRole="search"  >
             <TextInput
               placeholder="Buscar tarea.."
@@ -595,12 +761,12 @@ export default function Home() {
               accessibilityRole="search"
               clearButtonMode="while-editing"
             />
-            {/* Icono decorativo */}
+         
             <Ionicons name="search" size={20} color="#999" accessibilityElementsHidden importantForAccessibility="no" />
           </View>
         </View>
 
-        {/* ── Lista de tareas ── */}
+  
         {pendingTasks.length === 0 ? (
           <View style={styles.emptyBox} accessible accessibilityLiveRegion="polite">
             {totalToday > 0 && doneToday === totalToday ? (
@@ -640,6 +806,11 @@ export default function Home() {
                     )}
                     <View style={{ flex: 1 }}>
                       <Text style={styles.taskTitle} numberOfLines={1}>{item.title}</Text>
+                      {item.repeticion && item.repeticion !== 'ninguna' && (
+                        <Text style={{ fontSize: 10, color: PURPLE, fontWeight: '600' }}>
+                          {item.repeticion === 'diaria' ? '📅 Diaria' : '📆 Semanal'}
+                        </Text>
+                      )}
                       {urgente && !vencida && <Text style={{ fontSize: 11, color: ORANGE, fontWeight: '600' }}>¡Quedan {mins} min!</Text>}
                       {vencida && <Text style={{ fontSize: 11, color: RED, fontWeight: '600' }}>⚠ Fuera de hora</Text>}
                     </View>
@@ -741,7 +912,7 @@ export default function Home() {
                         />
                       </Pressable>
                     ))}
-                    {/* Opción sin pictograma */}
+                 
                     <Pressable
                       onPress={() => setPictogramId(null)}
                       style={[styles.pictoOpcion, styles.pictoNinguno, pictogramId === null && styles.pictoOpcionSelec]}
@@ -764,6 +935,7 @@ export default function Home() {
                       id: `${hoyAppStr()}_${ahoraAppMs()}_${Math.random().toString(36).slice(2, 8)}`,
                       title: titulo, pictogramId: pictogramId ?? null,
                       hora: selectedTime ?? 'Sin hora', completed: false, stars: 0,
+                      repeticion,
                     };
                     insertTarea(newTask);
                     setTasks(prev => [...prev, { ...newTask, fechaDia: hoyAppStr() }]);
@@ -783,11 +955,10 @@ export default function Home() {
         </View>
       </Modal>
 
-      {/* ── MODAL: DETALLE TAREA ── */}
       <Modal visible={taskModalVisible} transparent animationType="slide" onRequestClose={() => setTaskModalVisible(false)} accessibilityViewIsModal>
-        {/* overlay: solo él mismo invisible, sus hijos sí son accesibles */}
+     
         <Pressable style={styles.overlay} onPress={() => setTaskModalVisible(false)} accessible={false}>
-          {/* modalBox: no agrupado, VoiceOver navega elemento a elemento */}
+    
           <Pressable style={[styles.modalBox, { alignItems: 'center' }]} onPress={e => e.stopPropagation()} accessible={false} importantForAccessibility="yes">
 
             <Pressable onPress={() => setTaskModalVisible(false)} style={{ position: 'absolute', top: 14, right: 14, zIndex: 10, padding: 8 }} accessible accessibilityRole="button" accessibilityLabel="Cerrar detalle de tarea">
@@ -806,47 +977,10 @@ export default function Home() {
               </View>
             )}
 
-            <Pressable
-              onPress={() => { if (!selectedTask?.completed) { const dl = parseTiempoLim(selectedTask?.hora); setTaskTempTime(dl ? dl : fechaAppDate()); setShowTaskPicker(true); } }}
-              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 12, padding: 8 }}
-              accessible
-              accessibilityRole={selectedTask?.completed ? 'text' : 'button'}
-              accessibilityLabel={selectedTask?.hora && selectedTask.hora !== 'Sin hora' ? `Hora: ${selectedTask.hora}${!selectedTask?.completed ? '. Pulsa para cambiar' : ''}` : 'Sin hora asignada'}
-              disabled={!!selectedTask?.completed}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 12 }} accessible={false}>
-                <Text style={styles.detailTime} accessibilityElementsHidden importantForAccessibility="no">🕐 {selectedTask?.hora ?? 'Sin hora'}</Text>
-                {!selectedTask?.completed && <Ionicons name="pencil" size={20} color={PURPLE} accessibilityElementsHidden importantForAccessibility="no" />}
-              </View>
-            </Pressable>
 
-            {showTaskPicker && Platform.OS !== 'web' && (
-              <View accessible={false}>
-                <DateTimePicker value={taskTempTime} mode="time" is24Hour display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={handleTaskTimeChange} />
-                {Platform.OS === 'ios' && (
-                  <Pressable onPress={() => setShowTaskPicker(false)} style={{ alignSelf: 'flex-end', paddingHorizontal: 16, paddingVertical: 6 }} accessible accessibilityRole="button" accessibilityLabel="Confirmar hora seleccionada">
-                    <Text style={{ color: '#A77BBE', fontWeight: '700', fontSize: 15 }}>Listo</Text>
-                  </Pressable>
-                )}
-              </View>
-            )}
-            {showTaskPicker && Platform.OS === 'web' && (
-              <input type="time" defaultValue={selectedTask?.hora !== 'Sin hora' ? selectedTask?.hora : ''}
-                onChange={(e) => {
-                  setShowTaskPicker(false);
-                  if (!e.target.value || !selectedTask) return;
-                  const nuevaHora = e.target.value;
-                  const stored = localStorage.getItem('tareas');
-                  if (stored) {
-                    const tareas = JSON.parse(stored).map((t: any) => t.id === selectedTask.id ? { ...t, hora: nuevaHora } : t);
-                    localStorage.setItem('tareas', JSON.stringify(tareas));
-                  }
-                  setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, hora: nuevaHora } : t));
-                  setSelectedTask((prev: any) => ({ ...prev, hora: nuevaHora }));
-                }}
-                style={{ marginBottom: 12, padding: 8, fontSize: 16, borderRadius: 8, borderColor: PURPLE, borderWidth: 1 }}
-              />
-            )}
+            <View style={{ marginBottom: 12, padding: 8 }} accessible accessibilityLabel={selectedTask?.hora && selectedTask.hora !== 'Sin hora' ? `Hora: ${selectedTask.hora}` : 'Sin hora asignada'}>
+              <Text style={styles.detailTime} accessibilityElementsHidden importantForAccessibility="no">🕐 {selectedTask?.hora ?? 'Sin hora'}</Text>
+            </View>
 
             {selectedTask?.completed ? (
               <View style={styles.detailDoneBox} accessible accessibilityLabel={`Tarea completada con ${selectedTask?.stars ?? 5} de 5 estrellas`}>
@@ -854,32 +988,201 @@ export default function Home() {
                 <Text style={{ color: GREEN, fontWeight: '700', marginTop: 8, fontSize: 15 }} accessibilityElementsHidden importantForAccessibility="no">¡Tarea completada!</Text>
               </View>
             ) : (
-              <View style={{ flexDirection: 'row', alignContent: 'center', justifyContent: 'center', gap: 5 }} accessible={false}>
+              <View style={{ width: '100%', gap: 8 }} accessible={false}>
                 <Pressable
                   onPress={() => handleTareaCompletada(selectedTask)}
                   style={styles.btnPrimary}
-                  accessible
-                  accessibilityRole="button"
+                  accessible accessibilityRole="button"
                   accessibilityLabel={`Marcar como realizada la tarea ${selectedTask?.title}`}
                   accessibilityHint="Marca la tarea como completada y suma estrellas"
                 >
                   <Text style={styles.btnPrimaryText} accessibilityElementsHidden importantForAccessibility="no">Realizada ✓</Text>
                 </Pressable>
                 <Pressable
+                  onPress={handleAbrirEdicion}
+                  style={[styles.btnPrimary, { backgroundColor: '#E8F4FD' }]}
+                  accessible accessibilityRole="button"
+                  accessibilityLabel={`Editar la tarea ${selectedTask?.title}`}
+                  accessibilityHint="Cambia el nombre o el pictograma de la tarea"
+                >
+                  <Text style={[styles.btnPrimaryText, { color: '#2980B9' }]} accessibilityElementsHidden importantForAccessibility="no">Editar tarea
+                    <Ionicons name="pencil" size={16} color="#2980B9" style={{ marginLeft: 6 }} accessibilityElementsHidden importantForAccessibility="no" />  
+                  </Text>
+                </Pressable>
+                <Pressable
                   onPress={() => handleDeleteTask(selectedTask)}
-                  style={styles.btnPrimary}
-                  accessible
-                  accessibilityRole="button"
+                  style={[styles.btnPrimary, { backgroundColor: '#FDE8E8' }]}
+                  accessible accessibilityRole="button"
                   accessibilityLabel={`Eliminar la tarea ${selectedTask?.title}`}
                   accessibilityHint="Elimina la tarea y la mueve al historial como cancelada"
                 >
-                  <Text style={styles.btnPrimaryText} accessibilityElementsHidden importantForAccessibility="no">Eliminar tarea x</Text>
+                  <Text style={[styles.btnPrimaryText, { color: RED }]} accessibilityElementsHidden importantForAccessibility="no">Eliminar tarea ✕</Text>
                 </Pressable>
               </View>
             )}
           </Pressable>
         </Pressable>
       </Modal>
+      {/* ── MODAL: EDITAR TAREA ── */}
+      <Modal visible={editModalVisible} transparent animationType="slide" onRequestClose={() => setEditModalVisible(false)} accessibilityViewIsModal>
+        <View style={styles.overlay} accessible={false}>
+          <View style={styles.modalBox} accessible={false} importantForAccessibility="yes">
+            <ScrollView keyboardShouldPersistTaps="handled" accessible={false}>
+
+              <View style={styles.modalTopBar} accessible={false}>
+                <Pressable onPress={() => setEditModalVisible(false)} accessible accessibilityRole="button" accessibilityLabel="Cerrar edición" style={{ padding: 8 }}>
+                  <Ionicons name="close" size={26} color={PURPLE} accessibilityElementsHidden importantForAccessibility="no" />
+                </Pressable>
+                <Text style={styles.modalTopTitle} accessibilityRole="header">Editar tarea</Text>
+              </View>
+
+      
+              <View style={styles.inputRow} accessible={false}>
+                <TextInput
+                  value={editTitulo}
+                  onChangeText={async (texto) => {
+                    setEditTitulo(texto);
+                    if (texto.trim().length >= 2) {
+                      const ids = await buscarPictogramas(texto, 6);
+                      setEditPictogramas(ids);
+                    }
+                  }}
+                  style={{ flex: 1, paddingVertical: 10, fontSize: 16 }}
+                  accessibilityLabel="Título de la tarea"
+                  returnKeyType="done"
+                  clearButtonMode="while-editing"
+                  autoFocus
+                />
+              </View>
+
+              {/* Selector de pictogramas */}
+              {editPictogramas.length > 0 && (
+                <View style={{ marginTop: 16 }} accessible={false}>
+                  <Text style={styles.pictoLabel} accessibilityRole="header">Elige un pictograma</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 4 }} accessible={false}>
+                    {editPictogramas.map((id, i) => (
+                      <Pressable
+                        key={id}
+                        onPress={() => setEditPictogramId(id)}
+                        style={[styles.pictoOpcion, editPictogramId === id && styles.pictoOpcionSelec]}
+                        accessible accessibilityRole="button"
+                        accessibilityLabel={`Pictograma opción ${i + 1}${editPictogramId === id ? ', seleccionado' : ''}`}
+                        accessibilityState={{ selected: editPictogramId === id }}
+                      >
+                        <Image source={{ uri: `https://static.arasaac.org/pictograms/${id}/${id}_300.png` }} style={styles.pictoImg} accessibilityIgnoresInvertColors />
+                      </Pressable>
+                    ))}
+                    <Pressable
+                      onPress={() => setEditPictogramId(null)}
+                      style={[styles.pictoOpcion, styles.pictoNinguno, editPictogramId === null && styles.pictoOpcionSelec]}
+                      accessible accessibilityRole="button"
+                      accessibilityLabel={`Sin pictograma${editPictogramId === null ? ', seleccionado' : ''}`}
+                      accessibilityState={{ selected: editPictogramId === null }}
+                    >
+                      <Ionicons name="close" size={24} color={editPictogramId === null ? PURPLE : '#CCC'} accessibilityElementsHidden importantForAccessibility="no" />
+                      <Text style={[styles.pictoNingunoTxt, editPictogramId === null && { color: PURPLE }]} accessibilityElementsHidden importantForAccessibility="no">Ninguno</Text>
+                    </Pressable>
+                  </ScrollView>
+                </View>
+              )}
+
+              {/* ── Hora ── */}
+              <Text style={[styles.pictoLabel, { marginTop: 16 }]}>Hora (opcional)</Text>
+              {Platform.OS === 'web' ? (
+                <input
+                  type="time"
+                  value={editHora ?? ''}
+                  onChange={e => setEditHora(e.target.value || null)}
+                  style={{ padding: 10, fontSize: 15, borderRadius: 10, marginBottom: 8 }}
+                />
+              ) : (
+                <>
+                  <Pressable
+                    onPress={() => setShowEditPicker(true)}
+                    style={[styles.inputRow, { marginBottom: showEditPicker ? 8 : 16 }]}
+                    accessible accessibilityRole="button"
+                    accessibilityLabel={editHora ? `Hora: ${editHora}. Pulsa para cambiar` : 'Seleccionar hora, opcional'}
+                  >
+                    <Ionicons name="time-outline" size={18} color={PURPLE} style={{ marginRight: 8 }} accessibilityElementsHidden importantForAccessibility="no" />
+                    <Text style={[styles.inputRow, { color: editHora ? '#333' : '#AAA', flex: 1, borderWidth: 0, paddingVertical: 12 }]} accessibilityElementsHidden importantForAccessibility="no">
+                      {editHora ?? 'Sin hora seleccionada'}
+                    </Text>
+                    {editHora && (
+                      <Pressable onPress={() => { setEditHora(null); setShowEditPicker(false); }} accessible accessibilityRole="button" accessibilityLabel="Quitar hora" style={{ padding: 4 }}>
+                        <Ionicons name="close-circle" size={18} color="#CCC" accessibilityElementsHidden importantForAccessibility="no" />
+                      </Pressable>
+                    )}
+                  </Pressable>
+                  {showEditPicker && (
+                    <View style={{ marginBottom: 8 }} accessible={false}>
+                      <DateTimePicker
+                        value={editTempTime}
+                        mode="time"
+                        is24Hour
+                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                        onChange={(event, date) => {
+                          if (Platform.OS === 'android') setShowEditPicker(false);
+                          if (date) {
+                            setEditTempTime(date);
+                            setEditHora(date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+                          }
+                        }}
+                      />
+                      {Platform.OS === 'ios' && (
+                        <Pressable onPress={() => setShowEditPicker(false)} style={{ alignSelf: 'flex-end', paddingHorizontal: 16, paddingVertical: 6 }} accessible accessibilityRole="button" accessibilityLabel="Confirmar hora">
+                          <Text style={{ color: PURPLE, fontWeight: '700', fontSize: 15 }}>Listo</Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  )}
+                </>
+              )}
+
+              <Pressable
+                onPress={handleGuardarEdicion}
+                style={[styles.btnPrimary, !editTitulo.trim() && { opacity: 0.4 }]}
+                accessible accessibilityRole="button"
+                accessibilityLabel={editTitulo.trim() ? `Guardar cambios en ${editTitulo}` : 'Escribe un título primero'}
+              >
+                <Text style={styles.btnPrimaryText} accessibilityElementsHidden importantForAccessibility="no">Guardar cambios ✓</Text>
+              </Pressable>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+   
+      {confirmVisible && confirmConfig && (
+        <Modal visible={confirmVisible} transparent animationType="fade" accessibilityViewIsModal>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 32 }}>
+            <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 24, width: '100%', maxWidth: 340 }}>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: '#333', marginBottom: 8 }}>{confirmConfig.titulo}</Text>
+              <Text style={{ fontSize: 15, color: '#666', marginBottom: 24, lineHeight: 22 }}>{confirmConfig.mensaje}</Text>
+              <View style={{ gap: 10 }}>
+                {confirmConfig.opciones.map((op, i) => (
+                  <Pressable
+                    key={i}
+                    onPress={() => {
+                      setConfirmVisible(false);
+                      confirmResolveRef.current?.(op.valor);
+                    }}
+                    style={{
+                      paddingVertical: 12, borderRadius: 12, alignItems: 'center',
+                      backgroundColor: op.destructivo ? '#FDE8E8' : op.valor === null ? '#f5f5f5' : PURPLE_BG,
+                      borderWidth: 1,
+                      borderColor: op.destructivo ? '#E4A0A0' : op.valor === null ? '#ddd' : PURPLE_LT,
+                    }}
+                    accessible accessibilityRole="button" accessibilityLabel={op.texto}
+                  >
+                    <Text style={{ fontWeight: '700', fontSize: 15, color: op.destructivo ? RED : op.valor === null ? '#888' : PURPLE }}>
+                      {op.texto}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }

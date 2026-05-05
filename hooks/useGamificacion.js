@@ -50,7 +50,7 @@ const storage = {
   },
 };
  
-// Usa siempre la misma fuente de fecha que el resto de la app (incluyendo fecha simulada)
+
 const hoy = () => hoyAppStr();
  
 // Parsea YYYY-MM-DD en hora local para evitar offset UTC
@@ -65,7 +65,7 @@ const ESTADO_INICIAL = {
   tareasCompletasHoy:      0,
   fechaHoy:                null,
   penalizacionAplicada:    false,
-  historialPenalizaciones: [], // [{ fecha, puntos, motivo }]
+  historialPenalizaciones: [], 
 };
  
 export function useGamificacion() {
@@ -84,9 +84,6 @@ export function useGamificacion() {
       }
       guardado.tareasCompletasHoy = 0;
       guardado.fechaHoy           = hoyStr;
-      // Reseteamos penalizacionAplicada SOLO si la última penalización
-      // fue de un día anterior (no de hoy). Así en recargas del mismo
-      // día nuevo no se vuelve a penalizar, pero al día siguiente sí puede.
       const fechaPenal = guardado.fechaPenalizacion ?? null;
       if (fechaPenal !== hoyStr) {
         guardado.penalizacionAplicada = false;
@@ -110,8 +107,7 @@ export function useGamificacion() {
     await storage.set(STATE_KEY, siguiente);
   }, []);
  
-  // ── completarTarea: devuelve el nuevoEstado completo para que index.tsx
-  //    pueda leer totalHecho actualizado SIN depender del estado stale
+
   const completarTarea = useCallback(async (onTime = true) => {
     const pts    = onTime ? 5 : 3;
     const hoyStr = hoy();
@@ -159,9 +155,7 @@ export function useGamificacion() {
     });
   }, [persist]);
  
-  // tareasHechasHoy: cuántas completó ese día
-  // Si 0 → no hizo nada → -20 y racha rota
-  // Si >0 → dejó algunas → -10, racha intacta
+
   const penalizarFinDia = useCallback(async (tareasNoHechas, tareasHechasHoy = 0) => {
   return new Promise((resolve) => {
     setEstado((prev) => {

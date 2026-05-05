@@ -57,7 +57,7 @@ const formatTimeA11y = (totalSeg: number): string => {
   return partes.join(' y ');
 };
 
-// ─── Selector de número ───────────────────────────────────────────────────────
+// ─── Selector de número ─────────
 type NumPickerProps = { value: number; min: number; max: number; label: string; onChange: (v: number) => void };
 
 function NumPicker({ value, min, max, label, onChange }: NumPickerProps) {
@@ -107,7 +107,7 @@ const p = StyleSheet.create({
   num:       { fontSize: 26, fontWeight: '600', color: '#1A1A1A' },
 });
 
-// ─── Modal configurar tiempo ──────────────────────────────────────────────────
+
 type ModalConfigProps = { visible: boolean; config: ConfigTiempo; onConfirm: (c: ConfigTiempo) => void; onClose: () => void };
 
 function ModalConfig({ visible, config, onConfirm, onClose }: ModalConfigProps) {
@@ -220,7 +220,7 @@ const m = StyleSheet.create({
   btnDisabled:    { opacity: 0.4 },
 });
 
-// ─── Componente principal ─────────────────────────────────────────────────────
+
 const CONFIG_DEFAULT: ConfigTiempo = { horas: 0, minutos: 25, segundos: 0 };
 
 export default function Temporizador() {
@@ -348,7 +348,7 @@ export default function Temporizador() {
           style={s.clockWrap}
           accessible
           accessibilityLabel={`${formatTimeA11y(tiempoActual)}. ${estadoLabel}`}
-          accessibilityLiveRegion="none" // no anunciar cada segundo, es molesto
+          accessibilityLiveRegion="none" 
         >
           {modo === 'countdown' && (
             <View style={s.ringOuter} accessibilityElementsHidden importantForAccessibility="no">
@@ -368,7 +368,7 @@ export default function Temporizador() {
           </View>
         </View>
 
-        {/* Barra de progreso lineal */}
+   
         {modo === 'countdown' && totalSeg > 0 && (
           <View
             style={s.progressBarWrap}
@@ -427,7 +427,7 @@ export default function Temporizador() {
             </TouchableOpacity>
           )}
 
-          {/* Config */}
+        
           {modo === 'countdown' ? (
             <TouchableOpacity
               style={s.btnSecondary}
@@ -443,7 +443,7 @@ export default function Temporizador() {
           )}
         </View>
 
-        {/* Info tiempo configurado */}
+      
         {modo === 'countdown' && (
           <TouchableOpacity
             style={s.configInfo}
@@ -473,7 +473,7 @@ export default function Temporizador() {
   );
 }
 
-// ─── Estilos ──────────────────────────────────────────────────────────────────
+
 const s = StyleSheet.create({
   safe:      { flex: 1, backgroundColor: C.bg },
   container: { paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 40, alignItems: 'center' },

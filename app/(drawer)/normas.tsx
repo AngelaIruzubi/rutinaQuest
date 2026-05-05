@@ -23,7 +23,7 @@ const C = {
   purple: { bg: '#EEEDFE', text: '#A77BBE' } as ColorPair,
 };
 
-// ── Componentes pequeños ─────────────────────────────────────────────────────
+
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
@@ -52,7 +52,7 @@ type RuleRowProps = {
 };
 
 function RuleRow({ title, badge, subtitle, last = false }: RuleRowProps) {
-  // Etiqueta completa para VoiceOver: título + subtítulo + valor del badge juntos
+
   const a11yLabel = subtitle ? `${title}. ${subtitle}. ${badge}` : `${title}. ${badge}`;
 
   return (
@@ -98,7 +98,7 @@ function MedalCard({ icon, name, req }: { icon: string; name: string; req: strin
   );
 }
 
-// ── Pantalla principal ───────────────────────────────────────────────────────
+
 
 export default function NormasJuego() {
   return (
@@ -183,7 +183,7 @@ export default function NormasJuego() {
   );
 }
 
-// ── Estilos ──────────────────────────────────────────────────────────────────
+
 
 const s = StyleSheet.create({
   safe:      { flex: 1, backgroundColor: C.bg },

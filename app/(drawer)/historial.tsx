@@ -37,7 +37,7 @@ const COLORES_PELO = ['#1a1a1a', '#3B1F0E', '#8B4513', '#DAA520', '#E8C47A', '#E
 const DIAS_CORTOS       = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 const DIAS_CORTOS_LARGO = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
-// ─── Helpers fecha ────────────────────────────────────────────────────────────
+
 function lunesDe(fecha: Date): Date {
   const d = new Date(fecha);
   const diff = d.getDay() === 0 ? -6 : 1 - d.getDay();
@@ -59,9 +59,7 @@ function etiquetaSemana(lunes: Date): string {
   return `${lunes.toLocaleDateString('es-ES', opts)} – ${domingo.toLocaleDateString('es-ES', opts)}`;
 }
 
-// ─── Obtiene la fecha de referencia de una tarea (para saber en qué día mostrarla) ──
-// Completadas → fechaCompletada (día en que se hicieron)
-// Canceladas  → fechaDia (día en que estaban programadas)
+
 function fechaReferencia(t: any): string {
   if (t.estado === 'completada' || (t.completed === 1 && !t.estado)) {
     return t.fechaCompletada ?? t.fechaDia ?? '';
@@ -69,7 +67,7 @@ function fechaReferencia(t: any): string {
   return t.fechaDia ?? t.fechaCompletada ?? '';
 }
 
-// ─── StarRow ──────────────────────────────────────────────────────────────────
+
 function StarRow({ count = 0, size = 13 }: { count: number; size?: number }) {
   return (
     <Text
@@ -82,7 +80,7 @@ function StarRow({ count = 0, size = 13 }: { count: number; size?: number }) {
   );
 }
 
-// ─── Mini avatar ─────────────────────────────────────────────────────────────
+
 function AvatarMini({ avatar, size = 120 }: { avatar: any; size?: number }) {
   const { tonoPiel, cara, colorPelo, peloCorto, peloLargo, shirt } = avatar;
   const si: 0 | 1 = tonoPiel === 1 ? 1 : 0;
@@ -112,7 +110,7 @@ function AvatarMini({ avatar, size = 120 }: { avatar: any; size?: number }) {
   );
 }
 
-// ─── Tarjeta compartir ────────────────────────────────────────────────────────
+
 function TarjetaCompartir({ avatar, gami, tareasUltimaSemana }: {
   avatar: any; gami: any; tareasUltimaSemana: any[];
 }) {
@@ -172,7 +170,7 @@ const tc = StyleSheet.create({
   footer:             { textAlign: 'center', fontSize: 10, color: '#BBB', paddingVertical: 8, borderTopWidth: 1, borderTopColor: PURPLE_LT },
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
+
 export default function Historial() {
   const router     = useRouter();
   const gami       = useGamificacion();
@@ -207,10 +205,10 @@ export default function Historial() {
   const esEstaSemana = esMismaSemana(semanaActual);
   const dias         = diasDeSemana(semanaActual);
 
-  // ── Tareas de la semana visible — usando fechaReferencia correcta ─────────
+
   const tareasUltimaSemana = historial.filter(t => dias.includes(fechaReferencia(t)));
 
-  // ── Tareas del día seleccionado ───────────────────────────────────────────
+ 
   const tareasDelDia = historial.filter(t =>
     fechaReferencia(t) === diaSeleccionado &&
     t.title.toLowerCase().includes(search.toLowerCase())
@@ -222,7 +220,7 @@ export default function Historial() {
   const nombreDia = new Date(diaSeleccionado+'T12:00:00')
     .toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 
-  // ── Texto para compartir ──────────────────────────────────────────────────
+ 
   const buildTextoCompartir = () => {
     const completadas  = tareasUltimaSemana.filter(t => t.estado === 'completada' || (t.completed === 1 && !t.estado));
     const canceladas   = tareasUltimaSemana.filter(t => t.estado === 'cancelada' || t.estado === 'vencida');
@@ -244,7 +242,7 @@ export default function Historial() {
     ].filter(Boolean).join('\n');
   };
 
-  // ── Compartir ─────────────────────────────────────────────────────────────
+
   const iniciarCompartir = (destino: 'whatsapp'|'gmail'|'nativo') => {
     if (historial.length === 0) {
       Alert.alert('Sin historial', 'Aún no tienes tareas completadas para exportar.');
@@ -312,11 +310,11 @@ export default function Historial() {
     }
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
+
   return (
     <View style={styles.root}>
 
-      {/* Modal de captura — oculto al VoiceOver */}
+    
       <Modal visible={modalCaptura} transparent animationType="none" onShow={onModalListo} accessibilityViewIsModal={false}>
         <View style={styles.modalCapturaOverlay} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           <ViewShot ref={shotRef} options={{ format: 'png', quality: 1, result: 'tmpfile' }}>
@@ -541,7 +539,7 @@ export default function Historial() {
                 <Text style={styles.colEmpty} accessibilityLabel="Ninguna tarea sin realizar">Ninguna</Text>
               ) : (
                 <>
-                  {/* Eliminadas manualmente */}
+                  {/* Eliminadas  */}
                   {canceladasDia.map(item => (
                     <View key={item.id} style={[styles.tareaCard, { borderLeftColor: RED, opacity: 0.75 }]} accessible accessibilityLabel={`${item.title}, eliminada${item.hora && item.hora !== 'Sin hora' ? `, hora ${item.hora}` : ''}`}>
                       {item.pictogramId && (
@@ -582,7 +580,7 @@ export default function Historial() {
   );
 }
 
-// ─── Estilos ──────────────────────────────────────────────────────────────────
+
 const fs = (size: number) => Math.round(size * Math.min(PixelRatio.getFontScale(), 1.4));
 
 const styles = StyleSheet.create({

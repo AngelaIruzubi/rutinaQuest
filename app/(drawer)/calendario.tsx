@@ -46,7 +46,7 @@ function fechaLegible(fecha: string): string {
   return `${d} de ${meses[m - 1]} de ${y}`;
 }
 
-// ─── Calendario mensual ───────────────────────────────────────────────────────
+// ─── Calendario mensual ───
 function CalendarioMes({
   anyo, mes, fechasConTareas, fechaSeleccionada, onSelectFecha,
 }: {
@@ -130,7 +130,7 @@ function CalendarioMes({
   );
 }
 
-// ─── Modal para añadir tarea ──────────────────────────────────────────────────
+// ─── Modal para añadir tarea ─────
 function ModalNuevaTarea({
   visible, fecha, onClose, onGuardar,
 }: {
@@ -144,6 +144,7 @@ function ModalNuevaTarea({
   const [pictogramId, setPictogramId] = useState<number | null>(null);
   const [showPicker,  setShowPicker]  = useState(false);
   const [tempTime,    setTempTime]    = useState(new Date());
+  const [repeticion,  setRepeticion]  = useState<'ninguna'|'diaria'|'semanal'>('ninguna');
 
   const PURPLE    = '#A77BBE';
   const PURPLE_LT = '#E5D9EE';
@@ -167,8 +168,6 @@ function ModalNuevaTarea({
   };
 
   const handleTimeChange = (event: any, date?: Date) => {
-    // En Android el picker se cierra solo al seleccionar
-    // En iOS con display="spinner" se mantiene abierto hasta pulsar fuera
     if (Platform.OS === 'android') setShowPicker(false);
     if (date) {
       setTempTime(date);
@@ -179,7 +178,7 @@ function ModalNuevaTarea({
   const cerrar = () => {
     setTitulo(''); setHora(null);
     setPictogramId(null); setPictogramas([]);
-    setShowPicker(false);
+    setShowPicker(false); setRepeticion('ninguna');
     onClose();
   };
 
@@ -190,10 +189,11 @@ function ModalNuevaTarea({
       title: titulo.trim(),
       hora:  hora ?? 'Sin hora',
       pictogramId: pictogramId ?? null,
+      repeticion,
     });
     setTitulo(''); setHora(null);
     setPictogramId(null); setPictogramas([]);
-    setShowPicker(false);
+    setShowPicker(false); setRepeticion('ninguna');
     onClose();
     AccessibilityInfo.announceForAccessibility(`Tarea ${titulo} añadida para el ${fecha}`);
   };
@@ -210,9 +210,9 @@ function ModalNuevaTarea({
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1, justifyContent: 'flex-end' }}
       >
-        {/* overlay: no accesible para que VoiceOver pase directo al contenido */}
+        
         <Pressable style={s.overlay} onPress={cerrar} accessible={false} importantForAccessibility="no">
-          {/* modalBox: no agrupado para que VoiceOver navegue por hijos */}
+      
           <Pressable style={s.modalBox} onPress={e => e.stopPropagation()} accessible={false} importantForAccessibility="yes">
             <ScrollView
               keyboardShouldPersistTaps="handled"
@@ -222,7 +222,7 @@ function ModalNuevaTarea({
               importantForAccessibility="yes"
             >
 
-          {/* ── Cabecera ── */}
+    
           <View style={s.modalHeader} accessible={false}>
             <View style={s.modalHeaderTexts} accessible={false}>
               <Text style={s.modalTitle} accessibilityRole="header">Nueva tarea</Text>
@@ -358,6 +358,32 @@ function ModalNuevaTarea({
             </>
           )}
 
+          {/* ── Repetición ── */}
+          <Text style={[s.modalInputLabel, { marginTop: 8 }]}>¿Se repite?</Text>
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }} accessible={false}>
+            {(['ninguna', 'diaria', 'semanal'] as const).map(opcion => (
+              <Pressable
+                key={opcion}
+                onPress={() => setRepeticion(opcion)}
+                style={{
+                  flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center',
+                  borderWidth: 2, borderColor: repeticion === opcion ? PURPLE : '#E5E5E5',
+                  backgroundColor: repeticion === opcion ? PURPLE_BG : '#fff',
+                }}
+                accessible accessibilityRole="button"
+                accessibilityLabel={opcion === 'ninguna' ? 'Una vez' : opcion === 'diaria' ? 'Cada día' : 'Cada semana'}
+                accessibilityState={{ selected: repeticion === opcion }}
+              >
+                <Text style={{ fontSize: 18 }}>
+                  {opcion === 'ninguna' ? '1' : opcion === 'diaria' ? '📅' : '📆'}
+                </Text>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: repeticion === opcion ? PURPLE : '#999', marginTop: 2 }}>
+                  {opcion === 'ninguna' ? 'Una vez' : opcion === 'diaria' ? 'Cada día' : 'Semanal'}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
           {/* ── Botón guardar ── */}
           <Pressable
             onPress={guardar}
@@ -379,7 +405,7 @@ function ModalNuevaTarea({
   );
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
+
 export default function Calendario() {
   const ahora = ahoraApp();
   const [anyo, setAnyo] = useState(ahora.getFullYear());
@@ -565,7 +591,7 @@ export default function Calendario() {
   );
 }
 
-// ─── Estilos ──────────────────────────────────────────────────────────────────
+
 const s = StyleSheet.create({
   root: {
     flex: 1, backgroundColor: '#fff',
@@ -629,7 +655,7 @@ const s = StyleSheet.create({
   tareaHora:     { fontSize: 12, color: '#888', marginTop: 2 },
   btnEliminar:   { padding: 10 },
 
-// ── Modal ──────────────────────────────────────────────────────────────────
+
 overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
 modalBox: {
   backgroundColor: '#fff',
@@ -638,7 +664,7 @@ modalBox: {
   paddingTop: 20,
   paddingHorizontal: 24,
   paddingBottom: 44,
-  // ← sin gap
+ 
 },
 
 modalHeader:      { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 },

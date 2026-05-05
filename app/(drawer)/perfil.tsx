@@ -67,7 +67,7 @@ export default function Perfil() {
 
   const colorPeloSeguro = COLORES_PELO[colorPelo] ?? COLORES_PELO[0];
 
-  // ── Avatar preview — decorativo, oculto al VoiceOver ─────────────────────
+ 
   const AvatarPreview = ({ size = 290 }: { size?: number }) => (
     <View
       style={{ width: size, height: size * 1.2, position: 'relative' }}
@@ -105,7 +105,7 @@ export default function Perfil() {
     </View>
   );
 
-  // ── Panel de opciones según tab ───────────────────────────────────────────
+
   const renderOpciones = () => {
     switch (tabActivo) {
 
@@ -260,7 +260,7 @@ export default function Perfil() {
     }
   };
 
-  // ── Tabs ──────────────────────────────────────────────────────────────────
+
   const TabBar = () => (
     <View style={s.tabBar} accessible={false} accessibilityRole="tablist">
       {TABS.map(tab => (
@@ -343,7 +343,7 @@ export default function Perfil() {
   );
 }
 
-// ─── Estilos ──────────────────────────────────────────────────────────────────
+
 const s = StyleSheet.create({
   rootTablet: {
     flex: 1, flexDirection: 'row', backgroundColor: '#fff',
@@ -366,7 +366,7 @@ const s = StyleSheet.create({
   tabBtn: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
     paddingVertical: 12, position: 'relative', opacity: .45,
-    minHeight: 52, // zona táctil mínima
+    minHeight: 52, 
   },
   tabBtnActive:  { opacity: 1 },
   tabEmoji:      { fontSize: 22 },

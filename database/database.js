@@ -50,6 +50,8 @@ export function initDB() {
     `ALTER TABLE tareas ADD COLUMN stars INTEGER DEFAULT 0`,
     `ALTER TABLE tareas ADD COLUMN fechaDia TEXT`,
     `ALTER TABLE tareas ADD COLUMN estado TEXT DEFAULT 'pendiente'`,
+    `ALTER TABLE tareas ADD COLUMN repeticion TEXT DEFAULT 'ninguna'`,
+    `ALTER TABLE tareas ADD COLUMN tareaBaseId TEXT`,
   ];
   for (const sql of migraciones) {
     try { db.execSync(sql); } catch {}
@@ -93,11 +95,7 @@ export function getTareas() {
   return getDB().getAllSync('SELECT * FROM tareas');
 }
 
-// ── Historial: completadas, canceladas Y vencidas ─────────────────────────────
-// estados:
-//   'completada'      → tarea realizada ✓
-//   'cancelada'       → eliminada manualmente por el usuario
-//   'vencida'         → se quedó pendiente al pasar el día (genera penalización)
+
 export function getTareasHistorial() {
   if (Platform.OS === 'web') {
     return getTareas()
@@ -121,28 +119,110 @@ export function getTareasHistorial() {
   `);
 }
 
-// ── Insertar tarea ────────────────────────────────────────────────────────────
+
 export function insertTarea(tarea, fechaDiaParam) {
-  const fechaDia = fechaDiaParam ?? hoyAppStr();
+  const fechaDia   = fechaDiaParam ?? hoyAppStr();
+  const repeticion = tarea.repeticion ?? 'ninguna';
+  const tareaBaseId = tarea.tareaBaseId ?? null;
 
   if (Platform.OS === 'web') {
     const tareas = getTareas();
     localStorage.setItem('tareas', JSON.stringify([
       ...tareas,
-      { ...tarea, fechaDia, fechaCompletada: null, stars: 0, estado: 'pendiente' },
+      { ...tarea, fechaDia, fechaCompletada: null, stars: 0, estado: 'pendiente', repeticion, tareaBaseId },
     ]));
     return;
   }
   getDB().runSync(
     `INSERT INTO tareas
-       (id, title, pictogramId, hora, completed, stars, fechaCompletada, fechaDia, estado)
-     VALUES (?,?,?,?,?,?,?,?,?)`,
+       (id, title, pictogramId, hora, completed, stars, fechaCompletada, fechaDia, estado, repeticion, tareaBaseId)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
     [tarea.id, tarea.title, tarea.pictogramId ?? null,
-     tarea.hora ?? 'Sin hora', 0, 0, null, fechaDia, 'pendiente']
+     tarea.hora ?? 'Sin hora', 0, 0, null, fechaDia, 'pendiente', repeticion, tareaBaseId]
   );
 }
 
-// ── Obtener tareas de una fecha concreta ──────────────────────────────────────
+
+export function generarTareasRepetitivas() {
+  const hoy = hoyAppStr();
+  const [y, m, d] = hoy.split('-').map(Number);
+  const diaSemana = new Date(y, m - 1, d).getDay(); // 0=dom, 1=lun...
+
+  if (Platform.OS === 'web') {
+    const todas = getTareas();
+    const nuevas = [];
+
+  
+    const bases = todas.filter(t =>
+      t.repeticion && t.repeticion !== 'ninguna' && !t.tareaBaseId
+    );
+
+    for (const base of bases) {
+      // Comprobar si ya existe una instancia para hoy
+      const yaExiste = todas.some(t =>
+        t.tareaBaseId === base.id && t.fechaDia === hoy
+      );
+      if (yaExiste) continue;
+
+     
+      if (base.repeticion === 'semanal') {
+        const [by, bm, bd] = (base.fechaDia ?? hoy).split('-').map(Number);
+        const diaSemanaBase = new Date(by, bm - 1, bd).getDay();
+        if (diaSemana !== diaSemanaBase) continue;
+      }
+
+      nuevas.push({
+        id: `${hoy}_rep_${base.id}_${Math.random().toString(36).slice(2, 6)}`,
+        title: base.title,
+        pictogramId: base.pictogramId ?? null,
+        hora: base.hora ?? 'Sin hora',
+        fechaDia: hoy,
+        fechaCompletada: null,
+        stars: 0,
+        estado: 'pendiente',
+        completed: 0,
+        repeticion: 'ninguna', // la instancia no es repetitiva
+        tareaBaseId: base.id,  // referencia a la plantilla
+      });
+    }
+
+    if (nuevas.length > 0) {
+      localStorage.setItem('tareas', JSON.stringify([...todas, ...nuevas]));
+    }
+    return nuevas.length;
+  }
+
+
+  const bases = getDB().getAllSync(
+    `SELECT * FROM tareas WHERE repeticion != 'ninguna' AND (tareaBaseId IS NULL OR tareaBaseId = '')`,
+  );
+
+  let creadas = 0;
+  for (const base of bases) {
+    const yaExiste = getDB().getFirstSync(
+      `SELECT id FROM tareas WHERE tareaBaseId = ? AND fechaDia = ?`,
+      [base.id, hoy]
+    );
+    if (yaExiste) continue;
+
+    if (base.repeticion === 'semanal') {
+      const [by, bm, bd] = (base.fechaDia ?? hoy).split('-').map(Number);
+      const diaSemanaBase = new Date(by, bm - 1, bd).getDay();
+      if (diaSemana !== diaSemanaBase) continue;
+    }
+
+    const newId = `${hoy}_rep_${base.id}_${Math.random().toString(36).slice(2, 6)}`;
+    getDB().runSync(
+      `INSERT INTO tareas (id, title, pictogramId, hora, completed, stars, fechaCompletada, fechaDia, estado, repeticion, tareaBaseId)
+       VALUES (?,?,?,?,0,0,null,?,'pendiente','ninguna',?)`,
+      [newId, base.title, base.pictogramId ?? null, base.hora ?? 'Sin hora', hoy, base.id]
+    );
+    creadas++;
+  }
+  return creadas;
+}
+
+// ── Obtener tareas de una fecha concreta ──────
 export function getTareasPorFecha(fecha) {
   if (Platform.OS === 'web') {
     return getTareas().filter(t =>
@@ -157,7 +237,7 @@ export function getTareasPorFecha(fecha) {
   );
 }
 
-// ── Obtener fechas con tareas (para el calendario) ────────────────────────────
+// ── Obtener fechas con tareas (para el calendario) ──────
 export function getFechasConTareas() {
   if (Platform.OS === 'web') {
     const tareas = getTareas().filter(t =>
@@ -181,7 +261,7 @@ export function getFechasConTareas() {
   return fechas;
 }
 
-// ── Marcar completada ─────────────────────────────────────────────────────────
+// ── Marcar completada ────
 export function updateTareaCompletada(id, completed, stars = 5) {
   const fecha  = completed ? hoyAppStr() : null;
   const estado = completed ? 'completada' : 'pendiente';
@@ -201,8 +281,7 @@ export function updateTareaCompletada(id, completed, stars = 5) {
   );
 }
 
-// ── Cancelar tarea manualmente (NO genera penalización) ──────────────────────
-// El usuario la elimina a propósito → estado 'cancelada'
+
 export function cancelarTarea(id) {
   const hoy = hoyAppStr();
 
@@ -232,6 +311,47 @@ export function updateTareaHora(id, nuevaHora) {
   getDB().runSync('UPDATE tareas SET hora=? WHERE id=?', [nuevaHora, id]);
 }
 
+// ── Editar título y pictograma ──────
+export function updateTareaTituloPicto(id, titulo, pictogramId) {
+  if (Platform.OS === 'web') {
+    const tareas = getTareas().map(t =>
+      t.id === id ? { ...t, title: titulo, pictogramId: pictogramId ?? null } : t
+    );
+    localStorage.setItem('tareas', JSON.stringify(tareas));
+    return;
+  }
+  getDB().runSync(
+    'UPDATE tareas SET title=?, pictogramId=? WHERE id=?',
+    [titulo, pictogramId ?? null, id]
+  );
+}
+
+// ── Editar tarea base Y todas sus instancias pendientes ────
+export function updateTareaBaseCompleta(baseId, titulo, pictogramId, hora) {
+  if (Platform.OS === 'web') {
+    const tareas = getTareas().map(t => {
+      // Actualiza la base y todas las instancias pendientes (no las ya completadas/canceladas)
+      if (t.id === baseId || (t.tareaBaseId === baseId && t.estado === 'pendiente')) {
+        return { ...t, title: titulo, pictogramId: pictogramId ?? null, hora: hora ?? 'Sin hora' };
+      }
+      return t;
+    });
+    localStorage.setItem('tareas', JSON.stringify(tareas));
+    return;
+  }
+
+  getDB().runSync(
+    'UPDATE tareas SET title=?, pictogramId=?, hora=? WHERE id=?',
+    [titulo, pictogramId ?? null, hora ?? 'Sin hora', baseId]
+  );
+
+  getDB().runSync(
+    `UPDATE tareas SET title=?, pictogramId=?, hora=?
+     WHERE tareaBaseId=? AND estado='pendiente'`,
+    [titulo, pictogramId ?? null, hora ?? 'Sin hora', baseId]
+  );
+}
+
 export function deleteTarea(id) {
   if (Platform.OS === 'web') {
     const tareas = getTareas().filter(t => t.id !== id);
@@ -241,18 +361,21 @@ export function deleteTarea(id) {
   getDB().runSync('DELETE FROM tareas WHERE id=?', [id]);
 }
 
-// ── RESET DIARIO ──────────────────────────────────────────────────────────────
-// Se llama al arrancar la app.
-//
-// ESTADOS resultantes:
-//   'vencida'   → pendiente al terminar el día → SÍ genera penalización de -10
-//   'cancelada' → eliminada manualmente por el usuario → NO genera penalización
-//   'completada'→ realizada → NO genera penalización
-//
-// Devuelve:
-//   tareasHoy       → tareas para mostrar en pantalla principal
-//   vencidasAyer    → tareas que se quedaron sin hacer (para penalizar)
-//   completadasAyer → tareas completadas ayer (info, no penaliza)
+
+export function eliminarTareaYRepetitivas(baseId) {
+  if (Platform.OS === 'web') {
+    const tareas = getTareas().filter(t =>
+      t.id !== baseId && t.tareaBaseId !== baseId
+    );
+    localStorage.setItem('tareas', JSON.stringify(tareas));
+    return;
+  }
+  // Elimina la base y todas las instancias que apuntan a ella
+  getDB().runSync('DELETE FROM tareas WHERE id=? OR tareaBaseId=?', [baseId, baseId]);
+}
+
+// ── RESET DIARIO ─────
+
 export function limpiarTareasViejas() {
   const hoy  = hoyAppStr();
   // Calcular ayer en formato YYYY-MM-DD
@@ -275,8 +398,10 @@ export function limpiarTareasViejas() {
 
     localStorage.setItem('tareas', JSON.stringify(actualizadas));
 
-    const tareasHoy = actualizadas.filter(t => t.fechaDia === hoy);
-    // Solo contamos las vencidas de AYER, no de toda la historia
+    // Generar tareas repetitivas para hoy
+    generarTareasRepetitivas();
+
+    const tareasHoy = getTareas().filter(t => t.fechaDia === hoy);
     const vencidasAyer = actualizadas.filter(t =>
       t.fechaDia === ayer && t.estado === 'vencida'
     ).length;
@@ -284,7 +409,7 @@ export function limpiarTareasViejas() {
     return { tareasHoy, vencidasAyer };
   }
 
-  // ── SQLite nativo ─────────────────────────────────────────────────────────
+  
   getDB().runSync(`UPDATE tareas SET fechaDia=? WHERE fechaDia IS NULL`, [hoy]);
   getDB().runSync(`
     UPDATE tareas
@@ -299,6 +424,9 @@ export function limpiarTareasViejas() {
      WHERE fechaDia < ? AND estado='pendiente'`,
     [hoy]
   );
+
+
+  generarTareasRepetitivas();
 
   // Solo contar vencidas de AYER (no acumula días anteriores)
   const vencidasAyer = getDB().getFirstSync(
