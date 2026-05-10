@@ -353,25 +353,46 @@ export function updateTareaBaseCompleta(baseId, titulo, pictogramId, hora) {
 }
 
 export function deleteTarea(id) {
-  if (Platform.OS === 'web') {
-    const tareas = getTareas().filter(t => t.id !== id);
-    localStorage.setItem('tareas', JSON.stringify(tareas));
-    return;
-  }
-  getDB().runSync('DELETE FROM tareas WHERE id=?', [id]);
-}
+  const hoy = hoyAppStr();
 
-
-export function eliminarTareaYRepetitivas(baseId) {
   if (Platform.OS === 'web') {
-    const tareas = getTareas().filter(t =>
-      t.id !== baseId && t.tareaBaseId !== baseId
+    const tareas = getTareas().map(t =>
+      t.id === id
+        ? { ...t, estado: 'cancelada', completed: 0, fechaCompletada: hoy }
+        : t
     );
     localStorage.setItem('tareas', JSON.stringify(tareas));
     return;
   }
-  
-  getDB().runSync('DELETE FROM tareas WHERE id=? OR tareaBaseId=?', [baseId, baseId]);
+  getDB().runSync(
+    `UPDATE tareas SET estado='cancelada', completed=0, fechaCompletada=? WHERE id=?`,
+    [hoy, id]
+  );
+}
+
+
+export function eliminarTareaYRepetitivas(baseId) {
+  const hoy = hoyAppStr();
+
+  if (Platform.OS === 'web') {
+    const tareas = getTareas().map(t => {
+      if (t.id !== baseId && t.tareaBaseId !== baseId) return t;
+      // Las completadas se conservan tal cual en historial
+      if (t.estado === 'completada' || t.completed === 1) return t;
+      // Las pendientes se marcan canceladas
+      return { ...t, estado: 'cancelada', completed: 0, fechaCompletada: hoy };
+    });
+    localStorage.setItem('tareas', JSON.stringify(tareas));
+    return;
+  }
+
+  // Marcar como canceladas las pendientes (base + instancias)
+  getDB().runSync(
+    `UPDATE tareas SET estado='cancelada', completed=0, fechaCompletada=?
+     WHERE (id=? OR tareaBaseId=?) AND estado='pendiente'`,
+    [hoy, baseId, baseId]
+  );
+  // Las completadas/canceladas/vencidas no se tocan → permanecen en historial
 }
 
 // ── RESET DIARIO ─────

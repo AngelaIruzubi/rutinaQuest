@@ -687,7 +687,7 @@ inputRow: {
   paddingHorizontal: 20, backgroundColor: PURPLE_BG,
   minHeight: 48, marginBottom: 16,
 },
-input: { fontSize: 15, color: '#333' },
+input: { flex: 1, fontSize: 15, color: '#333' },
 
 btnGuardar:         { backgroundColor: PURPLE, borderRadius: 16, padding: 16, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, minHeight: 52, marginTop: 4 },
 btnGuardarDisabled: { opacity: 0.45 },
