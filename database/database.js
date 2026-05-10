@@ -153,7 +153,8 @@ export function generarTareasRepetitivas() {
 
   
     const bases = todas.filter(t =>
-      t.repeticion && t.repeticion !== 'ninguna' && !t.tareaBaseId
+      t.repeticion && t.repeticion !== 'ninguna' && !t.tareaBaseId &&
+      t.estado !== 'cancelada'
     );
 
     for (const base of bases) {
@@ -353,21 +354,12 @@ export function updateTareaBaseCompleta(baseId, titulo, pictogramId, hora) {
 }
 
 export function deleteTarea(id) {
-  const hoy = hoyAppStr();
-
   if (Platform.OS === 'web') {
-    const tareas = getTareas().map(t =>
-      t.id === id
-        ? { ...t, estado: 'cancelada', completed: 0, fechaCompletada: hoy }
-        : t
-    );
+    const tareas = getTareas().filter(t => t.id !== id);
     localStorage.setItem('tareas', JSON.stringify(tareas));
     return;
   }
-  getDB().runSync(
-    `UPDATE tareas SET estado='cancelada', completed=0, fechaCompletada=? WHERE id=?`,
-    [hoy, id]
-  );
+  getDB().runSync('DELETE FROM tareas WHERE id=?', [id]);
 }
 
 
@@ -377,22 +369,18 @@ export function eliminarTareaYRepetitivas(baseId) {
   if (Platform.OS === 'web') {
     const tareas = getTareas().map(t => {
       if (t.id !== baseId && t.tareaBaseId !== baseId) return t;
-      // Las completadas se conservan tal cual en historial
-      if (t.estado === 'completada' || t.completed === 1) return t;
-      // Las pendientes se marcan canceladas
-      return { ...t, estado: 'cancelada', completed: 0, fechaCompletada: hoy };
+      // Completadas: se conservan en historial pero se detiene la repetición
+      if (t.estado === 'completada' || t.completed === 1) {
+        return { ...t, repeticion: 'ninguna' };
+      }
+      // Pendientes: cancelar y detener repetición
+      return { ...t, estado: 'cancelada', completed: 0, fechaCompletada: hoy, repeticion: 'ninguna' };
     });
     localStorage.setItem('tareas', JSON.stringify(tareas));
     return;
   }
 
-  // Marcar como canceladas las pendientes (base + instancias)
-  getDB().runSync(
-    `UPDATE tareas SET estado='cancelada', completed=0, fechaCompletada=?
-     WHERE (id=? OR tareaBaseId=?) AND estado='pendiente'`,
-    [hoy, baseId, baseId]
-  );
-  // Las completadas/canceladas/vencidas no se tocan → permanecen en historial
+  getDB().runSync('DELETE FROM tareas WHERE id=? OR tareaBaseId=?', [baseId, baseId]);
 }
 
 // ── RESET DIARIO ─────
@@ -406,8 +394,10 @@ export function limpiarTareasViejas() {
 
   if (Platform.OS === 'web') {
     const todas = getTareas();
+    const [yy, mm, dd] = hoy.split('-').map(Number);
+    const diaSemana = new Date(yy, mm - 1, dd).getDay();
 
-   
+    // Paso 1: marcar vencidas en una sola pasada
     const actualizadas = todas.map(t => {
       const fechaDia = t.fechaDia ?? hoy;
       const estado   = t.estado ?? (t.completed === 1 ? 'completada' : 'pendiente');
@@ -417,12 +407,45 @@ export function limpiarTareasViejas() {
       return { ...t, fechaDia, estado };
     });
 
-    localStorage.setItem('tareas', JSON.stringify(actualizadas));
+    // Paso 2: generar instancias repetitivas en la misma pasada
+    const bases = actualizadas.filter(t =>
+      t.repeticion && t.repeticion !== 'ninguna' && !t.tareaBaseId &&
+      t.estado !== 'cancelada'
+    );
 
-  
-    generarTareasRepetitivas();
+    const nuevas = [];
+    for (const base of bases) {
+      const yaExiste = actualizadas.some(t =>
+        (t.tareaBaseId === base.id || t.id === base.id) && t.fechaDia === hoy
+      );
+      if (yaExiste) continue;
 
-    const tareasHoy = getTareas().filter(t => t.fechaDia === hoy);
+      if (base.repeticion === 'semanal') {
+        const [by, bm, bd] = (base.fechaDia ?? hoy).split('-').map(Number);
+        const diaSemanaBase = new Date(by, bm - 1, bd).getDay();
+        if (diaSemana !== diaSemanaBase) continue;
+      }
+
+      nuevas.push({
+        id: `${hoy}_rep_${base.id}_${Math.random().toString(36).slice(2, 6)}`,
+        title: base.title,
+        pictogramId: base.pictogramId ?? null,
+        hora: base.hora ?? 'Sin hora',
+        fechaDia: hoy,
+        fechaCompletada: null,
+        stars: 0,
+        estado: 'pendiente',
+        completed: 0,
+        repeticion: 'ninguna',
+        tareaBaseId: base.id,
+      });
+    }
+
+    // Un solo write a localStorage con todo
+    const final = [...actualizadas, ...nuevas];
+    localStorage.setItem('tareas', JSON.stringify(final));
+
+    const tareasHoy = final.filter(t => t.fechaDia === hoy);
     const vencidasAyer = actualizadas.filter(t =>
       t.fechaDia === ayer && t.estado === 'vencida'
     ).length;

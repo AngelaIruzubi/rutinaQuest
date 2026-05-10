@@ -42,17 +42,21 @@ import { buscarPictogramas } from "../../services/arasaac";
 
 import { ahoraApp, ahoraAppMs, fechaAppDate, hoyAppStr, setFechaSimulada, setHoraSimulada } from '../../utils/fecha';
 
-setFechaSimulada('2026-05-20');
+setFechaSimulada('2026-05-28');
 setHoraSimulada(12, 0);
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
+if (Notifications) {
+  Notifications.setNotificationHandler({
+     handleNotification: async () => ({
+    shouldShowBanner: true,   
+    shouldShowList: true,     
     shouldPlaySound: false,
     shouldSetBadge: false,
-  }),
-});
+    
+     
+    }),
+  });
+}
 
 const PURPLE    = '#A77BBE';
 const PURPLE_LT = '#E5D9EE';
@@ -379,7 +383,7 @@ export default function Home() {
  
   useEffect(() => {
     if (!gami.cargando) {
-      gami.forzarEstrellas(590);
+      gami.forzarEstrellas(290);
     }
   }, [gami.cargando]);
 
@@ -664,8 +668,9 @@ export default function Home() {
           saltadasRef.current += 1;
           if (saltadasRef.current >= 3) disparaNotif('saltadas');
           else disparaNotif('eliminada');
+        } else {
+          deleteTarea(task.id);
         }
-        // Si ya estaba completada, no tocar la BD — permanece en historial
         setTasks(prev => prev.filter(t => t.id !== task.id));
       } else {
         const baseId = task.tareaBaseId && task.tareaBaseId !== '' ? task.tareaBaseId : task.id;
