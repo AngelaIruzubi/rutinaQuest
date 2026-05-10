@@ -38,11 +38,11 @@ import {
 
 import { useAjustesCtx } from '../../context/AjustesContext';
 import { useGamificacion } from '../../hooks/useGamificacion';
-import { buscarPictogramas } from "../../services/arasaac"; // ← ahora devuelve varios
+import { buscarPictogramas } from "../../services/arasaac";
 
 import { ahoraApp, ahoraAppMs, fechaAppDate, hoyAppStr, setFechaSimulada, setHoraSimulada } from '../../utils/fecha';
 
-setFechaSimulada('2026-04-29');
+setFechaSimulada('2026-05-09');
 setHoraSimulada(12, 0);
 
 if (Notifications) {

@@ -124,12 +124,25 @@ export default function NormasJuego() {
           <Ionicons name="home-outline" size={16} color={PURPLE} accessibilityElementsHidden importantForAccessibility="no" />
           <Text style={s.btnInicioTxt}>Inicio</Text>
         </Pressable>
+        {/* ── Programar tareas ── */}
+        <SectionTitle>Programar tareas</SectionTitle>
+        <Card>
+          <RuleRow
+            title="Tarea puntual"
+            badge="Home/Calendario"
+          />
+          <RuleRow
+            title="Tarea repetitiva diaria o semanal"
+            badge="Calendario"
+            last
+          />
+        </Card>
 
         {/* ── Ganar estrellas ── */}
         <SectionTitle>Cómo ganar estrellas</SectionTitle>
         <Card>
           <RuleRow
-            title="Tarea completada a tiempo"
+            title="Tarea completada a tiempo o sin hora"
             badge="+5 estrellas"
           />
           <RuleRow
