@@ -1,4 +1,4 @@
-// app/(drawer)/_layout.tsx
+
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawer';
 import { useRouter } from 'expo-router';
@@ -17,10 +17,7 @@ SplashScreen.preventAutoHideAsync();
 const PURPLE = '#A77BBE';
 const WHITE  = '#ffffff';
 
-// ─── CLAVE: todas las funciones de label y header se definen FUERA del
-//     componente Layout, así React las trata como referencias estables y
-//     no desmonta/remonta las pantallas del drawer cuando cambia el contexto
-// ─────────────────────────────────────────────────────────────────────────────
+
 
 function DL({ icono, label, color = '#333' }: { icono: string; label: string; color?: string }) {
   return (
@@ -42,7 +39,7 @@ function CustomDrawerContent(props: any) {
   );
 }
 
-// Componentes de label estables (no se recrean en cada render de Layout)
+
 const LabelInicio       = () => <DL icono="home-outline"      label="Inicio"       />;
 const LabelCalendario   = () => <DL icono="calendar-outline"  label="Calendario"   />;
 const LabelTemporizador = () => <DL icono="timer-outline"     label="Temporizador" />;
@@ -52,7 +49,7 @@ const LabelTesting      = () => <DL icono="flask-outline"     label="Testing" co
 const LabelHistorial    = () => <DL icono="time-outline"      label="Historial"     />;
 const LabelNormas      = () => <DL icono="document-text-outline" label="Normas" />;
 
-// Header derecho estable
+
 function HeaderPerfilBtn() {
   const router = useRouter();
   return (
@@ -66,7 +63,7 @@ function HeaderPerfilBtn() {
 }
 const HeaderRight = () => <HeaderPerfilBtn />;
 
-// ═════════════════════════════════════════════════════════════════════════════
+
 export default function Layout() {
   const { width } = useWindowDimensions();
   const fontScale = PixelRatio.getFontScale();

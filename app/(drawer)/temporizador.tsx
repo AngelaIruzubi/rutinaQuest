@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -35,9 +36,34 @@ const C = {
   red:    { bg: '#FCEBEB', text: '#A32D2D', solid: '#A32D2D' },
 };
 
-const pad           = (n: number): string => String(n).padStart(2, '0');
-const configToSeg   = (c: ConfigTiempo): number => c.horas * 3600 + c.minutos * 60 + c.segundos;
-const formatTime    = (totalSeg: number): string => {
+
+
+async function pedirPermisosNotificacion() {
+  const { status } = await Notifications.requestPermissionsAsync();
+  return status === 'granted';
+}
+
+async function dispararNotificacionFin() {
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: '⏰ ¡Tiempo!',
+      body: 'El temporizador ha terminado.',
+      sound: true,
+    },
+    trigger: null, 
+  });
+}
+
+async function cancelarNotificaciones() {
+  await Notifications.cancelAllScheduledNotificationsAsync();
+}
+
+
+
+const pad         = (n: number): string => String(n).padStart(2, '0');
+const configToSeg = (c: ConfigTiempo): number => c.horas * 3600 + c.minutos * 60 + c.segundos;
+
+const formatTime = (totalSeg: number): string => {
   const h = Math.floor(totalSeg / 3600);
   const m = Math.floor((totalSeg % 3600) / 60);
   const s = totalSeg % 60;
@@ -45,7 +71,6 @@ const formatTime    = (totalSeg: number): string => {
   return `${pad(m)}:${pad(s)}`;
 };
 
-// Etiqueta legible del tiempo para VoiceOver
 const formatTimeA11y = (totalSeg: number): string => {
   const h = Math.floor(totalSeg / 3600);
   const m = Math.floor((totalSeg % 3600) / 60);
@@ -57,7 +82,7 @@ const formatTimeA11y = (totalSeg: number): string => {
   return partes.join(' y ');
 };
 
-// ─── Selector de número ───────────────────────────────────────────────────────
+
 type NumPickerProps = { value: number; min: number; max: number; label: string; onChange: (v: number) => void };
 
 function NumPicker({ value, min, max, label, onChange }: NumPickerProps) {
@@ -67,31 +92,13 @@ function NumPicker({ value, min, max, label, onChange }: NumPickerProps) {
   return (
     <View style={p.wrap} accessible={false}>
       <Text style={p.label} accessibilityElementsHidden importantForAccessibility="no">{label}</Text>
-      <TouchableOpacity
-        onPress={inc}
-        style={p.arrow}
-        accessible
-        accessibilityRole="button"
-        accessibilityLabel={`Aumentar ${label}`}
-        accessibilityHint={`Valor actual: ${value}`}
-      >
+      <TouchableOpacity onPress={inc} style={p.arrow} accessible accessibilityRole="button" accessibilityLabel={`Aumentar ${label}`} accessibilityHint={`Valor actual: ${value}`}>
         <Text style={p.arrowText}>▲</Text>
       </TouchableOpacity>
-      <View
-        style={p.numBox}
-        accessible
-        accessibilityLabel={`${label}: ${value}`}
-      >
+      <View style={p.numBox} accessible accessibilityLabel={`${label}: ${value}`}>
         <Text style={p.num} accessibilityElementsHidden importantForAccessibility="no">{pad(value)}</Text>
       </View>
-      <TouchableOpacity
-        onPress={dec}
-        style={p.arrow}
-        accessible
-        accessibilityRole="button"
-        accessibilityLabel={`Reducir ${label}`}
-        accessibilityHint={`Valor actual: ${value}`}
-      >
+      <TouchableOpacity onPress={dec} style={p.arrow} accessible accessibilityRole="button" accessibilityLabel={`Reducir ${label}`} accessibilityHint={`Valor actual: ${value}`}>
         <Text style={p.arrowText}>▼</Text>
       </TouchableOpacity>
     </View>
@@ -107,7 +114,7 @@ const p = StyleSheet.create({
   num:       { fontSize: 26, fontWeight: '600', color: '#1A1A1A' },
 });
 
-// ─── Modal configurar tiempo ──────────────────────────────────────────────────
+
 type ModalConfigProps = { visible: boolean; config: ConfigTiempo; onConfirm: (c: ConfigTiempo) => void; onClose: () => void };
 
 function ModalConfig({ visible, config, onConfirm, onClose }: ModalConfigProps) {
@@ -123,32 +130,19 @@ function ModalConfig({ visible, config, onConfirm, onClose }: ModalConfigProps) 
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-      accessibilityViewIsModal
-    >
-      <Pressable
-        style={m.overlay}
-        onPress={onClose}
-        accessible
-        accessibilityRole="button"
-        accessibilityLabel="Cerrar configuración"
-      >
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} accessibilityViewIsModal>
+      <Pressable style={m.overlay} onPress={onClose} accessible accessibilityRole="button" accessibilityLabel="Cerrar configuración">
         <Pressable style={m.sheet} onPress={e => e.stopPropagation()} accessible={false}>
           <Text style={m.title} accessibilityRole="header">Configurar tiempo</Text>
 
           <View style={m.pickers} accessible={false}>
-            <NumPicker label="Horas"  value={local.horas}    min={0} max={23} onChange={set('horas')} />
+            <NumPicker label="Horas" value={local.horas}    min={0} max={23} onChange={set('horas')} />
             <Text style={m.sep} accessibilityElementsHidden importantForAccessibility="no">:</Text>
-            <NumPicker label="Min"    value={local.minutos}  min={0} max={59} onChange={set('minutos')} />
+            <NumPicker label="Min"   value={local.minutos}  min={0} max={59} onChange={set('minutos')} />
             <Text style={m.sep} accessibilityElementsHidden importantForAccessibility="no">:</Text>
-            <NumPicker label="Seg"    value={local.segundos} min={0} max={59} onChange={set('segundos')} />
+            <NumPicker label="Seg"   value={local.segundos} min={0} max={59} onChange={set('segundos')} />
           </View>
 
-          {/* Atajos rápidos */}
           <View style={m.shortcuts} accessible={false}>
             {[
               { label: '5 minutos',  h: 0, min: 5,  s: 0 },
@@ -162,8 +156,7 @@ function ModalConfig({ visible, config, onConfirm, onClose }: ModalConfigProps) 
                   key={label}
                   style={[m.chip, activo && m.chipActive]}
                   onPress={() => setLocal({ horas: h, minutos: min, segundos: s })}
-                  accessible
-                  accessibilityRole="button"
+                  accessible accessibilityRole="button"
                   accessibilityLabel={label}
                   accessibilityState={{ selected: activo }}
                 >
@@ -174,21 +167,14 @@ function ModalConfig({ visible, config, onConfirm, onClose }: ModalConfigProps) 
           </View>
 
           <View style={m.actions} accessible={false}>
-            <TouchableOpacity
-              style={m.btnCancel}
-              onPress={onClose}
-              accessible
-              accessibilityRole="button"
-              accessibilityLabel="Cancelar"
-            >
+            <TouchableOpacity style={m.btnCancel} onPress={onClose} accessible accessibilityRole="button" accessibilityLabel="Cancelar">
               <Text style={m.btnCancelText}>Cancelar</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[m.btnConfirm, configToSeg(local) === 0 && m.btnDisabled]}
               onPress={handleConfirm}
               disabled={configToSeg(local) === 0}
-              accessible
-              accessibilityRole="button"
+              accessible accessibilityRole="button"
               accessibilityLabel="Aplicar tiempo configurado"
               accessibilityState={{ disabled: configToSeg(local) === 0 }}
             >
@@ -209,31 +195,36 @@ const m = StyleSheet.create({
   sep:            { fontSize: 28, fontWeight: '300', color: '#ABABAB', marginTop: 16 },
   shortcuts:      { flexDirection: 'row', gap: 8, justifyContent: 'center', marginBottom: 24, flexWrap: 'wrap' },
   chip:           { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: '#F5F4F0', borderWidth: 0.5, borderColor: 'rgba(0,0,0,0.1)', minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  chipActive:     { backgroundColor: '#EEEDFE', borderColor: '#3C3489' },
+  chipActive:     { backgroundColor: '#EEEDFE', borderColor: PURPLE },
   chipText:       { fontSize: 13, color: '#7A7A7A' },
-  chipTextActive: { color: '#3C3489', fontWeight: '500' },
+  chipTextActive: { color:PURPLE, fontWeight: '500' },
   actions:        { flexDirection: 'row', gap: 10 },
   btnCancel:      { flex: 1, height: 48, borderRadius: 12, borderWidth: 0.5, borderColor: 'rgba(0,0,0,0.12)', alignItems: 'center', justifyContent: 'center' },
   btnCancelText:  { fontSize: 15, color: '#7A7A7A' },
-  btnConfirm:     { flex: 1, height: 48, borderRadius: 12, backgroundColor: '#3C3489', alignItems: 'center', justifyContent: 'center' },
+  btnConfirm:     { flex: 1, height: 48, borderRadius: 12, backgroundColor: PURPLE, alignItems: 'center', justifyContent: 'center' },
   btnConfirmText: { fontSize: 15, fontWeight: '600', color: '#FFF' },
   btnDisabled:    { opacity: 0.4 },
 });
 
 // ─── Componente principal ─────────────────────────────────────────────────────
+
 const CONFIG_DEFAULT: ConfigTiempo = { horas: 0, minutos: 25, segundos: 0 };
 
 export default function Temporizador() {
-  const [modo,         setModo]        = useState<Modo>('countdown');
-  const [estado,       setEstado]      = useState<EstadoTimer>('idle');
-  const [config,       setConfig]      = useState<ConfigTiempo>(CONFIG_DEFAULT);
-  const [tiempoActual, setTiempoActual]= useState<number>(configToSeg(CONFIG_DEFAULT));
-  const [modalVisible, setModalVisible]= useState<boolean>(false);
+  const [modo,         setModo]         = useState<Modo>('countdown');
+  const [estado,       setEstado]       = useState<EstadoTimer>('idle');
+  const [config,       setConfig]       = useState<ConfigTiempo>(CONFIG_DEFAULT);
+  const [tiempoActual, setTiempoActual] = useState<number>(configToSeg(CONFIG_DEFAULT));
+  const [modalVisible, setModalVisible] = useState<boolean>(false);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const totalSeg = configToSeg(config);
   const progreso = modo === 'countdown' && totalSeg > 0 ? tiempoActual / totalSeg : 0;
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') pedirPermisosNotificacion();
+  }, []);
 
   const tick = useCallback(() => {
     setTiempoActual(prev => {
@@ -241,7 +232,10 @@ export default function Temporizador() {
         if (prev <= 1) {
           clearInterval(intervalRef.current!);
           setEstado('finished');
-          if (Platform.OS !== 'web') Vibration.vibrate([0, 400, 200, 400]);
+          if (Platform.OS !== 'web') {
+            Vibration.vibrate([0, 400, 200, 400]);
+            dispararNotificacionFin(); // notificación inmediata al llegar a 0
+          }
           AccessibilityInfo.announceForAccessibility('¡Tiempo terminado!');
           return 0;
         }
@@ -263,6 +257,7 @@ export default function Temporizador() {
 
   const handlePlay = () => {
     if (estado === 'finished') return;
+    if (Platform.OS !== 'web') cancelarNotificaciones();
     setEstado('running');
     AccessibilityInfo.announceForAccessibility(
       modo === 'countdown'
@@ -273,22 +268,26 @@ export default function Temporizador() {
 
   const handlePause = () => {
     setEstado('paused');
+    if (Platform.OS !== 'web') cancelarNotificaciones();
     AccessibilityInfo.announceForAccessibility('Temporizador pausado');
   };
 
   const handleReset = () => {
     setEstado('idle');
+    if (Platform.OS !== 'web') cancelarNotificaciones();
     setTiempoActual(modo === 'countdown' ? configToSeg(config) : 0);
     AccessibilityInfo.announceForAccessibility('Temporizador reiniciado');
   };
 
   const handleModo = (nuevo: Modo) => {
+    if (Platform.OS !== 'web') cancelarNotificaciones();
     setModo(nuevo);
     setEstado('idle');
     setTiempoActual(nuevo === 'countdown' ? configToSeg(config) : 0);
   };
 
   const handleConfig = (nueva: ConfigTiempo) => {
+    if (Platform.OS !== 'web') cancelarNotificaciones();
     setConfig(nueva);
     setEstado('idle');
     setTiempoActual(configToSeg(nueva));
@@ -302,9 +301,9 @@ export default function Temporizador() {
     C.textPrimary;
 
   const estadoLabel =
-    estado === 'idle'     ? (modo === 'countdown' ? 'Listo' : 'En espera') :
-    estado === 'running'  ? 'En curso' :
-    estado === 'paused'   ? 'Pausado' :
+    estado === 'idle'    ? (modo === 'countdown' ? 'Listo' : 'En espera') :
+    estado === 'running' ? 'En curso' :
+    estado === 'paused'  ? 'Pausado' :
     '¡Tiempo!';
 
   return (
@@ -313,13 +312,7 @@ export default function Temporizador() {
 
         <Text style={s.title} accessibilityRole="header">Temporizador</Text>
 
-        <Pressable
-          onPress={() => router.replace('/')}
-          style={s.btnInicio}
-          accessible
-          accessibilityRole="button"
-          accessibilityLabel="Ir a Inicio"
-        >
+        <Pressable onPress={() => router.replace('/')} style={s.btnInicio} accessible accessibilityRole="button" accessibilityLabel="Ir a Inicio">
           <Ionicons name="home-outline" size={16} color={PURPLE} accessibilityElementsHidden importantForAccessibility="no" />
           <Text style={s.btnInicioTxt}>Inicio</Text>
         </Pressable>
@@ -331,8 +324,7 @@ export default function Temporizador() {
               key={md}
               style={[s.modoBtn, modo === md && s.modoBtnActive]}
               onPress={() => handleModo(md)}
-              accessible
-              accessibilityRole="button"
+              accessible accessibilityRole="button"
               accessibilityLabel={md === 'countdown' ? 'Cuenta atrás' : 'Cronómetro'}
               accessibilityState={{ selected: modo === md }}
             >
@@ -344,18 +336,10 @@ export default function Temporizador() {
         </View>
 
         {/* Reloj central */}
-        <View
-          style={s.clockWrap}
-          accessible
-          accessibilityLabel={`${formatTimeA11y(tiempoActual)}. ${estadoLabel}`}
-          accessibilityLiveRegion="none" // no anunciar cada segundo, es molesto
-        >
+        <View style={s.clockWrap} accessible accessibilityLabel={`${formatTimeA11y(tiempoActual)}. ${estadoLabel}`} accessibilityLiveRegion="none">
           {modo === 'countdown' && (
             <View style={s.ringOuter} accessibilityElementsHidden importantForAccessibility="no">
-              <View style={[
-                s.ringInner,
-                { borderColor: estado === 'finished' ? C.green.solid : estado === 'running' ? C.accent : C.border }
-              ]} />
+              <View style={[s.ringInner, { borderColor: estado === 'finished' ? C.green.solid : estado === 'running' ? C.accent : C.border }]} />
             </View>
           )}
           <View style={s.clockContent}>
@@ -368,20 +352,10 @@ export default function Temporizador() {
           </View>
         </View>
 
-        {/* Barra de progreso lineal */}
         {modo === 'countdown' && totalSeg > 0 && (
-          <View
-            style={s.progressBarWrap}
-            accessible
-            accessibilityRole="progressbar"
-            accessibilityValue={{ min: 0, max: 100, now: Math.round(progreso * 100) }}
-            accessibilityLabel={`Progreso: ${Math.round(progreso * 100)} por ciento`}
-          >
+          <View style={s.progressBarWrap} accessible accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: Math.round(progreso * 100) }} accessibilityLabel={`Progreso: ${Math.round(progreso * 100)} por ciento`}>
             <View style={s.progressBarBg}>
-              <View style={[s.progressBarFill, {
-                width: `${progreso * 100}%` as any,
-                backgroundColor: estado === 'finished' ? C.green.solid : C.accent,
-              }]} />
+              <View style={[s.progressBarFill, { width: `${progreso * 100}%` as any, backgroundColor: estado === 'finished' ? C.green.solid : C.accent }]} />
             </View>
             <Text style={s.progressLabel} accessibilityElementsHidden importantForAccessibility="no">
               {Math.round(progreso * 100)}%
@@ -391,26 +365,12 @@ export default function Temporizador() {
 
         {/* Controles */}
         <View style={s.controls} accessible={false}>
-          {/* Reset */}
-          <TouchableOpacity
-            style={s.btnSecondary}
-            onPress={handleReset}
-            accessible
-            accessibilityRole="button"
-            accessibilityLabel="Reiniciar"
-          >
+          <TouchableOpacity style={s.btnSecondary} onPress={handleReset} accessible accessibilityRole="button" accessibilityLabel="Reiniciar">
             <Ionicons name="refresh" size={24} color={C.textMuted} accessibilityElementsHidden importantForAccessibility="no" />
           </TouchableOpacity>
 
-          {/* Play / Pause */}
           {estado === 'running' ? (
-            <TouchableOpacity
-              style={s.btnPrimary}
-              onPress={handlePause}
-              accessible
-              accessibilityRole="button"
-              accessibilityLabel="Pausar"
-            >
+            <TouchableOpacity style={s.btnPrimary} onPress={handlePause} accessible accessibilityRole="button" accessibilityLabel="Pausar">
               <Ionicons name="pause" size={32} color="#FFF" accessibilityElementsHidden importantForAccessibility="no" />
             </TouchableOpacity>
           ) : (
@@ -418,8 +378,7 @@ export default function Temporizador() {
               style={[s.btnPrimary, estado === 'finished' && s.btnFinished]}
               onPress={handlePlay}
               disabled={estado === 'finished'}
-              accessible
-              accessibilityRole="button"
+              accessible accessibilityRole="button"
               accessibilityLabel={estado === 'paused' ? 'Reanudar' : 'Iniciar'}
               accessibilityState={{ disabled: estado === 'finished' }}
             >
@@ -427,15 +386,8 @@ export default function Temporizador() {
             </TouchableOpacity>
           )}
 
-          {/* Config */}
           {modo === 'countdown' ? (
-            <TouchableOpacity
-              style={s.btnSecondary}
-              onPress={() => setModalVisible(true)}
-              accessible
-              accessibilityRole="button"
-              accessibilityLabel="Configurar tiempo"
-            >
+            <TouchableOpacity style={s.btnSecondary} onPress={() => setModalVisible(true)} accessible accessibilityRole="button" accessibilityLabel="Configurar tiempo">
               <Ionicons name="settings-outline" size={22} color={C.textMuted} accessibilityElementsHidden importantForAccessibility="no" />
             </TouchableOpacity>
           ) : (
@@ -443,15 +395,8 @@ export default function Temporizador() {
           )}
         </View>
 
-        {/* Info tiempo configurado */}
         {modo === 'countdown' && (
-          <TouchableOpacity
-            style={s.configInfo}
-            onPress={() => setModalVisible(true)}
-            accessible
-            accessibilityRole="button"
-            accessibilityLabel={`Tiempo configurado: ${formatTimeA11y(totalSeg)}. Pulsa para editar`}
-          >
+          <TouchableOpacity style={s.configInfo} onPress={() => setModalVisible(true)} accessible accessibilityRole="button" accessibilityLabel={`Tiempo configurado: ${formatTimeA11y(totalSeg)}. Pulsa para editar`}>
             <Text style={s.configInfoText} accessibilityElementsHidden importantForAccessibility="no">
               Tiempo configurado: {config.horas > 0 ? `${config.horas}h ` : ''}
               {config.minutos > 0 ? `${config.minutos}min ` : ''}
@@ -463,17 +408,11 @@ export default function Temporizador() {
 
       </ScrollView>
 
-      <ModalConfig
-        visible={modalVisible}
-        config={config}
-        onConfirm={handleConfig}
-        onClose={() => setModalVisible(false)}
-      />
+      <ModalConfig visible={modalVisible} config={config} onConfirm={handleConfig} onClose={() => setModalVisible(false)} />
     </SafeAreaView>
   );
 }
 
-// ─── Estilos ──────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   safe:      { flex: 1, backgroundColor: C.bg },
   container: { paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 40, alignItems: 'center' },
@@ -483,8 +422,8 @@ const s = StyleSheet.create({
   btnInicio:    { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: PURPLE + '18', borderRadius: 20, alignSelf: 'flex-start', marginBottom: 8, minHeight: 44 },
   btnInicioTxt: { color: PURPLE, fontWeight: '600', fontSize: 13 },
 
-  modoWrap: { flexDirection: 'row', backgroundColor: C.surface, borderRadius: 14, borderWidth: 0.5, borderColor: C.border, padding: 4, marginBottom: 36, width: '100%' },
-  modoBtn:  { flex: 1, paddingVertical: 10, borderRadius: 11, alignItems: 'center', minHeight: 44, justifyContent: 'center' },
+  modoWrap:          { flexDirection: 'row', backgroundColor: C.surface, borderRadius: 14, borderWidth: 0.5, borderColor: C.border, padding: 4, marginBottom: 36, width: '100%' },
+  modoBtn:           { flex: 1, paddingVertical: 10, borderRadius: 11, alignItems: 'center', minHeight: 44, justifyContent: 'center' },
   modoBtnActive:     { backgroundColor: C.accentBg },
   modoBtnText:       { fontSize: 14, color: C.textMuted },
   modoBtnTextActive: { color: C.accentText, fontWeight: '600' },
@@ -501,12 +440,12 @@ const s = StyleSheet.create({
   progressBarFill: { height: 6, borderRadius: 3 },
   progressLabel:   { fontSize: 12, color: C.textMuted, minWidth: 32, textAlign: 'right' },
 
-  controls:              { flexDirection: 'row', alignItems: 'center', gap: 20, marginBottom: 20 },
-  btnPrimary:            { width: 72, height: 72, borderRadius: 36, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
-  btnFinished:           { opacity: 0.5 },
-  btnPrimaryText:        { fontSize: 26, color: '#FFF' },
-  btnSecondary:          { width: 52, height: 52, borderRadius: 26, backgroundColor: C.surface, borderWidth: 0.5, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
-  btnSecondaryIcon:      { fontSize: 20, color: C.textMuted },
+  controls:               { flexDirection: 'row', alignItems: 'center', gap: 20, marginBottom: 20 },
+  btnPrimary:             { width: 72, height: 72, borderRadius: 36, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
+  btnFinished:            { opacity: 0.5 },
+  btnPrimaryText:         { fontSize: 26, color: '#FFF' },
+  btnSecondary:           { width: 52, height: 52, borderRadius: 26, backgroundColor: C.surface, borderWidth: 0.5, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
+  btnSecondaryIcon:       { fontSize: 20, color: C.textMuted },
   btnSecondaryPlaceholder:{ width: 52, height: 52 },
 
   configInfo:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 14, backgroundColor: C.surface, borderRadius: 10, borderWidth: 0.5, borderColor: C.border, marginBottom: 28, minHeight: 44 },

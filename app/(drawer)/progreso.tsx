@@ -26,7 +26,7 @@ const ORANGE    = '#FF6B35';
 const ORANGE_LT = '#FFF2EC';
 const ORANGE_BG = '#FFF7F0';
 
-// ─── Hook Reduce Motion ───────────────────────────────────────────────────────
+// ─── Hook Reduce Motion ────
 function useReduceMotion() {
   const [reducida, setReducida] = useState(false);
   useEffect(() => {
@@ -37,7 +37,7 @@ function useReduceMotion() {
   return reducida;
 }
 
-// ─── Estrellas ────────────────────────────────────────────────────────────────
+// ─── Estrellas ───────
 function StarRow({ count = 0, size = 14 }: { count: number; size?: number }) {
   return (
     <Text
@@ -50,7 +50,7 @@ function StarRow({ count = 0, size = 14 }: { count: number; size?: number }) {
   );
 }
 
-// ─── Barra animada ────────────────────────────────────────────────────────────
+// ─── Barra animada ────
 function BarraProgreso({ pct, color }: { pct: number; color: string }) {
   const reduceMotion = useReduceMotion();
   const anim = useRef(new Animated.Value(0)).current;
@@ -79,7 +79,7 @@ function BarraProgreso({ pct, color }: { pct: number; color: string }) {
   );
 }
 
-// ─── Medalla Card ─────────────────────────────────────────────────────────────
+// ─── Medalla Card ───────────
 function MedalCard({ type, progreso }: { type: 'bronce' | 'plata' | 'oro'; progreso: number }) {
   const cfg = {
     bronce: { color: '#CD7F32', bgEarned: '#FDF5EC', emoji: '🥉', label: 'Bronce', req: 100 },
@@ -121,7 +121,7 @@ function MedalCard({ type, progreso }: { type: 'bronce' | 'plata' | 'oro'; progr
   );
 }
 
-// ─── Grupos por fecha ─────────────────────────────────────────────────────────
+
 function agruparPorFecha(tareas: any[]): { fecha: string; items: any[] }[] {
   const mapa: Record<string, any[]> = {};
   for (const t of tareas) {
@@ -208,12 +208,12 @@ function AnimatedRachaNum({ anim }: { anim: Animated.Value }) {
   );
 }
 
-// ─── Línea semanal ────────────────────────────────────────────────────────────
+
 function SemanaRacha({ racha }: { racha: number }) {
   const ultimos7   = getUltimos7Dias();
   const rachaActiva = Math.min(racha, 7);
 
-  // Descripción completa para VoiceOver
+
   const descripcion = ultimos7.map((fecha, idx) => {
     const activo  = idx >= (7 - rachaActiva);
     const esHoy   = idx === 6;
@@ -263,7 +263,7 @@ function SemanaRacha({ racha }: { racha: number }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+
 const TABS = ['Estrellas', 'Racha', 'Medallas'];
 
 export default function Progreso() {
@@ -469,8 +469,7 @@ export default function Progreso() {
   );
 }
 
-// ─── Estilos ──────────────────────────────────────────────────────────────────
-// Escala fuentes respetando accesibilidad pero sin romper layout
+
 const fs = (size: number) => {
   const scale = Math.min(PixelRatio.getFontScale(), 1.4);
   return Math.round(size * scale);
