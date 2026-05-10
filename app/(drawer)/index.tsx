@@ -42,19 +42,17 @@ import { buscarPictogramas } from "../../services/arasaac";
 
 import { ahoraApp, ahoraAppMs, fechaAppDate, hoyAppStr, setFechaSimulada, setHoraSimulada } from '../../utils/fecha';
 
-setFechaSimulada('2026-05-09');
-setHoraSimulada(12, 0);
+setFechaSimulada('2026-05-18');
+setHoraSimulada(21, 0);
 
-if (Notifications) {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,  
-      shouldPlaySound: false,
-      shouldSetBadge: false,
-     
-    }),
-  });
-}
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: false,
+    shouldSetBadge: false,
+  }),
+});
 
 const PURPLE    = '#A77BBE';
 const PURPLE_LT = '#E5D9EE';
@@ -381,7 +379,7 @@ export default function Home() {
  
   useEffect(() => {
     if (!gami.cargando) {
-      gami.forzarEstrellas(290);
+      gami.forzarEstrellas(590);
     }
   }, [gami.cargando]);
 
