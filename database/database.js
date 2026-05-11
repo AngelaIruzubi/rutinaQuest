@@ -54,17 +54,20 @@ export function initDB() {
     `ALTER TABLE tareas ADD COLUMN tareaBaseId TEXT`,
   ];
   for (const sql of migraciones) {
-    try { db.execSync(sql); } catch {}
+    try { db.execSync(sql); } catch {}  //Si la columna ya existe lanza un error
   }
 }
 
-// ── USUARIO ───────────
+// ── USUARIO ────
+
+//Inicializa al usuario
 const USUARIO_DEFAULT = {
   tonoPiel: 0, cara: 0, ojos: 0,
   peloCorto: 0, peloLargo: -1, shirt: 0,
   nivel: 1, puntos: 0,
 };
 
+//Lee datos del avatar
 export function getUsuario() {
   if (Platform.OS === 'web') {
     const data = localStorage.getItem('usuario');
@@ -72,6 +75,8 @@ export function getUsuario() {
   }
   return getDB().getFirstSync('SELECT * FROM usuario WHERE id = 1');
 }
+
+//Escribe datos del avatar
 
 export function updateUsuario(fields) {
   if (Platform.OS === 'web') {
@@ -85,7 +90,7 @@ export function updateUsuario(fields) {
 }
 
 // ── TAREAS ────
-
+ //devuelve todas las tareas
 export function getTareas() {
   if (Platform.OS === 'web') {
     const data = localStorage.getItem('tareas');
@@ -94,7 +99,7 @@ export function getTareas() {
   return getDB().getAllSync('SELECT * FROM tareas');
 }
 
-
+//Devuelve las tareas filtradas por completadas, canceladad o vencidad y ordenadas por fecha
 export function getTareasHistorial() {
   if (Platform.OS === 'web') {
     return getTareas()
@@ -118,7 +123,7 @@ export function getTareasHistorial() {
   `);
 }
 
-
+//Insertat tarea nueva
 export function insertTarea(tarea, fechaDiaParam) {
   const fechaDia   = fechaDiaParam ?? hoyAppStr();
   const repeticion = tarea.repeticion ?? 'ninguna';
@@ -141,10 +146,11 @@ export function insertTarea(tarea, fechaDiaParam) {
   );
 }
 
-
+//Inertar tarea repetitiva
 export function generarTareasRepetitivas() {
+
   const hoy = hoyAppStr();
-  const [y, m, d] = hoy.split('-').map(Number);
+  const [y, m, d] = hoy.split('-').map(Number); //año , mes y día
   const diaSemana = new Date(y, m - 1, d).getDay(); 
 
   if (Platform.OS === 'web') {
@@ -192,7 +198,7 @@ export function generarTareasRepetitivas() {
     return nuevas.length;
   }
 
-
+//busca las tareas que tienen repetición activa
   const bases = getDB().getAllSync(
     `SELECT * FROM tareas WHERE repeticion != 'ninguna' AND (tareaBaseId IS NULL OR tareaBaseId = '')`,
   );
@@ -204,12 +210,12 @@ export function generarTareasRepetitivas() {
       `SELECT id FROM tareas WHERE (tareaBaseId = ? OR id = ?) AND fechaDia = ?`,
       [base.id, base.id, hoy]
     );
-    if (yaExiste) continue;
+    if (yaExiste) continue; //si ya existe continua sino la crea
 
     if (base.repeticion === 'semanal') {
       const [by, bm, bd] = (base.fechaDia ?? hoy).split('-').map(Number);
       const diaSemanaBase = new Date(by, bm - 1, bd).getDay();
-      if (diaSemana !== diaSemanaBase) continue;
+      if (diaSemana !== diaSemanaBase) continue; // si es semanal mira en que semana estamos
     }
 
     const newId = `${hoy}_rep_${base.id}_${Math.random().toString(36).slice(2, 6)}`;
@@ -223,7 +229,7 @@ export function generarTareasRepetitivas() {
   return creadas;
 }
 
-
+//Devuelve una tarea por fecha sin tener en cuenta canceladas o vencidad.
 export function getTareasPorFecha(fecha) {
   if (Platform.OS === 'web') {
     return getTareas().filter(t =>
@@ -238,7 +244,7 @@ export function getTareasPorFecha(fecha) {
   );
 }
 
-
+//Devuelve el numero de tareas activas por día
 export function getFechasConTareas() {
   if (Platform.OS === 'web') {
     const tareas = getTareas().filter(t =>
@@ -262,7 +268,7 @@ export function getFechasConTareas() {
   return fechas;
 }
 
-
+//marcar tarea como completada
 export function updateTareaCompletada(id, completed, stars = 5) {
   const fecha  = completed ? hoyAppStr() : null;
   const estado = completed ? 'completada' : 'pendiente';
@@ -282,7 +288,7 @@ export function updateTareaCompletada(id, completed, stars = 5) {
   );
 }
 
-
+//Cancelar tarea y marcar el día de hoy como fecha completada
 export function cancelarTarea(id) {
   const hoy = hoyAppStr();
 
@@ -301,6 +307,7 @@ export function cancelarTarea(id) {
   );
 }
 
+//Actualizar Hora
 export function updateTareaHora(id, nuevaHora) {
   if (Platform.OS === 'web') {
     const tareas = getTareas().map(t =>
@@ -312,7 +319,7 @@ export function updateTareaHora(id, nuevaHora) {
   getDB().runSync('UPDATE tareas SET hora=? WHERE id=?', [nuevaHora, id]);
 }
 
-
+//Actualizar Pictograma
 export function updateTareaTituloPicto(id, titulo, pictogramId) {
   if (Platform.OS === 'web') {
     const tareas = getTareas().map(t =>
@@ -327,7 +334,7 @@ export function updateTareaTituloPicto(id, titulo, pictogramId) {
   );
 }
 
-
+//actualizar todas las tareas repetitivas al elegir todas las veces
 export function updateTareaBaseCompleta(baseId, titulo, pictogramId, hora) {
   if (Platform.OS === 'web') {
     const tareas = getTareas().map(t => {
@@ -352,7 +359,7 @@ export function updateTareaBaseCompleta(baseId, titulo, pictogramId, hora) {
     [titulo, pictogramId ?? null, hora ?? 'Sin hora', baseId]
   );
 }
-
+//Borrar tarea
 export function deleteTarea(id) {
   if (Platform.OS === 'web') {
     const tareas = getTareas().filter(t => t.id !== id);
@@ -362,28 +369,49 @@ export function deleteTarea(id) {
   getDB().runSync('DELETE FROM tareas WHERE id=?', [id]);
 }
 
-
+//Elimina tarea repetitiva  futuras y actualiza a 'eliminadas' las pasadas
 export function eliminarTareaYRepetitivas(baseId) {
   const hoy = hoyAppStr();
 
   if (Platform.OS === 'web') {
     const tareas = getTareas().map(t => {
       if (t.id !== baseId && t.tareaBaseId !== baseId) return t;
-      // Completadas: se conservan en historial pero se detiene la repetición
+    
       if (t.estado === 'completada' || t.completed === 1) {
         return { ...t, repeticion: 'ninguna' };
       }
-      // Pendientes: cancelar y detener repetición
+  
       return { ...t, estado: 'cancelada', completed: 0, fechaCompletada: hoy, repeticion: 'ninguna' };
     });
     localStorage.setItem('tareas', JSON.stringify(tareas));
     return;
   }
 
-  getDB().runSync('DELETE FROM tareas WHERE id=? OR tareaBaseId=?', [baseId, baseId]);
+
+  getDB().runSync(
+    `UPDATE tareas SET repeticion='ninguna'
+     WHERE (id=? OR tareaBaseId=?) AND (estado='completada' OR completed=1)`,
+    [baseId, baseId]
+  );
+
+ 
+  getDB().runSync(
+    `UPDATE tareas SET estado='cancelada', completed=0, fechaCompletada=fechaDia, repeticion='ninguna'
+     WHERE (id=? OR tareaBaseId=?) AND estado='pendiente' AND fechaDia <= ?`,
+    [baseId, baseId, hoy]
+  );
+
+ 
+  getDB().runSync(
+    `DELETE FROM tareas WHERE (id=? OR tareaBaseId=?) AND estado='pendiente' AND fechaDia > ?`,
+    [baseId, baseId, hoy]
+  );
 }
 
 // ── RESET DIARIO ─────
+
+
+//Se llama todos los dias
 
 export function limpiarTareasViejas() {
   const hoy  = hoyAppStr();
@@ -397,7 +425,6 @@ export function limpiarTareasViejas() {
     const [yy, mm, dd] = hoy.split('-').map(Number);
     const diaSemana = new Date(yy, mm - 1, dd).getDay();
 
-    // Paso 1: marcar vencidas en una sola pasada
     const actualizadas = todas.map(t => {
       const fechaDia = t.fechaDia ?? hoy;
       const estado   = t.estado ?? (t.completed === 1 ? 'completada' : 'pendiente');
@@ -407,7 +434,6 @@ export function limpiarTareasViejas() {
       return { ...t, fechaDia, estado };
     });
 
-    // Paso 2: generar instancias repetitivas en la misma pasada
     const bases = actualizadas.filter(t =>
       t.repeticion && t.repeticion !== 'ninguna' && !t.tareaBaseId &&
       t.estado !== 'cancelada'
@@ -441,7 +467,6 @@ export function limpiarTareasViejas() {
       });
     }
 
-    // Un solo write a localStorage con todo
     const final = [...actualizadas, ...nuevas];
     localStorage.setItem('tareas', JSON.stringify(final));
 
@@ -453,7 +478,7 @@ export function limpiarTareasViejas() {
     return { tareasHoy, vencidasAyer };
   }
 
-  
+  //
   getDB().runSync(`UPDATE tareas SET fechaDia=? WHERE fechaDia IS NULL`, [hoy]);
   getDB().runSync(`
     UPDATE tareas
@@ -469,7 +494,7 @@ export function limpiarTareasViejas() {
     [hoy]
   );
 
-
+//LLa para ver si hay tareas repetitivas
   generarTareasRepetitivas();
 
 
@@ -482,6 +507,8 @@ export function limpiarTareasViejas() {
   const tareasHoy = getDB().getAllSync(
     `SELECT * FROM tareas WHERE fechaDia = ? ORDER BY id DESC`, [hoy]
   );
+
+  //devuelve si hay alguna vencida para calcular penalizaciones
 
   return { tareasHoy, vencidasAyer };
 }

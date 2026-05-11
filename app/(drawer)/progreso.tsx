@@ -37,18 +37,6 @@ function useReduceMotion() {
   return reducida;
 }
 
-// ─── Estrellas ───────
-function StarRow({ count = 0, size = 14 }: { count: number; size?: number }) {
-  return (
-    <Text
-      style={{ fontSize: size, color: GOLD, letterSpacing: 1 }}
-      accessibilityLabel={`${count} de 5 estrellas`}
-    >
-      {'★'.repeat(count)}
-      <Text style={{ color: '#DDD' }}>{'★'.repeat(5 - count)}</Text>
-    </Text>
-  );
-}
 
 // ─── Barra animada ────
 function BarraProgreso({ pct, color }: { pct: number; color: string }) {

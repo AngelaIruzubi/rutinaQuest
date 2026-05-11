@@ -35,7 +35,7 @@ const DIAS_SEMANA_LARGO = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sá
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-function primerDiaMes(anyo: number, mes: number): Date { return new Date(anyo, mes, 1); }
+function primerDiaMes(anyo: number, mes: number): Date { return new Date(anyo, mes, 1); } //en que columna empieza
 function diasEnMes(anyo: number, mes: number): number  { return new Date(anyo, mes + 1, 0).getDate(); }
 
 // Convierte YYYY-MM-DD a texto legible: "10 de abril de 2026"

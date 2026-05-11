@@ -2,13 +2,13 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { getUsuario, initDB, updateUsuario } from '../database/database';
 
 export type AvatarType = {
-  tonoPiel:  number;  // 0 = claro, 1 = oscuro
-  cara:      number;  // 0-2
-  ojos:      number;  // 0-3 color
-  colorPelo: number;  // 0-3 color
-  peloCorto: number;  // índice o -1
-  peloLargo: number;  // índice o -1
-  shirt:     number;  // 0-1
+  tonoPiel:  number;  
+  cara:      number;  
+  ojos:      number;  
+  colorPelo: number;  
+  peloCorto: number;  
+  peloLargo: number;  
+  shirt:     number;  
 };
 
 type AvatarContextType = {

@@ -42,15 +42,15 @@ import { buscarPictogramas } from "../../services/arasaac";
 
 import { ahoraApp, ahoraAppMs, fechaAppDate, hoyAppStr, setFechaSimulada, setHoraSimulada } from '../../utils/fecha';
 
-setFechaSimulada('2026-05-28');
-setHoraSimulada(12, 0);
+setFechaSimulada('2026-05-12');
+setHoraSimulada(21, 0);
 
 if (Notifications) {
   Notifications.setNotificationHandler({
      handleNotification: async () => ({
     shouldShowBanner: true,   
     shouldShowList: true,     
-    shouldPlaySound: false,
+    shouldPlaySound: true,
     shouldSetBadge: false,
     
      
@@ -332,11 +332,9 @@ export default function Home() {
   const [pictogramas,  setPictogramas]  = useState<number[]>([]);
   const [pictogramId,  setPictogramId]  = useState<number | null>(null);
 
-  // ── Repetición de tarea ─────
+
   const [repeticion, setRepeticion] = useState<'ninguna'|'diaria'|'semanal'>('ninguna');
 
-  const [showTaskPicker,   setShowTaskPicker]   = useState(false);
-  const [taskTempTime,     setTaskTempTime]     = useState(fechaAppDate());
   const [notifType,        setNotifType]        = useState('ontime');
   const [showNotif,        setShowNotif]        = useState(false);
   const notifTimer       = useRef<any>(null);
@@ -383,7 +381,7 @@ export default function Home() {
  
   useEffect(() => {
     if (!gami.cargando) {
-      gami.forzarEstrellas(290);
+      gami.forzarEstrellas(295);
     }
   }, [gami.cargando]);
 
@@ -429,6 +427,7 @@ export default function Home() {
       if (hoy !== ultimoDiaInterval.current) {
         ultimoDiaInterval.current = hoy;
 
+        generarTareasRepetitivas(); 
         const { tareasHoy, vencidasAyer } = limpiarTareasViejas() as any;
         setTasks(tareasHoy.map((r: any) => ({ ...r, completed: r.completed === 1 })));
 
@@ -553,17 +552,28 @@ export default function Home() {
     const debeMostrarRacha = newRacha >= 1 && !notifEnviadasHoy.current.has('rachaHoy');
     if (debeMostrarRacha) notifEnviadasHoy.current.add('rachaHoy');
 
-    if      (newTotal >= 600 && prevTotal < 600)          disparaNotif('oro');
-    else if (newTotal >= 300 && prevTotal < 300)          disparaNotif('plata');
-    else if (newTotal >= 100 && prevTotal < 100)          disparaNotif('bronce');
-    else if (pendingAntes.length === 0 && totalDeHoy > 0) disparaNotif('goalmet');
-    else if (!tieneHora)                                  disparaNotif('sinHora');
-    else if (enTiempo)                                    disparaNotif('ontime');
-    else                                                  disparaNotif('late');
+    const todasCompletadas = pendingAntes.length === 0 && totalDeHoy > 0;
+    let delay = 0;
 
-    if (debeMostrarRacha) disparaRachaDespues(newRacha, 3200);
-    setTaskModalVisible(false);
-  };
+    if      (newTotal >= 600 && prevTotal < 600) disparaNotif('oro');
+    else if (newTotal >= 300 && prevTotal < 300) disparaNotif('plata');
+    else if (newTotal >= 100 && prevTotal < 100) disparaNotif('bronce');
+    else if (!tieneHora)                         disparaNotif('sinHora');
+    else if (enTiempo)                           disparaNotif('ontime');
+    else                                         disparaNotif('late');
+
+    delay += 4000; // deja que la notificación de estrellas termine
+
+    if (todasCompletadas) {
+      setTimeout(() => disparaNotif('goalmet'), delay);
+      delay += 4000;
+    }
+
+    if (debeMostrarRacha) {
+      setTimeout(() => disparaRachaNotif(newRacha), delay);
+    }
+        setTaskModalVisible(false);
+      };
 
   // ── Abrir modal de edición ────
   const handleAbrirEdicion = async () => {
@@ -674,7 +684,19 @@ export default function Home() {
         setTasks(prev => prev.filter(t => t.id !== task.id));
       } else {
         const baseId = task.tareaBaseId && task.tareaBaseId !== '' ? task.tareaBaseId : task.id;
-        eliminarTareaYRepetitivas(baseId);
+        const hoyStr = hoyAppStr();
+
+ 
+        const instanciasEnPantalla = tasks.filter(
+          t => t.id === baseId || t.tareaBaseId === baseId
+        );
+        for (const inst of instanciasEnPantalla) {
+          if (!inst.completed && inst.fechaDia <= hoyStr) {
+            cancelarTarea(inst.id);
+          }
+        }
+
+        eliminarTareaYRepetitivas(baseId); 
         setTasks(prev => prev.filter(t => t.id !== baseId && t.tareaBaseId !== baseId));
         disparaNotif('eliminada');
       }
@@ -1241,7 +1263,7 @@ const styles = StyleSheet.create({
   inputRow:      { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#DDD', borderRadius: 12, paddingHorizontal: 12, backgroundColor: 'white', minHeight: 44 },
   timeText:      { marginTop: 8, textAlign: 'center', color: '#888', fontSize: 13 },
 
-  // ── Selector de pictogramas ────────────────────────────────────────────────
+
   pictoLabel:       { fontSize: 12, fontWeight: '700', color: '#999', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10 },
   pictoOpcion:      { width: 80, height: 80, borderRadius: 14, borderWidth: 2, borderColor: '#E5E5E5', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', padding: 4 },
   pictoOpcionSelec: { borderColor: PURPLE, borderWidth: 3, backgroundColor: PURPLE_BG },

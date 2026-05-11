@@ -46,7 +46,7 @@ async function pedirPermisosNotificacion() {
 async function dispararNotificacionFin() {
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: '⏰ ¡Tiempo!',
+      title: '¡Tiempo!',
       body: 'El temporizador ha terminado.',
       sound: true,
     },
@@ -60,7 +60,7 @@ async function cancelarNotificaciones() {
 
 
 
-const pad         = (n: number): string => String(n).padStart(2, '0');
+const pad         = (n: number): string => String(n).padStart(2, '0'); //Añade 0 a la izquierda
 const configToSeg = (c: ConfigTiempo): number => c.horas * 3600 + c.minutos * 60 + c.segundos;
 
 const formatTime = (totalSeg: number): string => {
@@ -71,7 +71,7 @@ const formatTime = (totalSeg: number): string => {
   return `${pad(m)}:${pad(s)}`;
 };
 
-const formatTimeA11y = (totalSeg: number): string => {
+const formatTimeA11y = (totalSeg: number): string => { //conversión a lenguaje natural para VoiceOver
   const h = Math.floor(totalSeg / 3600);
   const m = Math.floor((totalSeg % 3600) / 60);
   const s = totalSeg % 60;
@@ -208,7 +208,7 @@ const m = StyleSheet.create({
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 
-const CONFIG_DEFAULT: ConfigTiempo = { horas: 0, minutos: 25, segundos: 0 };
+const CONFIG_DEFAULT: ConfigTiempo = { horas: 0, minutos: 5, segundos: 0 };
 
 export default function Temporizador() {
   const [modo,         setModo]         = useState<Modo>('countdown');

@@ -44,8 +44,6 @@ const LabelInicio       = () => <DL icono="home-outline"      label="Inicio"    
 const LabelCalendario   = () => <DL icono="calendar-outline"  label="Calendario"   />;
 const LabelTemporizador = () => <DL icono="timer-outline"     label="Temporizador" />;
 const LabelProgreso     = () => <DL icono="bar-chart-outline" label="Progreso"     />;
-const LabelAjustes      = () => <DL icono="settings-outline"  label="Ajustes"      />;
-const LabelTesting      = () => <DL icono="flask-outline"     label="Testing" color="#E67E22" />;
 const LabelHistorial    = () => <DL icono="time-outline"      label="Historial"     />;
 const LabelNormas      = () => <DL icono="document-text-outline" label="Normas" />;
 
@@ -118,10 +116,6 @@ export default function Layout() {
             options={{ drawerLabel: LabelProgreso, headerTitle: 'RutinaQuest' }}
           />
           <Drawer.Screen
-            name="ajustes"
-            options={{ drawerItemStyle: { display: 'none' }, headerTitle: 'RutinaQuest' }}
-          />
-          <Drawer.Screen
             name="historial"
             options={{ drawerLabel: LabelHistorial, headerTitle: 'RutinaQuest' }}
           />
@@ -132,14 +126,6 @@ export default function Layout() {
           <Drawer.Screen
             name="normas"
             options={{drawerLabel: LabelNormas , headerTitle: 'RutinaQuest' }}
-          />
-          <Drawer.Screen
-            name="testing"
-            options={{
-             drawerItemStyle: { display: 'none' },
-         
-              headerTitle:     '🧪 Testing Gamificación',
-            }}
           />
         </Drawer>
       </AvatarProvider>

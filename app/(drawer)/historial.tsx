@@ -1,4 +1,4 @@
-// app/(drawer)/historial.tsx
+
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
@@ -67,7 +67,7 @@ function fechaReferencia(t: any): string {
   return t.fechaDia ?? t.fechaCompletada ?? '';
 }
 
-
+ //Dibuja las estrellas
 function StarRow({ count = 0, size = 13 }: { count: number; size?: number }) {
   return (
     <Text
@@ -80,7 +80,7 @@ function StarRow({ count = 0, size = 13 }: { count: number; size?: number }) {
   );
 }
 
-
+//Renderiza el avata
 function AvatarMini({ avatar, size = 120 }: { avatar: any; size?: number }) {
   const { tonoPiel, cara, colorPelo, peloCorto, peloLargo, shirt } = avatar;
   const si: 0 | 1 = tonoPiel === 1 ? 1 : 0;
@@ -187,7 +187,7 @@ export default function Historial() {
   const hoy = hoyAppStr();
   const [diaSeleccionado, setDiaSeleccionado] = useState(hoy);
 
-  useFocusEffect(useCallback(() => { setHistorial(getTareasHistorial()); }, []));
+  useFocusEffect(useCallback(() => { setHistorial(getTareasHistorial()); }, [])); //Recarga el historial
 
   const esMismaSemana = (lunes: Date) =>
     toLocalDateStr(lunes) === toLocalDateStr(lunesDe(fechaAppDate()));
@@ -432,7 +432,7 @@ export default function Historial() {
             const sel   = fecha === diaSeleccionado;
             const esHoy = fecha === hoy;
 
-            // Usar fechaReferencia correcta para los contadores
+   
             const nC = historial.filter(t =>
               fechaReferencia(t) === fecha &&
               (t.estado === 'completada' || (t.completed === 1 && !t.estado))
@@ -471,7 +471,7 @@ export default function Historial() {
           })}
         </View>
 
-        {/* Cabecera día */}
+
         <View style={styles.diaHeader}>
           <Text
             style={styles.diaNombre}
@@ -495,7 +495,7 @@ export default function Historial() {
           )}
         </View>
 
-        {/* Contenido día */}
+ 
         {tareasDelDia.length === 0 ? (
           <View style={styles.emptyBox} accessible accessibilityLiveRegion="polite" accessibilityLabel="Sin tareas este día. Pulsa otro día para ver su historial">
             <Text style={styles.emptyText}>Sin tareas este día</Text>
@@ -527,7 +527,7 @@ export default function Historial() {
               }
             </View>
 
-            {/* Columna no realizadas: canceladas + vencidas (saltadas) */}
+          
             <View style={styles.columna}>
               <View style={[styles.columnaHeader, { backgroundColor: PURPLE_BG, borderColor: PURPLE }]}>
                 <Text style={[styles.columnaHeaderText, { color: PURPLE }]} accessibilityRole="header" accessibilityLabel={`No realizadas: ${canceladasDia.length + vencidasDia.length}`}>

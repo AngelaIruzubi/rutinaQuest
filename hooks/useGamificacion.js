@@ -53,7 +53,7 @@ const storage = {
 
 const hoy = () => hoyAppStr();
  
-// Parsea YYYY-MM-DD en hora local para evitar offset UTC
+
 const parseLocal = (str) => { const [y, m, d] = str.split('-').map(Number); return new Date(y, m - 1, d).getTime(); };
 const diasDif = (a, b) => Math.round((parseLocal(a) - parseLocal(b)) / 86_400_000);
  
@@ -77,13 +77,16 @@ export function useGamificacion() {
   const guardado = await storage.get(STATE_KEY);
   if (guardado) {
     const hoyStr = hoy();
+    //reset racha
     if (guardado.fechaHoy !== hoyStr) {
       if (guardado.ultimaFecha) {
         const diff = diasDif(hoyStr, guardado.ultimaFecha);
         if (diff !== 1) guardado.racha = 0;
       }
+      //resetea tareas completadas
       guardado.tareasCompletasHoy = 0;
       guardado.fechaHoy           = hoyStr;
+      //comprueba prnalizaciones
       const fechaPenal = guardado.fechaPenalizacion ?? null;
       if (fechaPenal !== hoyStr) {
         guardado.penalizacionAplicada = false;
@@ -107,7 +110,7 @@ export function useGamificacion() {
     await storage.set(STATE_KEY, siguiente);
   }, []);
  
-
+ //Al completar una tarea combia el estado
   const completarTarea = useCallback(async (onTime = true) => {
     const pts    = onTime ? 5 : 3;
     const hoyStr = hoy();
@@ -128,14 +131,13 @@ export function useGamificacion() {
         const nuevoEstado = {
           ...prev,
           estrellas:          nuevasEstrellas,
-          totalHecho:         nuevasEstrellas, // totalHecho = estrellas
+          totalHecho:         nuevasEstrellas, 
           racha:              nuevaRacha,
           ultimaFecha:        hoyStr,
           tareasCompletasHoy: prev.fechaHoy === hoyStr ? prev.tareasCompletasHoy + 1 : 1,
           fechaHoy:           hoyStr,
         };
         persist(nuevoEstado);
-        // Resolvemos con el estado nuevo para que index.tsx lo use directamente
         resolve({ pts, nuevoEstado });
         return nuevoEstado;
       });
@@ -155,7 +157,7 @@ export function useGamificacion() {
     });
   }, [persist]);
  
-
+ // cambia el estado si hay una penalización
   const penalizarFinDia = useCallback(async (tareasNoHechas, tareasHechasHoy = 0) => {
   return new Promise((resolve) => {
     setEstado((prev) => {
@@ -230,7 +232,7 @@ export function useGamificacion() {
 }
 
  
-// Medallas por estrellas: Bronce 100⭐ · Plata 300⭐ · Oro 600⭐
+
 export function getMedalla(estrellas) {
   if (estrellas >= 600) return 'oro';
   if (estrellas >= 300) return 'plata';
