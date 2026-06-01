@@ -15,6 +15,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { DIAS_SEMANA, MESES } from '../../constants/diasSemana';
+import { Colors } from '../../constants/theme';
 import {
   deleteTarea,
   getFechasConTareas,
@@ -24,17 +26,12 @@ import {
 import { buscarPictogramas } from '../../services/arasaac';
 import { ahoraApp, ahoraAppMs, hoyAppStr } from '../../utils/fecha';
 
-const PURPLE    = '#A77BBE';
-const PURPLE_LT = '#E5D9EE';
-const PURPLE_BG = '#F4F0F6';
-const GREEN     = '#58CC02';
-const RED       = '#FF4444';
 
-const DIAS_SEMANA       = ['L','M','X','J','V','S','D'];
-const DIAS_SEMANA_LARGO = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
-const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
-               'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-
+const PURPLE    = Colors.purple;
+const PURPLE_LT = Colors.purpleLt;
+const PURPLE_BG = Colors.purpleBg;
+const GREEN     = Colors.green;
+const RED       = Colors.red;
 function primerDiaMes(anyo: number, mes: number): Date { return new Date(anyo, mes, 1); } //en que columna empieza
 function diasEnMes(anyo: number, mes: number): number  { return new Date(anyo, mes + 1, 0).getDate(); }
 
@@ -83,7 +80,7 @@ function CalendarioMes({
             const esPasado    = fecha < hoy;
             const selec       = fecha === fechaSeleccionada;
             const tieneTareas = !!fechasConTareas[fecha];
-            const diaSemana   = DIAS_SEMANA_LARGO[idx % 7];
+            const diaSemana   = DIAS_SEMANA[idx % 7];
 
             let a11yLabel = `${dia} de ${MESES[mes]}, ${diaSemana}`;
             if (esHoy)              a11yLabel += ', hoy';

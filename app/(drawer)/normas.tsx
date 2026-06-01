@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
@@ -10,8 +11,7 @@ import {
   Text,
   View,
 } from 'react-native';
-
-const PURPLE = '#A77BBE';
+import { UMBRALES_MEDALLA } from '../../constants/medallas';
 
 type ColorPair = { bg: string; text: string };
 const C = {
@@ -28,7 +28,7 @@ const C = {
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
     <Text
-      style={s.sectionTitle}
+      style={estilos.sectionTitle}
       accessibilityRole="header"
     >
       {children}
@@ -38,8 +38,8 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 function Badge({ label }: { label: string }) {
   return (
-    <View style={s.badge} accessibilityElementsHidden importantForAccessibility="no">
-      <Text style={s.badgeText}>{label}</Text>
+    <View style={estilos.badge} accessibilityElementsHidden importantForAccessibility="no">
+      <Text style={estilos.badgeText}>{label}</Text>
     </View>
   );
 }
@@ -57,14 +57,14 @@ function RuleRow({ title, badge, subtitle, last = false }: RuleRowProps) {
 
   return (
     <View
-      style={[s.row, last && s.rowLast]}
+      style={[estilos.row, last && estilos.rowLast]}
       accessible
       accessibilityLabel={a11yLabel}
     >
-      <View style={s.rowContent}>
-        <Text style={s.rowTitle} accessibilityElementsHidden importantForAccessibility="no">{title}</Text>
+      <View style={estilos.rowContent}>
+        <Text style={estilos.rowTitle} accessibilityElementsHidden importantForAccessibility="no">{title}</Text>
         {subtitle && (
-          <Text style={s.rowSubtitle} accessibilityElementsHidden importantForAccessibility="no">{subtitle}</Text>
+          <Text style={estilos.rowSubtitle} accessibilityElementsHidden importantForAccessibility="no">{subtitle}</Text>
         )}
       </View>
       <Badge label={badge} />
@@ -75,7 +75,7 @@ function RuleRow({ title, badge, subtitle, last = false }: RuleRowProps) {
 function Card({ children, a11yLabel }: { children: React.ReactNode; a11yLabel?: string }) {
   return (
     <View
-      style={s.card}
+      style={estilos.card}
       accessible={false}
       accessibilityLabel={a11yLabel}
     >
@@ -87,13 +87,13 @@ function Card({ children, a11yLabel }: { children: React.ReactNode; a11yLabel?: 
 function MedalCard({ icon, name, req }: { icon: string; name: string; req: string }) {
   return (
     <View
-      style={s.medalCard}
+      style={estilos.medalCard}
       accessible
       accessibilityLabel={`Medalla de ${name}, se consigue con ${req}`}
     >
-      <Text style={s.medalIcon} accessibilityElementsHidden importantForAccessibility="no">{icon}</Text>
-      <Text style={s.medalName} accessibilityElementsHidden importantForAccessibility="no">{name}</Text>
-      <Text style={s.medalReq}  accessibilityElementsHidden importantForAccessibility="no">{req}</Text>
+      <Text style={estilos.medalIcon} accessibilityElementsHidden importantForAccessibility="no">{icon}</Text>
+      <Text style={estilos.medalName} accessibilityElementsHidden importantForAccessibility="no">{name}</Text>
+      <Text style={estilos.medalReq}  accessibilityElementsHidden importantForAccessibility="no">{req}</Text>
     </View>
   );
 }
@@ -102,27 +102,27 @@ function MedalCard({ icon, name, req }: { icon: string; name: string; req: strin
 
 export default function NormasJuego() {
   return (
-    <SafeAreaView style={s.safe}>
+    <SafeAreaView style={estilos.safe}>
       <ScrollView
-        style={s.scroll}
-        contentContainerStyle={s.container}
+        style={estilos.scroll}
+        contentContainerStyle={estilos.container}
         showsVerticalScrollIndicator={false}
         accessible={false}
       >
         {/* Cabecera */}
-        <Text style={s.headerTitle} accessibilityRole="header">
+        <Text style={estilos.headerTitle} accessibilityRole="header">
           Normas del juego
         </Text>
 
         <Pressable
           onPress={() => router.replace('/')}
-          style={s.btnInicio}
+          style={estilos.btnInicio}
           accessible
           accessibilityRole="button"
           accessibilityLabel="Ir a Inicio"
         >
-          <Ionicons name="home-outline" size={16} color={PURPLE} accessibilityElementsHidden importantForAccessibility="no" />
-          <Text style={s.btnInicioTxt}>Inicio</Text>
+          <Ionicons name="home-outline" size={16} color={Colors.purple} accessibilityElementsHidden importantForAccessibility="no" />
+          <Text style={estilos.btnInicioTxt}>Inicio</Text>
         </Pressable>
         {/* ── Programar tareas ── */}
         <SectionTitle>Programar tareas</SectionTitle>
@@ -182,14 +182,14 @@ export default function NormasJuego() {
         {/* ── Medallas ── */}
         <SectionTitle>Medallas</SectionTitle>
         <View
-          style={s.medalGrid}
+          style={estilos.medalGrid}
           accessible={false}
           accessibilityLabel="Cuadrícula de medallas"
         >
-          <MedalCard icon="🥉" name="Bronce" req="100 estrellas" />
-          <MedalCard icon="🥈" name="Plata"  req="300 estrellas" />
-          <MedalCard icon="🥇" name="Oro"    req="600 estrellas" />
-        </View>
+          <MedalCard icon="🥉" name="Bronce" req={`${UMBRALES_MEDALLA.bronce} ⭐`} />
+          <MedalCard icon="🥈" name="Plata"  req={`${UMBRALES_MEDALLA.plata} ⭐`}  />
+          <MedalCard icon="🥇" name="Oro"    req={`${UMBRALES_MEDALLA.oro} ⭐`}    />
+                  </View>
 
       </ScrollView>
     </SafeAreaView>
@@ -198,7 +198,7 @@ export default function NormasJuego() {
 
 
 
-const s = StyleSheet.create({
+const estilos = StyleSheet.create({
   safe:      { flex: 1, backgroundColor: C.bg },
   scroll:    { flex: 1 },
   container: {
@@ -227,11 +227,11 @@ const s = StyleSheet.create({
   btnInicio: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 12, paddingVertical: 7,
-    backgroundColor: PURPLE + '18', borderRadius: 20,
+    backgroundColor: Colors.purple + '18', borderRadius: 20,
     alignSelf: 'flex-start', marginBottom: 8,
     minHeight: 44,
   },
-  btnInicioTxt: { color: PURPLE, fontWeight: '600', fontSize: 13 },
+  btnInicioTxt: { color: Colors.purple, fontWeight: '600', fontSize: 13 },
 
   row: {
     flexDirection: 'row', alignItems: 'center',

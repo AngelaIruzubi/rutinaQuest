@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { getTareas } from '../../database/database';
 import { useGamificacion } from '../../hooks/useGamificacion';
+import { Tarea } from '../../types/tarea';
 import { ahoraApp } from '../../utils/fecha';
 
 const PURPLE    = '#A77BBE';
@@ -110,15 +111,6 @@ function MedalCard({ type, progreso }: { type: 'bronce' | 'plata' | 'oro'; progr
 }
 
 
-function agruparPorFecha(tareas: any[]): { fecha: string; items: any[] }[] {
-  const mapa: Record<string, any[]> = {};
-  for (const t of tareas) {
-    const fecha = t.fechaCompletada ?? 'Hoy';
-    if (!mapa[fecha]) mapa[fecha] = [];
-    mapa[fecha].push(t);
-  }
-  return Object.entries(mapa).map(([fecha, items]) => ({ fecha, items }));
-}
 
 function calcularProgresos(estrellas: number) {
   const progresBronce = Math.min(estrellas, 100);
@@ -256,16 +248,16 @@ const TABS = ['Estrellas', 'Racha', 'Medallas'];
 
 export default function Progreso() {
   const [tab,        setTab]        = useState(0);
-  const [completadas, setCompletadas] = useState<any[]>([]);
+  const [completadas, setCompletadas] = useState<Tarea[]>([]);
   const gami   = useGamificacion();
   const router = useRouter();
 
   useFocusEffect(
     useCallback(() => {
-      const rows  = getTareas();
-      const hechas = rows
-        .filter((r: any) => r.completed === 1)
-        .map((r: any) => ({ ...r }))
+      const rows = getTareas() as any[];
+      const hechas: Tarea[] = rows
+        .filter(r => r.completed === 1)
+        .map(r => ({ ...r, completed: true }))
         .reverse();
       setCompletadas(hechas);
       gami.recargar();
@@ -273,7 +265,6 @@ export default function Progreso() {
   );
 
   const totalEstrellas = completadas.reduce((acc, t) => acc + (t.stars ?? 5), 0);
-  const grupos = agruparPorFecha(completadas.slice(0, 30));
   const { progresBronce, progresPlata, progresOro } = calcularProgresos(gami.estrellas);
 
   const porFecha: Record<string, number> = {};

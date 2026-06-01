@@ -1,6 +1,7 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawer';
+import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import { Drawer } from 'expo-router/drawer';
 import * as SplashScreen from 'expo-splash-screen';
@@ -10,9 +11,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../constants/theme';
 import { AjustesProvider } from '../../context/AjustesContext';
 import { AvatarProvider } from '../../context/AvatarContext';
-import { initDB, limpiarTareasViejas } from '../../database/database';
+import { initDB } from '../../database/database';
 
 SplashScreen.preventAutoHideAsync();
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList:   true,
+    shouldPlaySound:  true,
+    shouldSetBadge:   false,
+  }),
+});
 
 const PURPLE = '#A77BBE';
 const WHITE  = '#ffffff';
@@ -72,7 +81,7 @@ export default function Layout() {
     async function prepare() {
       try {
         initDB();
-        limpiarTareasViejas();
+
       } catch (e) {
         console.warn('Error en carga inicial:', e);
       } finally {

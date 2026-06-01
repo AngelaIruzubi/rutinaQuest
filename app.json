@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "gestor-tareas-gamificado",
-    "slug": "gestor-tareas-gamificado",
+    "name": "RutinaQuest",
+    "slug": "rutinaquest",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icono.gif",
-    "scheme": "gestortareasgamificado",
+    "scheme": "rutinaquest",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {

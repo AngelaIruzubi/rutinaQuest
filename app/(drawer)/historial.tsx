@@ -20,22 +20,25 @@ import {
   View,
 } from 'react-native';
 import ViewShot from 'react-native-view-shot';
+import { DIAS_CORTOS, DIAS_LARGOS } from '../../constants/diasSemana';
+import { Colors } from '../../constants/theme';
 import { useAvatar } from '../../context/AvatarContext';
 import { getTareasHistorial } from '../../database/database';
 import { useGamificacion } from '../../hooks/useGamificacion';
+import { Tarea } from '../../types/tarea';
 import { fechaAppDate, hoyAppStr } from '../../utils/fecha';
 
-const PURPLE    = '#A77BBE';
-const ORANGE    = '#FF6B35';
-const PURPLE_LT = '#E5D9EE';
-const PURPLE_BG = '#F4F0F6';
-const GREEN     = '#58CC02';
-const RED       = '#FF4444';
-const GOLD      = '#FFD700';
+const PURPLE    = Colors.purple;
+const ORANGE    = Colors.orange;
+const PURPLE_LT = Colors.purpleLt;
+const PURPLE_BG = Colors.purpleBg;
+const GREEN     = Colors.green;
+const RED       = Colors.red;
+const GOLD      = Colors.gold;
+
 const COLORES_PELO = ['#1a1a1a', '#3B1F0E', '#8B4513', '#DAA520', '#E8C47A', '#E8E8E8'];
 
-const DIAS_CORTOS       = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-const DIAS_CORTOS_LARGO = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+
 
 
 function lunesDe(fecha: Date): Date {
@@ -60,8 +63,8 @@ function etiquetaSemana(lunes: Date): string {
 }
 
 
-function fechaReferencia(t: any): string {
-  if (t.estado === 'completada' || (t.completed === 1 && !t.estado)) {
+function fechaReferencia(t: Tarea): string {
+  if (t.estado === 'completada' || (t.completed && !t.estado)) {
     return t.fechaCompletada ?? t.fechaDia ?? '';
   }
   return t.fechaDia ?? t.fechaCompletada ?? '';
@@ -115,7 +118,7 @@ function TarjetaCompartir({ avatar, gami, tareasUltimaSemana }: {
   avatar: any; gami: any; tareasUltimaSemana: any[];
 }) {
   const medallaEmoji = gami.medalla ? ({ bronce: '🥉', plata: '🥈', oro: '🥇' } as any)[gami.medalla] : null;
-  const completadas  = tareasUltimaSemana.filter(t => t.estado === 'completada' || (t.completed === 1 && !t.estado));
+  const completadas  = tareasUltimaSemana.filter(t => t.estado === 'completada' || (t.completada === 1 && !t.estado));
   const canceladas   = tareasUltimaSemana.filter(t => t.estado === 'cancelada' || t.estado === 'vencida');
 
   return (
@@ -136,7 +139,7 @@ function TarjetaCompartir({ avatar, gami, tareasUltimaSemana }: {
         <View style={tc.tareasSection}>
           <Text style={tc.tareasSectionTitle}>Esta semana</Text>
           {tareasUltimaSemana.slice(0, 10).map((t, i) => {
-            const ok = t.estado === 'completada' || (t.completed === 1 && !t.estado);
+            const ok = t.estado === 'completada' || (t.completada === 1 && !t.estado);
             return (
               <View key={i} style={tc.tareaFila}>
                 <Text style={tc.tareaEmoji}>{ok ? '✅' : '❌'}</Text>
@@ -178,7 +181,7 @@ export default function Historial() {
   const shotRef    = useRef<any>(null);
 
   const [search,       setSearch]       = useState('');
-  const [historial,    setHistorial]    = useState<any[]>([]);
+  const [historial, setHistorial] = useState<Tarea[]>([]);
   const [compartiendo, setCompartiendo] = useState(false);
   const [modalCaptura, setModalCaptura] = useState(false);
   const [destinoPend,  setDestinoPend]  = useState<'whatsapp'|'gmail'|'nativo'|null>(null);
@@ -187,7 +190,10 @@ export default function Historial() {
   const hoy = hoyAppStr();
   const [diaSeleccionado, setDiaSeleccionado] = useState(hoy);
 
-  useFocusEffect(useCallback(() => { setHistorial(getTareasHistorial()); }, [])); //Recarga el historial
+  useFocusEffect(useCallback(() => {
+  const rows = getTareasHistorial() as any[];
+  setHistorial(rows.map(r => ({ ...r, completed: r.completed === 1 })));
+}, []));
 
   const esMismaSemana = (lunes: Date) =>
     toLocalDateStr(lunes) === toLocalDateStr(lunesDe(fechaAppDate()));
@@ -213,7 +219,7 @@ export default function Historial() {
     fechaReferencia(t) === diaSeleccionado &&
     t.title.toLowerCase().includes(search.toLowerCase())
   );
-  const completadasDia = tareasDelDia.filter(t => t.estado === 'completada' || (t.completed === 1 && !t.estado));
+  const completadasDia = tareasDelDia.filter(t => t.estado === 'completada' || (t.completed && !t.estado));
   const canceladasDia  = tareasDelDia.filter(t => t.estado === 'cancelada');
   const vencidasDia    = tareasDelDia.filter(t => t.estado === 'vencida');
 
@@ -222,7 +228,7 @@ export default function Historial() {
 
  
   const buildTextoCompartir = () => {
-    const completadas  = tareasUltimaSemana.filter(t => t.estado === 'completada' || (t.completed === 1 && !t.estado));
+    const completadas  = tareasUltimaSemana.filter(t => t.estado === 'completada' || (t.completed && !t.estado));
     const canceladas   = tareasUltimaSemana.filter(t => t.estado === 'cancelada' || t.estado === 'vencida');
     const medallaEmoji = gami.medalla ? ({ bronce: '🥉', plata: '🥈', oro: '🥇' } as any)[gami.medalla] : '';
     return [
@@ -235,7 +241,7 @@ export default function Historial() {
       `❌ ${canceladas.length} canceladas`, '',
       '📋 Tareas de la semana:',
       ...tareasUltimaSemana.slice(0, 10).map(t => {
-        const ok = t.estado === 'completada' || (t.completed === 1 && !t.estado);
+        const ok = t.estado === 'completada' || (t.completed && !t.estado);
         return `${ok ? '✅' : '❌'} ${t.title}`;
       }),
       '', new Date().toLocaleDateString('es-ES', { dateStyle: 'long' }),
@@ -435,14 +441,14 @@ export default function Historial() {
    
             const nC = historial.filter(t =>
               fechaReferencia(t) === fecha &&
-              (t.estado === 'completada' || (t.completed === 1 && !t.estado))
+              (t.estado === 'completada' || (t.completed && !t.estado))
             ).length;
             const nX = historial.filter(t =>
               fechaReferencia(t) === fecha &&
               (t.estado === 'cancelada' || t.estado === 'vencida')
             ).length;
 
-            const partes = [DIAS_CORTOS_LARGO[idx]];
+            const partes = [DIAS_LARGOS[idx]];
             if (esHoy) partes.push('hoy');
             if (sel)   partes.push('seleccionado');
             if (nC > 0) partes.push(`${nC} completada${nC > 1 ? 's' : ''}`);

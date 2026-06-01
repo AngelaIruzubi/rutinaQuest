@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { getUsuario, initDB, updateUsuario } from '../database/database';
+import { EstadoAvatar } from '../types/avatar';
 
 export type AvatarType = {
   tonoPiel:  number;  
@@ -19,15 +20,10 @@ type AvatarContextType = {
 const AvatarContext = createContext<AvatarContextType | null>(null);
 
 export const AvatarProvider = ({ children }: any) => {
-  const [avatar, setAvatar] = useState<AvatarType>({
-    tonoPiel:  0,
-    cara:      0,
-    ojos:      0,
-    colorPelo: 0,
-    peloCorto: 0,
-    peloLargo: -1,
-    shirt:     0,
-  });
+ const [avatar, setAvatar] = useState<EstadoAvatar>({
+  tonoPiel: 0, cara: 0, colorPelo: 0, ojos: 0,
+  peloCorto: 0, peloLargo: -1, shirt: 0,
+});
 
   useEffect(() => {
     initDB();

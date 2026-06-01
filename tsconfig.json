@@ -6,13 +6,10 @@
     "strict": true,
     "esModuleInterop": true,
     "allowJs": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "skipLibCheck": true,
-    "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"]
     }
   },
   "include": [
@@ -20,7 +17,8 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts",
-    "services/taskServices.js"
+    "services/taskServices.js",
+    "database/database.js"
   ],
   "extends": "expo/tsconfig.base"
 }

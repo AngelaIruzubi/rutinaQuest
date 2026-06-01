@@ -1,9 +1,12 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useState } from 'react';
 import {
   Image, Pressable, ScrollView,
   StyleSheet, Text, useWindowDimensions, View,
 } from 'react-native';
 import { useAvatar } from '../../context/AvatarContext';
+
+// ─── Constantes ───────────────────────────────────────────────────────────────
 
 const TONOS_PIEL   = ['#F5C89A', '#7B3F2C'];
 const COLORES_PELO = ['#1a1a1a', '#3B1F0E', '#8B4513', '#DAA520', '#E8C47A', '#E8E8E8'];
@@ -11,7 +14,6 @@ const NOMBRES_TONO = ['Claro', 'Oscuro'];
 const NOMBRES_PELO = ['Negro', 'Marrón oscuro', 'Castaño', 'Rubio oscuro', 'Rubio claro', 'Blanco'];
 
 const PURPLE = '#e9d3f5';
-const BG     = '#EEF4FB';
 
 const TABS = [
   { id: 'piel',      icon: 'palette-outline',     title: 'Tono de piel' },
@@ -21,82 +23,100 @@ const TABS = [
   { id: 'camiseta',  icon: 'tshirt-crew-outline',  title: 'Camiseta' },
 ];
 
-export default function Perfil() {
-  const { width }  = useWindowDimensions();
-  const isTablet   = width >= 768;
-  const { avatar, updateAvatar } = useAvatar();
-  const { tonoPiel, cara, colorPelo, peloCorto, peloLargo, shirt } = avatar;
+// ─── Imágenes (fuera del componente para que no se recreen en cada render) ────
 
-  const [tabActivo, setTabActivo] = (require('react').useState)('piel');
+const CARAS = [
+  [
+    require('../../assets/images/avatar/cara1_claro.png'),
+    require('../../assets/images/avatar/cara2_claro.png'),
+    require('../../assets/images/avatar/cara3_claro.png'),
+  ],
+  [
+    require('../../assets/images/avatar/cara1_oscuro.png'),
+    require('../../assets/images/avatar/cara2_oscuro.png'),
+    require('../../assets/images/avatar/cara3_oscuro.png'),
+  ],
+];
 
-  const si: 0 | 1 = tonoPiel === 1 ? 1 : 0;
+const CAMISETAS = [
+  [
+    require('../../assets/images/avatar/camiseta1_claro.png'),
+    require('../../assets/images/avatar/camiseta2_claro.png'),
+  ],
+  [
+    require('../../assets/images/avatar/camiseta1_oscuro.png'),
+    require('../../assets/images/avatar/camiseta2_oscuro.png'),
+  ],
+];
 
-  const caras = [
-    [
-      require('../../assets/images/avatar/cara1_claro.png'),
-      require('../../assets/images/avatar/cara2_claro.png'),
-      require('../../assets/images/avatar/cara3_claro.png'),
-    ],
-    [
-      require('../../assets/images/avatar/cara1_oscuro.png'),
-      require('../../assets/images/avatar/cara2_oscuro.png'),
-      require('../../assets/images/avatar/cara3_oscuro.png'),
-    ],
-  ];
+const PELO_CORTO_OPTIONS = [
+  require('../../assets/images/avatar/pelo1.png'),
+  require('../../assets/images/avatar/pelo3.png'),
+];
 
-  const camisetas = [
-    [
-      require('../../assets/images/avatar/camiseta1_claro.png'),
-      require('../../assets/images/avatar/camiseta2_claro.png'),
-    ],
-    [
-      require('../../assets/images/avatar/camiseta1_oscuro.png'),
-      require('../../assets/images/avatar/camiseta2_oscuro.png'),
-    ],
-  ];
+const PELO_LARGO_OPTIONS = [
+  require('../../assets/images/avatar/pelo5.png'),
+  require('../../assets/images/avatar/pelo6.png'),
+];
 
-  const peloCortoOptions = [
-    require('../../assets/images/avatar/pelo1.png'),
-    require('../../assets/images/avatar/pelo3.png'),
-  ];
+// ─── Tipos ────────────────────────────────────────────────────────────────────
 
-  const peloLargoOptions = [
-    require('../../assets/images/avatar/pelo5.png'),
-    require('../../assets/images/avatar/pelo6.png'),
-  ];
+interface AvatarPreviewProps {
+  size?: number;
+  si: 0 | 1;
+  shirt: number;
+  cara: number;
+  peloCorto: number;
+  peloLargo: number;
+  colorPeloSeguro: string;
+}
 
-  const colorPeloSeguro = COLORES_PELO[colorPelo] ?? COLORES_PELO[0];
+interface TabBarProps {
+  tabActivo: string;
+  onTabPress: (id: string) => void;
+}
 
- 
-  const AvatarPreview = ({ size = 290 }: { size?: number }) => (
+// ─── AvatarPreview ────────────────────────────────────────────────────────────
+// Fuera de Perfil para que React no la desmonte/remonte en cada render del padre
+
+function AvatarPreview({
+  size = 290,
+  si,
+  shirt,
+  cara,
+  peloCorto,
+  peloLargo,
+  colorPeloSeguro,
+}: AvatarPreviewProps) {
+  return (
     <View
       style={{ width: size, height: size * 1.2, position: 'relative' }}
       accessibilityElementsHidden
       importantForAccessibility="no"
     >
       <Image
-        source={camisetas[si][shirt] ?? camisetas[0][0]}
+        source={CAMISETAS[si][shirt] ?? CAMISETAS[0][0]}
         style={{ position: 'absolute', top: size * 0.70, left: -size * 0.12, width: size * 1.3, height: size * 1.3, zIndex: 3 }}
         resizeMode="contain"
         accessibilityIgnoresInvertColors
       />
       <Image
-        source={caras[si][cara] ?? caras[0][0]}
+        source={CARAS[si][cara] ?? CARAS[0][0]}
         style={{ position: 'absolute', top: -size * 0.02, left: 0, width: size, height: size, zIndex: 1 }}
         resizeMode="contain"
         accessibilityIgnoresInvertColors
       />
-      {peloCorto >= 0 && peloCortoOptions[peloCorto] && (
+      {peloCorto >= 0 && PELO_CORTO_OPTIONS[peloCorto] && (
         <Image
-          source={peloCortoOptions[peloCorto]}
+          source={PELO_CORTO_OPTIONS[peloCorto]}
           style={{ position: 'absolute', top: -size * 0.28, left: size * -0.02, width: size * 1.05, height: size * 0.8, zIndex: 4, tintColor: colorPeloSeguro }}
           resizeMode="contain"
           accessibilityIgnoresInvertColors
         />
       )}
-      {peloCorto < 0 && peloLargo >= 0 && peloLargoOptions[peloLargo] && (
+      {peloCorto < 0 && peloLargo >= 0 && PELO_LARGO_OPTIONS[peloLargo] && (
         <Image
-          source={peloLargoOptions[peloLargo]}
+          source={PELO_LARGO_OPTIONS[peloLargo]}
           style={{ position: 'absolute', top: -size * 0.27, left: size * -0.1, width: size * 1.20, height: size * 1.20, zIndex: 4, tintColor: colorPeloSeguro }}
           resizeMode="contain"
           accessibilityIgnoresInvertColors
@@ -104,7 +124,59 @@ export default function Perfil() {
       )}
     </View>
   );
+}
 
+// ─── TabBar ───────────────────────────────────────────────────────────────────
+// Fuera de Perfil por el mismo motivo que AvatarPreview
+
+function TabBar({ tabActivo, onTabPress }: TabBarProps) {
+  return (
+    <View style={estilos.tabBar} accessible={false} accessibilityRole="tablist">
+      {TABS.map(tab => (
+        <Pressable
+          key={tab.id}
+          onPress={() => onTabPress(tab.id)}
+          style={[estilos.tabBtn, tabActivo === tab.id && estilos.tabBtnActive]}
+          accessible
+          accessibilityRole="tab"
+          accessibilityLabel={tab.title}
+          accessibilityState={{ selected: tabActivo === tab.id }}
+        >
+          <Text style={[estilos.tabEmoji, tabActivo === tab.id && { opacity: 1 }]}>
+            <MaterialCommunityIcons
+              name={tab.icon as any}
+              size={24}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            />
+          </Text>
+          {tabActivo === tab.id && (
+            <View
+              style={estilos.tabActiveLine}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            />
+          )}
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+// ─── Perfil ───────────────────────────────────────────────────────────────────
+
+export default function Perfil() {
+  const { width }  = useWindowDimensions();
+  const isTablet   = width >= 768;
+  const { avatar, updateAvatar } = useAvatar();
+  const { tonoPiel, cara, colorPelo, peloCorto, peloLargo, shirt } = avatar;
+
+  const [tabActivo, setTabActivo] = useState('piel');
+
+  const si: 0 | 1        = tonoPiel === 1 ? 1 : 0;
+  const colorPeloSeguro  = COLORES_PELO[colorPelo] ?? COLORES_PELO[0];
+
+  // ── Opciones según tab activo ──────────────────────────────────────────────
 
   const renderOpciones = () => {
     switch (tabActivo) {
@@ -112,13 +184,13 @@ export default function Perfil() {
       case 'piel':
         return (
           <>
-            <Text style={s.opcionTitulo} accessibilityRole="header">Tono de piel</Text>
-            <View style={s.gridColores} accessible={false}>
+            <Text style={estilos.opcionTitulo} accessibilityRole="header">Tono de piel</Text>
+            <View style={estilos.gridColores} accessible={false}>
               {TONOS_PIEL.map((color, i) => (
                 <Pressable
                   key={i}
                   onPress={() => updateAvatar('tonoPiel', i)}
-                  style={[s.circleColor, { backgroundColor: color }, tonoPiel === i && s.circleSelected]}
+                  style={[estilos.circleColor, { backgroundColor: color }, tonoPiel === i && estilos.circleSelected]}
                   accessible
                   accessibilityRole="button"
                   accessibilityLabel={`Tono de piel ${NOMBRES_TONO[i]}`}
@@ -132,13 +204,13 @@ export default function Perfil() {
       case 'cara':
         return (
           <>
-            <Text style={s.opcionTitulo} accessibilityRole="header">Cara</Text>
-            <View style={s.gridImagenes} accessible={false}>
-              {caras[si].map((img, i) => (
+            <Text style={estilos.opcionTitulo} accessibilityRole="header">Cara</Text>
+            <View style={estilos.gridImagenes} accessible={false}>
+              {CARAS[si].map((img, i) => (
                 <Pressable
                   key={i}
                   onPress={() => updateAvatar('cara', i)}
-                  style={[s.imgCard, cara === i && s.imgCardSelected]}
+                  style={[estilos.imgCard, cara === i && estilos.imgCardSelected]}
                   accessible
                   accessibilityRole="button"
                   accessibilityLabel={`Cara opción ${i + 1}`}
@@ -146,7 +218,7 @@ export default function Perfil() {
                 >
                   <Image
                     source={img}
-                    style={s.imgCardImg}
+                    style={estilos.imgCardImg}
                     resizeMode="contain"
                     accessibilityElementsHidden importantForAccessibility="no"
                     accessibilityIgnoresInvertColors
@@ -160,13 +232,13 @@ export default function Perfil() {
       case 'pelo':
         return (
           <>
-            <Text style={s.opcionTitulo} accessibilityRole="header">Pelo corto</Text>
-            <View style={s.gridImagenes} accessible={false}>
-              {peloCortoOptions.map((img, i) => (
+            <Text style={estilos.opcionTitulo} accessibilityRole="header">Pelo corto</Text>
+            <View style={estilos.gridImagenes} accessible={false}>
+              {PELO_CORTO_OPTIONS.map((img, i) => (
                 <Pressable
                   key={i}
                   onPress={() => { updateAvatar('peloCorto', i); updateAvatar('peloLargo', -1); }}
-                  style={[s.imgCard, peloCorto === i && s.imgCardSelected]}
+                  style={[estilos.imgCard, peloCorto === i && estilos.imgCardSelected]}
                   accessible
                   accessibilityRole="button"
                   accessibilityLabel={`Pelo corto opción ${i + 1}`}
@@ -174,7 +246,7 @@ export default function Perfil() {
                 >
                   <Image
                     source={img}
-                    style={[s.imgCardImg, { tintColor: colorPeloSeguro }]}
+                    style={[estilos.imgCardImg, { tintColor: colorPeloSeguro }]}
                     resizeMode="contain"
                     accessibilityElementsHidden importantForAccessibility="no"
                     accessibilityIgnoresInvertColors
@@ -183,13 +255,13 @@ export default function Perfil() {
               ))}
             </View>
 
-            <Text style={[s.opcionTitulo, { marginTop: 20 }]} accessibilityRole="header">Pelo largo</Text>
-            <View style={s.gridImagenes} accessible={false}>
-              {peloLargoOptions.map((img, i) => (
+            <Text style={[estilos.opcionTitulo, { marginTop: 20 }]} accessibilityRole="header">Pelo largo</Text>
+            <View style={estilos.gridImagenes} accessible={false}>
+              {PELO_LARGO_OPTIONS.map((img, i) => (
                 <Pressable
                   key={i}
                   onPress={() => { updateAvatar('peloLargo', i); updateAvatar('peloCorto', -1); }}
-                  style={[s.imgCard, peloLargo === i && s.imgCardSelected]}
+                  style={[estilos.imgCard, peloLargo === i && estilos.imgCardSelected]}
                   accessible
                   accessibilityRole="button"
                   accessibilityLabel={`Pelo largo opción ${i + 1}`}
@@ -197,7 +269,7 @@ export default function Perfil() {
                 >
                   <Image
                     source={img}
-                    style={[s.imgCardImg, { tintColor: colorPeloSeguro }]}
+                    style={[estilos.imgCardImg, { tintColor: colorPeloSeguro }]}
                     resizeMode="contain"
                     accessibilityElementsHidden importantForAccessibility="no"
                     accessibilityIgnoresInvertColors
@@ -211,13 +283,13 @@ export default function Perfil() {
       case 'colorPelo':
         return (
           <>
-            <Text style={s.opcionTitulo} accessibilityRole="header">Color de pelo</Text>
-            <View style={s.gridColores} accessible={false}>
+            <Text style={estilos.opcionTitulo} accessibilityRole="header">Color de pelo</Text>
+            <View style={estilos.gridColores} accessible={false}>
               {COLORES_PELO.map((color, i) => (
                 <Pressable
                   key={i}
                   onPress={() => updateAvatar('colorPelo', i)}
-                  style={[s.circleColor, { backgroundColor: color }, colorPelo === i && s.circleSelected]}
+                  style={[estilos.circleColor, { backgroundColor: color }, colorPelo === i && estilos.circleSelected]}
                   accessible
                   accessibilityRole="button"
                   accessibilityLabel={`Color de pelo ${NOMBRES_PELO[i]}`}
@@ -231,13 +303,13 @@ export default function Perfil() {
       case 'camiseta':
         return (
           <>
-            <Text style={s.opcionTitulo} accessibilityRole="header">Camiseta</Text>
-            <View style={s.gridImagenes} accessible={false}>
-              {camisetas[si].map((img, i) => (
+            <Text style={estilos.opcionTitulo} accessibilityRole="header">Camiseta</Text>
+            <View style={estilos.gridImagenes} accessible={false}>
+              {CAMISETAS[si].map((img, i) => (
                 <Pressable
                   key={i}
                   onPress={() => updateAvatar('shirt', i)}
-                  style={[s.imgCard, shirt === i && s.imgCardSelected]}
+                  style={[estilos.imgCard, shirt === i && estilos.imgCardSelected]}
                   accessible
                   accessibilityRole="button"
                   accessibilityLabel={`Camiseta opción ${i + 1}`}
@@ -245,7 +317,7 @@ export default function Perfil() {
                 >
                   <Image
                     source={img}
-                    style={s.imgCardImg}
+                    style={estilos.imgCardImg}
                     resizeMode="contain"
                     accessibilityElementsHidden importantForAccessibility="no"
                     accessibilityIgnoresInvertColors
@@ -260,56 +332,29 @@ export default function Perfil() {
     }
   };
 
+  // ── Render ─────────────────────────────────────────────────────────────────
 
-  const TabBar = () => (
-    <View style={s.tabBar} accessible={false} accessibilityRole="tablist">
-      {TABS.map(tab => (
-        <Pressable
-          key={tab.id}
-          onPress={() => setTabActivo(tab.id)}
-          style={[s.tabBtn, tabActivo === tab.id && s.tabBtnActive]}
-          accessible
-          accessibilityRole="tab"
-          accessibilityLabel={tab.title}
-          accessibilityState={{ selected: tabActivo === tab.id }}
-        >
-          <Text style={[s.tabEmoji, tabActivo === tab.id && { opacity: 1 }]}>
-            <MaterialCommunityIcons
-              name={tab.icon as any}
-              size={24}
-              accessibilityElementsHidden
-              importantForAccessibility="no"
-            />
-          </Text>
-          {tabActivo === tab.id && (
-            <View
-              style={s.tabActiveLine}
-              accessibilityElementsHidden
-              importantForAccessibility="no"
-            />
-          )}
-        </Pressable>
-      ))}
-    </View>
-  );
+  const avatarProps: AvatarPreviewProps = {
+    si, shirt, cara, peloCorto, peloLargo, colorPeloSeguro,
+  };
 
   if (isTablet) {
     return (
-      <View style={s.rootTablet}>
+      <View style={estilos.rootTablet}>
         <View
-          style={s.leftPanel}
+          style={estilos.leftPanel}
           accessible
           accessibilityLabel="Vista previa del avatar"
         >
-          <View style={s.avatarBgTablet}>
-            <AvatarPreview size={220} />
+          <View style={estilos.avatarBgTablet}>
+            <AvatarPreview {...avatarProps} size={220} />
           </View>
         </View>
-        <View style={s.rightPanel}>
-          <TabBar />
+        <View style={estilos.rightPanel}>
+          <TabBar tabActivo={tabActivo} onTabPress={setTabActivo} />
           <ScrollView
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={s.opcionesScroll}
+            contentContainerStyle={estilos.opcionesScroll}
             accessible={false}
           >
             {renderOpciones()}
@@ -320,19 +365,19 @@ export default function Perfil() {
   }
 
   return (
-    <View style={s.rootMobile}>
+    <View style={estilos.rootMobile}>
       <View
-        style={s.avatarBgMobile}
+        style={estilos.avatarBgMobile}
         accessible
         accessibilityLabel="Vista previa del avatar"
       >
-        <AvatarPreview size={180} />
+        <AvatarPreview {...avatarProps} size={180} />
       </View>
-      <View style={s.bottomPanel}>
-        <TabBar />
+      <View style={estilos.bottomPanel}>
+        <TabBar tabActivo={tabActivo} onTabPress={setTabActivo} />
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={s.opcionesScroll}
+          contentContainerStyle={estilos.opcionesScroll}
           keyboardShouldPersistTaps="handled"
           accessible={false}
         >
@@ -343,8 +388,9 @@ export default function Perfil() {
   );
 }
 
+// ─── Estilos ──────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
+const estilos = StyleSheet.create({
   rootTablet: {
     flex: 1, flexDirection: 'row', backgroundColor: '#fff',
     borderColor: '#EEE', borderWidth: 2, borderRadius: 14, overflow: 'hidden',
@@ -366,7 +412,7 @@ const s = StyleSheet.create({
   tabBtn: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
     paddingVertical: 12, position: 'relative', opacity: .45,
-    minHeight: 52, 
+    minHeight: 52,
   },
   tabBtnActive:  { opacity: 1 },
   tabEmoji:      { fontSize: 22 },

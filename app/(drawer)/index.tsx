@@ -3,6 +3,8 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Notifications from 'expo-notifications';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Colors } from '../../constants/theme';
+import { Tarea } from '../../types/tarea';
 
 import {
   AccessibilityInfo,
@@ -16,7 +18,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  useWindowDimensions,
   Vibration,
   View
 } from 'react-native';
@@ -27,76 +28,34 @@ import {
   eliminarTareaYRepetitivas,
   generarTareasRepetitivas,
   getTareasPorFecha,
-  initDB,
   insertTarea,
   limpiarTareasViejas,
   updateTareaBaseCompleta,
   updateTareaCompletada,
   updateTareaHora,
-  updateTareaTituloPicto,
+  updateTareaTituloPicto
 } from '../../database/database';
 
+import { NOTIF_CFG, PEREZOSO_IMAGENES } from '../../constants/notiConfig';
 import { useAjustesCtx } from '../../context/AjustesContext';
 import { useGamificacion } from '../../hooks/useGamificacion';
 import { buscarPictogramas } from "../../services/arasaac";
 
 import { ahoraApp, ahoraAppMs, fechaAppDate, hoyAppStr, setFechaSimulada, setHoraSimulada } from '../../utils/fecha';
 
-setFechaSimulada('2026-05-12');
-setHoraSimulada(21, 0);
-
-if (Notifications) {
-  Notifications.setNotificationHandler({
-     handleNotification: async () => ({
-    shouldShowBanner: true,   
-    shouldShowList: true,     
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    
-     
-    }),
-  });
+if (__DEV__) {
+  setFechaSimulada('2026-08-08');
+  setHoraSimulada(12, 0);
 }
 
-const PURPLE    = '#A77BBE';
-const PURPLE_LT = '#E5D9EE';
-const PURPLE_BG = '#F4F0F6';
-const GREEN     = '#58CC02';
-const GOLD      = '#FFD700';
-const ORANGE    = '#FF6B35';
-const RED       = '#FF4444';
 
-const PEREZOSO_IMAGENES: Record<string, any> = {
-  pulgar:         require('../../assets/images/perezoso/perezoso_pulgar.png'),
-  contento_gif:   require('../../assets/images/perezoso/alegre_noti.gif'),
-  llorando:       require('../../assets/images/perezoso/perezoso_llorando.png'),
-  celebrando:     require('../../assets/images/perezoso/perezoso_celebrando.png'),
-  celebrando_gif: require('../../assets/images/perezoso/contento_noti.gif'),
-  llorando_gif:   require('../../assets/images/perezoso/triste_noti.gif'),
-  enfadado:       require('../../assets/images/perezoso/perezoso_enfadado.png'),
-  enfadado_gif:   require('../../assets/images/perezoso/enfadado_noti.gif'),
-  esperando:      require('../../assets/images/perezoso/perezoso_esperando.png'),
-  esperando_gif:  require('../../assets/images/perezoso/aburrido_noti.gif'),
-  cansado:        require('../../assets/images/perezoso/perezoso_cansado.png'),
-  bronce:          require('../../assets/images/medallas/broncebg.png'),
-  plata:           require('../../assets/images/medallas/platabg.png'),
-  oro:             require('../../assets/images/medallas/orobg.png'),
-};
-
-const NOTIF_CFG: Record<string, { asset: string; msg: string; color: string }> = {
-  ontime:          { asset: 'contento_gif',   msg: '¡Genial, conseguiste las 5 estrellas!',                    color: PURPLE },
-  late:            { asset: 'contento_gif',   msg: '¡Completada un poco tarde! 3 estrellas',                   color: PURPLE },
-  sinHora:         { asset: 'contento_gif',   msg: '¡Tarea completada! Conseguiste las 5 estrellas',            color: PURPLE },
-  goalmet:         { asset: 'celebrando_gif', msg: '¡Todas las tareas de hoy completadas!',                    color: PURPLE },
-  bronce:          { asset: 'bronce',   msg: '¡Medalla de Bronce conseguida!',                           color: '#CD7F32' },
-  plata:           { asset: 'plata',   msg: '¡Medalla de Plata conseguida!',                            color: '#C0C0C0' },
-  oro:             { asset: 'oro', msg: '¡Medalla de Oro conseguida!',                              color: GOLD },
-  saltadas:        { asset: 'enfadado_gif',   msg: 'Has saltado varias tareas',                                color: PURPLE },
-  eliminada:       { asset: 'llorando_gif',   msg: 'Has eliminado una tarea',                                  color: PURPLE },
-  penal10:         { asset: 'enfadado_gif',   msg: 'Ayer te quedó alguna tarea sin hacer. Menos 10 estrellas', color: RED },
-  bajaOroPlata:    { asset: 'llorando_gif',   msg: '¡Has perdido la medalla de Oro! Bajaste a Plata 🥈',       color: '#C0C0C0' },
-  bajaPlatabronce: { asset: 'llorando_gif',   msg: '¡Has perdido la medalla de Plata! Bajaste a Bronce 🥉',    color: '#CD7F32' },
-};
+const PURPLE    = Colors.purple;
+const PURPLE_LT = Colors.purpleLt;
+const PURPLE_BG = Colors.purpleBg;
+const GREEN     = Colors.green;
+const GOLD      = Colors.gold;
+const ORANGE    = Colors.orange;
+const RED       = Colors.red;
 
 async function pedirPermisosNotificaciones() {
   if (Platform.OS === 'web') return;
@@ -278,12 +237,11 @@ function minutosRestantes(hora?: string | null): number | null {
 
 
 export default function Home() {
-  const { width } = useWindowDimensions();
 
   const [modalVisible,     setModalVisible]     = useState(false);
   const [taskModalVisible, setTaskModalVisible] = useState(false);
   const [search,           setSearch]           = useState('');
-  const [selectedTask,     setSelectedTask]     = useState<any>(null);
+  const [selectedTask,     setSelectedTask]     = useState<Tarea | null>(null);
 
  
   const [editModalVisible,  setEditModalVisible]  = useState(false);
@@ -322,7 +280,7 @@ export default function Home() {
       setConfirmVisible(true);
     }
   });
-  const [tasks,            setTasks]            = useState<any[]>([]);
+  const [tasks, setTasks]               = useState<Tarea[]>([]);
   const [showPicker,       setShowPicker]       = useState(false);
   const [selectedTime,     setSelectedTime]     = useState<string | null>(null);
   const [tempTime]                              = useState(fechaAppDate());
@@ -356,36 +314,27 @@ export default function Home() {
   const yaInicializado = useRef(false);
   const ultimoDiaNotif = useRef(hoyAppStr()); 
   useFocusEffect(
-    useCallback(() => {
-      const hoyStr = hoyAppStr();
+  useCallback(() => {
+    const hoyStr = hoyAppStr();
 
-      if (hoyStr !== ultimoDiaNotif.current) {
-        ultimoDiaNotif.current = hoyStr;
-        notifEnviadasHoy.current = new Set();
-      }
-
-      if (!yaInicializado.current) {
-        if (Platform.OS !== 'web') initDB();
-        generarTareasRepetitivas(); 
-        const { tareasHoy, vencidasAyer } = limpiarTareasViejas() as any;
-        setTasks(tareasHoy.map((r: any) => ({ ...r, completed: r.completed === 1 })));
-        pendientesPenalRef.current = { vencidasAyer };
-        yaInicializado.current = true;
-      } else {
-        const tareasHoy = getTareasPorFecha(hoyAppStr()) as any[];
-        setTasks(tareasHoy.map((r: any) => ({ ...r, completed: r.completed === 1 })));
-      }
-    }, [])
-  );
-
- 
-  useEffect(() => {
-    if (!gami.cargando) {
-      gami.forzarEstrellas(295);
+    if (hoyStr !== ultimoDiaNotif.current) {
+      ultimoDiaNotif.current = hoyStr;
+      notifEnviadasHoy.current = new Set();
     }
-  }, [gami.cargando]);
 
-
+    if (!yaInicializado.current) {
+      generarTareasRepetitivas();
+      const { tareasHoy, vencidasAyer } = limpiarTareasViejas() as any;
+      setTasks(tareasHoy.map((r: any) => ({ ...r, completed: r.completed === 1 })));
+      pendientesPenalRef.current = { vencidasAyer };
+      yaInicializado.current = true;
+    } else {
+      const tareasHoy = getTareasPorFecha(hoyAppStr()) as any[];
+      setTasks(tareasHoy.map((r: any) => ({ ...r, completed: r.completed === 1 })));
+    }
+  }, [])
+);
+ 
   const penalizacionDisparadaRef = useRef(false);
   useEffect(() => {
     if (gami.cargando) return;
@@ -528,7 +477,7 @@ export default function Home() {
   const capitalize     = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
   const formattedToday = `${capitalize(today.toLocaleDateString('es-ES', { weekday: 'long' }))}, ${today.getDate()} de ${capitalize(today.toLocaleDateString('es-ES', { month: 'long' }))} de ${today.getFullYear()}`;
 
-  const handleTareaCompletada = async (task: any) => {
+  const handleTareaCompletada = async (task: Tarea) => {
     const tieneHora = task.hora && task.hora !== 'Sin hora';
     const deadline  = parseTiempoLim(task.hora);
     const enTiempo  = tieneHora ? (deadline ? ahoraAppMs() <= deadline.getTime() : false) : true;
@@ -577,6 +526,7 @@ export default function Home() {
 
   // ── Abrir modal de edición ────
   const handleAbrirEdicion = async () => {
+    if (!selectedTask) return;
     setEditTitulo(selectedTask.title);
     setEditPictogramId(selectedTask.pictogramId ?? null);
     setEditHora(selectedTask.hora !== 'Sin hora' ? selectedTask.hora : null);
@@ -653,7 +603,7 @@ export default function Home() {
     setEditModalVisible(false);
   };
 
-  const handleDeleteTask = async (task: any) => {
+  const handleDeleteTask = async (task: Tarea) => {
     const esInstanciaRepetitiva = !!task.tareaBaseId && task.tareaBaseId !== '';
     const esTareaBase = task.repeticion && task.repeticion !== 'ninguna' && !esInstanciaRepetitiva;
 
@@ -752,6 +702,7 @@ export default function Home() {
     setRepeticion('ninguna');
     setModalVisible(false);
   };
+  const tareaSeleccionada = selectedTask;
 
   return (
     <View style={{ flex: 1, backgroundColor: '#ffffff', paddingHorizontal: 20 }}>
@@ -1006,18 +957,18 @@ export default function Home() {
               <Text style={styles.detailTime} accessibilityElementsHidden importantForAccessibility="no">🕐 {selectedTask?.hora ?? 'Sin hora'}</Text>
             </View>
 
-            {selectedTask?.completed ? (
-              <View style={styles.detailDoneBox} accessible accessibilityLabel={`Tarea completada con ${selectedTask?.stars ?? 5} de 5 estrellas`}>
-                <StarRow count={selectedTask?.stars ?? 5} size={30} />
+            {tareaSeleccionada && tareaSeleccionada.completed ? (
+              <View style={styles.detailDoneBox} accessible accessibilityLabel={`Tarea completada con ${tareaSeleccionada.stars ?? 5} de 5 estrellas`}>
+                <StarRow count={tareaSeleccionada.stars ?? 5} size={30} />
                 <Text style={{ color: GREEN, fontWeight: '700', marginTop: 8, fontSize: 15 }} accessibilityElementsHidden importantForAccessibility="no">¡Tarea completada!</Text>
               </View>
             ) : (
               <View style={{ width: '100%', gap: 8 }} accessible={false}>
                 <Pressable
-                  onPress={() => handleTareaCompletada(selectedTask)}
+                  onPress={() => handleTareaCompletada(tareaSeleccionada!)}
                   style={styles.btnPrimary}
                   accessible accessibilityRole="button"
-                  accessibilityLabel={`Marcar como realizada la tarea ${selectedTask?.title}`}
+                  accessibilityLabel={`Marcar como realizada la tarea ${tareaSeleccionada?.title}`}
                   accessibilityHint="Marca la tarea como completada y suma estrellas"
                 >
                   <Text style={styles.btnPrimaryText} accessibilityElementsHidden importantForAccessibility="no">Realizada ✓</Text>
@@ -1026,7 +977,7 @@ export default function Home() {
                   onPress={handleAbrirEdicion}
                   style={[styles.btnPrimary, { backgroundColor: '#E8F4FD' }]}
                   accessible accessibilityRole="button"
-                  accessibilityLabel={`Editar la tarea ${selectedTask?.title}`}
+                  accessibilityLabel={`Editar la tarea ${tareaSeleccionada?.title}`}
                   accessibilityHint="Cambia el nombre o el pictograma de la tarea"
                 >
                   <Text style={[styles.btnPrimaryText, { color: '#2980B9' }]} accessibilityElementsHidden importantForAccessibility="no">Editar tarea
@@ -1034,10 +985,10 @@ export default function Home() {
                   </Text>
                 </Pressable>
                 <Pressable
-                  onPress={() => handleDeleteTask(selectedTask)}
+                  onPress={() => handleDeleteTask(tareaSeleccionada!)}
                   style={[styles.btnPrimary, { backgroundColor: '#FDE8E8' }]}
                   accessible accessibilityRole="button"
-                  accessibilityLabel={`Eliminar la tarea ${selectedTask?.title}`}
+                  accessibilityLabel={`Eliminar la tarea ${tareaSeleccionada?.title}`}
                   accessibilityHint="Elimina la tarea y la mueve al historial como cancelada"
                 >
                   <Text style={[styles.btnPrimaryText, { color: RED }]} accessibilityElementsHidden importantForAccessibility="no">Eliminar tarea ✕</Text>
@@ -1221,7 +1172,7 @@ function parseTiempoLim(hora: string | undefined | null): Date | null {
 }
 
 const styles = StyleSheet.create({
-  root:     { flex: 1, backgroundColor: '#F9FBF8', paddingTop: Platform.OS === 'ios' ? 60 : 40, paddingHorizontal: 20 },
+
   title:    { fontSize: 30, fontWeight: '800', color: PURPLE, textAlign: 'center', marginBottom: 6 },
   dateText: { textAlign: 'center', color: '#888', marginBottom: 20, fontSize: 17 },
 
@@ -1238,11 +1189,6 @@ const styles = StyleSheet.create({
   rachaNotifCount:   { fontSize: 24, color: '#fff', fontWeight: '600', textAlign: 'center', flexShrink: 1 },
   rachaNotifNum:     { fontSize: 46, color: ORANGE, fontWeight: '800' },
 
-  progressCard:   { backgroundColor: PURPLE_BG, borderRadius: 18, paddingVertical: 12, paddingHorizontal: 10, width: '100%', borderWidth: 1.5, borderColor: PURPLE_LT, gap: 2, shadowColor: PURPLE, shadowOpacity: .08, shadowRadius: 8, elevation: 3 },
-  progressHeader: { flexDirection: 'column', justifyContent: 'center', alignItems: 'center', marginBottom: 4, gap: 20, paddingVertical: 12, paddingHorizontal: 40, width: '100%' },
-  progressLabel:  { fontSize: 20, fontWeight: '700', color: PURPLE },
-  progressCount:  { fontSize: 16, color: '#888' },
-
   searchBar:    { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f3f2f2', borderRadius: 25, paddingHorizontal: 15, paddingVertical: 10, marginBottom: 20, minHeight: 44 },
   emptyBox:     { alignItems: 'center', paddingVertical: 40, width: '100%', height: 200 },
   emptyText:    { fontSize: 26, color: PURPLE, fontWeight: '600', marginTop: 14, textAlign: 'center' },
@@ -1253,7 +1199,6 @@ const styles = StyleSheet.create({
   taskRowUrgent: { backgroundColor: '#FFF8F0', borderWidth: 1, borderColor: '#FFD9A8' },
   pictogram:     { width: 40, height: 40, marginRight: 10, borderRadius: 6 },
   taskTitle:     { fontSize: 17, flex: 1, color: '#333' },
-  taskTitleDone: { textDecorationLine: 'line-through', color: '#888' },
   taskTime:      { color: '#888', fontSize: 13 },
 
   overlay:       { flex: 1, backgroundColor: 'rgba(0,0,0,0.28)', justifyContent: 'center', alignItems: 'center' },
@@ -1273,13 +1218,9 @@ const styles = StyleSheet.create({
 
   btnPrimary:     { backgroundColor: PURPLE_LT, padding: 15, borderRadius: 15, alignItems: 'center', marginTop: 16, minHeight: 44 },
   btnPrimaryText: { fontSize: 20, color: PURPLE, fontWeight: '600' },
-  btnDelete:      { padding: 12, borderRadius: 15, alignItems: 'center', marginTop: 6, minHeight: 44 },
-  btnDeleteText:  { fontSize: 15, color: RED },
 
   detailPicto:      { width: 160, height: 160, marginVertical: 16, borderRadius: 12 },
   detailPictoEmpty: { width: 160, height: 160, marginVertical: 16, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f3f2f2', borderRadius: 12 },
   detailTime:       { color: '#888', fontSize: 20 },
   detailDoneBox:    { alignItems: 'center', paddingVertical: 16, width: '100%' },
-  starsPreview:     { backgroundColor: '#FFFBEA', borderRadius: 14, padding: 12, marginBottom: 12, width: '100%', alignItems: 'center', borderWidth: 1.5, borderColor: GOLD },
-  starsPreviewText: { fontSize: 15, fontWeight: '700' },
 });
