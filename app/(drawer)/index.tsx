@@ -1,17 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Notifications from 'expo-notifications';
-import { useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { ModalDetalleTarea } from '../../components/modals/ModalDetalleTarea';
+import { ModalNuevaTarea } from '../../components/modals/ModalNuevaTarea';
 import { Colors } from '../../constants/theme';
+import { useTareasHoy } from '../../hooks/useTareasHoy';
 import { Tarea } from '../../types/tarea';
+import { capitalize } from '../../utils/fechaFormato';
+import { minutosRestantes, parseTiempoLim } from '../../utils/tiempo';
 
 import {
-  AccessibilityInfo,
   Alert,
-  Animated,
   Image,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -27,7 +27,6 @@ import {
   deleteTarea,
   eliminarTareaYRepetitivas,
   generarTareasRepetitivas,
-  getTareasPorFecha,
   insertTarea,
   limpiarTareasViejas,
   updateTareaBaseCompleta,
@@ -36,24 +35,24 @@ import {
   updateTareaTituloPicto
 } from '../../database/database';
 
-import { NOTIF_CFG, PEREZOSO_IMAGENES } from '../../constants/notiConfig';
+import { PEREZOSO_IMAGENES } from '../../constants/notiConfig';
 import { useAjustesCtx } from '../../context/AjustesContext';
 import { useGamificacion } from '../../hooks/useGamificacion';
-import { buscarPictogramas } from "../../services/arasaac";
 
-import { ahoraApp, ahoraAppMs, fechaAppDate, hoyAppStr, setFechaSimulada, setHoraSimulada } from '../../utils/fecha';
+import { ModalConfirm } from '../../components/modals/ModalConfirm';
+import { ModalEditarTarea } from '../../components/modals/ModalEditarTarea';
+import { PerezosoNotif } from '../../components/notifs/PerezosoNotif';
+import { RachaNotif } from '../../components/notifs/RachaNotif';
+import { useReduceMotion } from '../../hooks/useReduceMotion';
+import { ahoraApp, ahoraAppMs, hoyAppStr, setFechaSimulada, setHoraSimulada } from '../../utils/fecha';
+import { detectarMedalla } from '../../utils/gamificacion';
 
 if (__DEV__) {
-  setFechaSimulada('2026-08-08');
+  setFechaSimulada('2026-08-11');
   setHoraSimulada(12, 0);
 }
 
-
 const PURPLE    = Colors.purple;
-const PURPLE_LT = Colors.purpleLt;
-const PURPLE_BG = Colors.purpleBg;
-const GREEN     = Colors.green;
-const GOLD      = Colors.gold;
 const ORANGE    = Colors.orange;
 const RED       = Colors.red;
 
@@ -75,184 +74,14 @@ async function enviarNotifSistema(titulo: string, cuerpo: string) {
   }
 }
 
-function useReduceMotion() {
-  const [reducida, setReducida] = useState(false);
-  useEffect(() => {
-    AccessibilityInfo.isReduceMotionEnabled().then(setReducida);
-    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReducida);
-    return () => sub.remove();
-  }, []);
-  return reducida;
-}
-
-function PerezosoNotif({ type, show }: { type: string; show: boolean }) {
-  const reduceMotion = useReduceMotion();
-  const slideAnim   = useRef(new Animated.Value(80)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim   = useRef(new Animated.Value(0.85)).current;
-  const cfg = NOTIF_CFG[type] || NOTIF_CFG.ontime;
-
-  useEffect(() => {
-    if (show) {
-      slideAnim.setValue(reduceMotion ? 0 : 80);
-      opacityAnim.setValue(0);
-      scaleAnim.setValue(reduceMotion ? 1 : 0.85);
-      if (reduceMotion) {
-        Animated.timing(opacityAnim, { toValue: 1, duration: 150, useNativeDriver: true }).start();
-      } else {
-        Animated.parallel([
-          Animated.spring(slideAnim,   { toValue: 0, useNativeDriver: true, speed: 14, bounciness: 10 }),
-          Animated.timing(opacityAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
-          Animated.spring(scaleAnim,   { toValue: 1, useNativeDriver: true, speed: 12, bounciness: 10 }),
-        ]).start();
-      }
-    } else {
-      Animated.parallel([
-        Animated.timing(slideAnim,   { toValue: reduceMotion ? 0 : 80, duration: 220, useNativeDriver: true }),
-        Animated.timing(opacityAnim, { toValue: 0, duration: 180, useNativeDriver: true }),
-        Animated.timing(scaleAnim,   { toValue: reduceMotion ? 1 : 0.85, duration: 180, useNativeDriver: true }),
-      ]).start();
-    }
-  }, [show, type]);
-
-  useEffect(() => {
-    if (show) AccessibilityInfo.announceForAccessibility(cfg.msg);
-  }, [show, type]);
-
-  return (
-    <Modal visible={show} transparent animationType="none" statusBarTranslucent accessibilityViewIsModal={false}>
-      {reduceMotion ? (
-        <View pointerEvents="none" style={styles.fullNotifOverlay} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-          <View style={styles.fullNotifCard}>
-            <Image source={PEREZOSO_IMAGENES[cfg.asset]} style={styles.fullNotifImg} resizeMode="contain" accessibilityIgnoresInvertColors />
-            <Text style={[styles.fullNotifText, { color: cfg.color }]}>{cfg.msg}</Text>
-          </View>
-        </View>
-      ) : (
-        <Animated.View pointerEvents="none" style={[styles.fullNotifOverlay, { opacity: opacityAnim }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-          <Animated.View style={[styles.fullNotifCard, { transform: [{ translateY: slideAnim }, { scale: scaleAnim }] }]}>
-            <Image source={PEREZOSO_IMAGENES[cfg.asset]} style={styles.fullNotifImg} resizeMode="contain" accessibilityIgnoresInvertColors />
-            <Text style={[styles.fullNotifText, { color: cfg.color }]}>{cfg.msg}</Text>
-          </Animated.View>
-        </Animated.View>
-      )}
-    </Modal>
-  );
-}
-
-function RachaNotif({ show, racha }: { show: boolean; racha: number }) {
-  const reduceMotion = useReduceMotion();
-  const slideAnim   = useRef(new Animated.Value(100)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim   = useRef(new Animated.Value(0.6)).current;
-  const countAnim   = useRef(new Animated.Value(Math.max(0, racha - 1))).current;
-
-  useEffect(() => {
-    if (show) {
-      slideAnim.setValue(reduceMotion ? 0 : 100);
-      opacityAnim.setValue(0);
-      scaleAnim.setValue(reduceMotion ? 1 : 0.6);
-      countAnim.setValue(Math.max(0, racha - 1));
-      if (reduceMotion) {
-        Animated.timing(opacityAnim, { toValue: 1, duration: 150, useNativeDriver: true }).start(() => { countAnim.setValue(racha); });
-      } else {
-        Animated.parallel([
-          Animated.spring(slideAnim,   { toValue: 0, useNativeDriver: true, speed: 14, bounciness: 10 }),
-          Animated.timing(opacityAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
-          Animated.spring(scaleAnim,   { toValue: 1, useNativeDriver: true, speed: 12, bounciness: 12 }),
-        ]).start(() => {
-          Animated.timing(countAnim, { toValue: racha, duration: 600, useNativeDriver: false }).start();
-        });
-      }
-    } else {
-      Animated.parallel([
-        Animated.timing(slideAnim,   { toValue: reduceMotion ? 0 : 100, duration: 250, useNativeDriver: true }),
-        Animated.timing(opacityAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
-        Animated.spring(scaleAnim,   { toValue: reduceMotion ? 1 : 0.6, useNativeDriver: true, speed: 14, bounciness: 0 }),
-      ]).start();
-    }
-  }, [show, racha]);
-
-  useEffect(() => {
-    if (show) AccessibilityInfo.announceForAccessibility(`¡Racha activa! ${racha} días seguidos`);
-  }, [show]);
-
-  return (
-    <Modal visible={show} transparent animationType="none" statusBarTranslucent accessibilityViewIsModal={false}>
-      {reduceMotion ? (
-        <View pointerEvents="none" style={styles.rachaNotif} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-          <View style={styles.rachaNotifCard}>
-            <Text style={styles.rachaNotifFire}>🔥</Text>
-            <View style={styles.rachaNotifTextCol}>
-              <Text style={styles.rachaNotifLabel}>¡Racha activa!</Text>
-              <Text style={styles.rachaNotifCount}>
-                <Text style={styles.rachaNotifNum}>{racha}</Text>
-                <Text>{' días seguidos'}</Text>
-              </Text>
-            </View>
-          </View>
-        </View>
-      ) : (
-        <Animated.View pointerEvents="none" style={[styles.rachaNotif, { opacity: opacityAnim }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-          <Animated.View style={[styles.rachaNotifCard, { transform: [{ translateY: slideAnim }, { scale: scaleAnim }] }]}>
-            <Text style={styles.rachaNotifFire}>🔥</Text>
-            <View style={styles.rachaNotifTextCol}>
-              <Text style={styles.rachaNotifLabel}>¡Racha activa!</Text>
-              <AnimatedCounter anim={countAnim} max={racha} />
-            </View>
-          </Animated.View>
-        </Animated.View>
-      )}
-    </Modal>
-  );
-}
-
-function AnimatedCounter({ anim, max }: { anim: Animated.Value; max: number }) {
-  const [display, setDisplay] = useState(Math.max(0, max - 1));
-  useEffect(() => {
-    const id = anim.addListener(({ value }) => setDisplay(Math.round(value)));
-    return () => anim.removeListener(id);
-  }, [anim]);
-  return (
-    <Text style={styles.rachaNotifCount}>
-      <Text style={styles.rachaNotifNum}>{display}</Text>
-      <Text>{' días seguidos'}</Text>
-    </Text>
-  );
-}
-
-function StarRow({ count = 0, size = 14 }: { count: number; size?: number }) {
-  return (
-    <Text style={{ fontSize: size, color: GOLD, letterSpacing: 2 }} accessibilityLabel={`${count} de 5 estrellas`}>
-      {'★'.repeat(count)}<Text style={{ color: '#DDD' }}>{'★'.repeat(5 - count)}</Text>
-    </Text>
-  );
-}
-
-function minutosRestantes(hora?: string | null): number | null {
-  const dl = parseTiempoLim(hora);
-  if (!dl) return null;
-  return Math.round((dl.getTime() - ahoraAppMs()) / 60000);
-}
-
 
 export default function Home() {
 
   const [modalVisible,     setModalVisible]     = useState(false);
   const [taskModalVisible, setTaskModalVisible] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);  // ← añadir aquí
   const [search,           setSearch]           = useState('');
   const [selectedTask,     setSelectedTask]     = useState<Tarea | null>(null);
-
- 
-  const [editModalVisible,  setEditModalVisible]  = useState(false);
-  const [editTitulo,        setEditTitulo]        = useState('');
-  const [editPictogramas,   setEditPictogramas]   = useState<number[]>([]);
-  const [editPictogramId,   setEditPictogramId]   = useState<number | null>(null);
-  const [editHora,          setEditHora]          = useState<string | null>(null);
-  const [showEditPicker,    setShowEditPicker]    = useState(false);
-  const [editTempTime,      setEditTempTime]      = useState(fechaAppDate());
-
- 
   const [confirmVisible,  setConfirmVisible]  = useState(false);
   const [confirmConfig,   setConfirmConfig]   = useState<{
     titulo: string; mensaje: string;
@@ -280,19 +109,7 @@ export default function Home() {
       setConfirmVisible(true);
     }
   });
-  const [tasks, setTasks]               = useState<Tarea[]>([]);
-  const [showPicker,       setShowPicker]       = useState(false);
-  const [selectedTime,     setSelectedTime]     = useState<string | null>(null);
-  const [tempTime]                              = useState(fechaAppDate());
-  const [titulo,           setTitulo]           = useState('');
-
- 
-  const [pictogramas,  setPictogramas]  = useState<number[]>([]);
-  const [pictogramId,  setPictogramId]  = useState<number | null>(null);
-
-
-  const [repeticion, setRepeticion] = useState<'ninguna'|'diaria'|'semanal'>('ninguna');
-
+  const { tasks, setTasks, cargarTareas } = useTareasHoy()
   const [notifType,        setNotifType]        = useState('ontime');
   const [showNotif,        setShowNotif]        = useState(false);
   const notifTimer       = useRef<any>(null);
@@ -309,32 +126,7 @@ export default function Home() {
   const gami         = useGamificacion();
   const { ajustes }  = useAjustesCtx();
   const reduceMotion = useReduceMotion();
-
-
-  const yaInicializado = useRef(false);
-  const ultimoDiaNotif = useRef(hoyAppStr()); 
-  useFocusEffect(
-  useCallback(() => {
-    const hoyStr = hoyAppStr();
-
-    if (hoyStr !== ultimoDiaNotif.current) {
-      ultimoDiaNotif.current = hoyStr;
-      notifEnviadasHoy.current = new Set();
-    }
-
-    if (!yaInicializado.current) {
-      generarTareasRepetitivas();
-      const { tareasHoy, vencidasAyer } = limpiarTareasViejas() as any;
-      setTasks(tareasHoy.map((r: any) => ({ ...r, completed: r.completed === 1 })));
-      pendientesPenalRef.current = { vencidasAyer };
-      yaInicializado.current = true;
-    } else {
-      const tareasHoy = getTareasPorFecha(hoyAppStr()) as any[];
-      setTasks(tareasHoy.map((r: any) => ({ ...r, completed: r.completed === 1 })));
-    }
-  }, [])
-);
- 
+  
   const penalizacionDisparadaRef = useRef(false);
   useEffect(() => {
     if (gami.cargando) return;
@@ -443,38 +235,8 @@ export default function Home() {
     rachaNotifTimer.current = setTimeout(() => setShowRachaNotif(false), 3500);
   };
 
-  const disparaRachaDespues = (racha: number, delay = 3200) => {
-    setTimeout(() => disparaRachaNotif(racha), delay);
-  };
-
-
-  const buscarImagen = async (texto: string) => {
-    setTitulo(texto);
-    if (texto.trim().length < 2) {
-      setPictogramas([]);
-      setPictogramId(null);
-      return;
-    }
-    const ids = await buscarPictogramas(texto, 6);
-    if (ids.length > 0) {
-      setPictogramas(ids);
-      setPictogramId(ids[0]);
-    } else {
-      setPictogramas([]);
-      setPictogramId(null);
-    }
-  };
-
-  const handleTimeChange = (event: any, date?: Date) => {
-   
-    if (Platform.OS === 'android') setShowPicker(false);
-    if (date) setSelectedTime(date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-  };
-
- 
-
   const today          = ahoraApp();
-  const capitalize     = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
   const formattedToday = `${capitalize(today.toLocaleDateString('es-ES', { weekday: 'long' }))}, ${today.getDate()} de ${capitalize(today.toLocaleDateString('es-ES', { month: 'long' }))} de ${today.getFullYear()}`;
 
   const handleTareaCompletada = async (task: Tarea) => {
@@ -503,13 +265,12 @@ export default function Home() {
 
     const todasCompletadas = pendingAntes.length === 0 && totalDeHoy > 0;
     let delay = 0;
-
-    if      (newTotal >= 600 && prevTotal < 600) disparaNotif('oro');
-    else if (newTotal >= 300 && prevTotal < 300) disparaNotif('plata');
-    else if (newTotal >= 100 && prevTotal < 100) disparaNotif('bronce');
-    else if (!tieneHora)                         disparaNotif('sinHora');
-    else if (enTiempo)                           disparaNotif('ontime');
-    else                                         disparaNotif('late');
+    const medalla = detectarMedalla(prevTotal, newTotal);
+    
+    if      (medalla)    disparaNotif(medalla);
+    else if (!tieneHora) disparaNotif('sinHora');
+    else if (enTiempo)   disparaNotif('ontime');
+    else                 disparaNotif('late')
 
     delay += 4000; // deja que la notificación de estrellas termine
 
@@ -525,82 +286,9 @@ export default function Home() {
       };
 
   // ── Abrir modal de edición ────
-  const handleAbrirEdicion = async () => {
-    if (!selectedTask) return;
-    setEditTitulo(selectedTask.title);
-    setEditPictogramId(selectedTask.pictogramId ?? null);
-    setEditHora(selectedTask.hora !== 'Sin hora' ? selectedTask.hora : null);
-    const dl = parseTiempoLim(selectedTask.hora);
-    setEditTempTime(dl ?? fechaAppDate());
-    setShowEditPicker(false);
-    if (selectedTask.title.trim().length >= 2) {
-      const ids = await buscarPictogramas(selectedTask.title, 6);
-      setEditPictogramas(ids);
-    } else {
-      setEditPictogramas(selectedTask.pictogramId ? [selectedTask.pictogramId] : []);
-    }
+    const handleAbrirEdicion = () => {
     setTaskModalVisible(false);
     setEditModalVisible(true);
-  };
-
-  // ── Guardar edición ──
-  const handleGuardarEdicion = async () => {
-    if (!editTitulo.trim() || !selectedTask) return;
-    const horaFinal = editHora ?? 'Sin hora';
-
-    const esInstanciaRepetitiva = !!selectedTask.tareaBaseId && selectedTask.tareaBaseId !== '';
-    const esTareaBase = selectedTask.repeticion && selectedTask.repeticion !== 'ninguna' && !esInstanciaRepetitiva;
-
-    if (esInstanciaRepetitiva || esTareaBase) {
-      setEditModalVisible(false);
-      await new Promise(r => setTimeout(r, 300));
-      const opcion = await mostrarConfirm(
-        'Editar tarea repetitiva', '¿Qué quieres cambiar?',
-        [
-          { texto: 'Cancelar', valor: null },
-          { texto: 'Solo esta vez', valor: 'esta' },
-          { texto: 'Todas las veces', valor: 'todas' },
-        ]
-      );
-
-      if (!opcion) return;
-
-      if (opcion === 'esta') {
-      
-        updateTareaTituloPicto(selectedTask.id, editTitulo.trim(), editPictogramId);
-        updateTareaHora(selectedTask.id, horaFinal);
-        setTasks(prev => prev.map(t =>
-          t.id === selectedTask.id
-            ? { ...t, title: editTitulo.trim(), pictogramId: editPictogramId, hora: horaFinal }
-            : t
-        ));
-
-      } else {
-     
-        const baseId = esInstanciaRepetitiva ? selectedTask.tareaBaseId : selectedTask.id;
-        updateTareaBaseCompleta(baseId, editTitulo.trim(), editPictogramId, horaFinal);
-    
-        setTasks(prev => prev.map(t =>
-          (t.id === baseId || t.tareaBaseId === baseId)
-            ? { ...t, title: editTitulo.trim(), pictogramId: editPictogramId, hora: horaFinal }
-            : t
-        ));
-      }
-
-    } else {
-  
-      updateTareaTituloPicto(selectedTask.id, editTitulo.trim(), editPictogramId);
-      updateTareaHora(selectedTask.id, horaFinal);
-      setTasks(prev => prev.map(t =>
-        t.id === selectedTask.id
-          ? { ...t, title: editTitulo.trim(), pictogramId: editPictogramId, hora: horaFinal }
-          : t
-      ));
-    }
-
-    setSelectedTask((prev: any) => ({ ...prev, title: editTitulo.trim(), pictogramId: editPictogramId, hora: horaFinal }));
-    AccessibilityInfo.announceForAccessibility(`Tarea actualizada: ${editTitulo}`);
-    setEditModalVisible(false);
   };
 
   const handleDeleteTask = async (task: Tarea) => {
@@ -692,17 +380,6 @@ export default function Home() {
       if (tieneHoraB) return 1;  
       return 0; 
     });
-
-
-  const cerrarModalAnadir = () => {
-    setTitulo('');
-    setSelectedTime(null);
-    setPictogramId(null);
-    setPictogramas([]);
-    setRepeticion('ninguna');
-    setModalVisible(false);
-  };
-  const tareaSeleccionada = selectedTask;
 
   return (
     <View style={{ flex: 1, backgroundColor: '#ffffff', paddingHorizontal: 20 }}>
@@ -815,379 +492,97 @@ export default function Home() {
       </Pressable>
 
       {/* ── MODAL: AÑADIR TAREA ── */}
-      <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={cerrarModalAnadir} accessibilityViewIsModal>
-        <View style={styles.overlay}>
-          <View style={styles.modalBox}>
-            <ScrollView keyboardShouldPersistTaps="handled">
-
-              <View style={styles.modalTopBar}>
-                <Pressable onPress={cerrarModalAnadir} accessible accessibilityRole="button" accessibilityLabel="Cerrar" style={{ padding: 8 }}>
-                  <Ionicons name="close" size={26} color={PURPLE} />
-                </Pressable>
-                <Text style={styles.modalTopTitle} accessibilityRole="header">Nueva tarea</Text>
-              </View>
-
-              <View style={styles.inputRow}>
-                <TextInput
-                  placeholder="Escribe tu tarea..."
-                  value={titulo}
-                  onChangeText={buscarImagen}
-                  style={{ flex: 1, paddingVertical: 10, fontSize: 16 }}
-                  accessibilityLabel="Título de la tarea"
-                  accessibilityHint="Escribe el nombre de la tarea. Se buscarán pictogramas automáticamente"
-                  returnKeyType="done"
-                  clearButtonMode="while-editing"
-                  autoFocus
-                />
-                <Pressable onPress={() => setShowPicker(true)} accessible accessibilityRole="button" accessibilityLabel="Seleccionar hora" accessibilityHint="Abre el selector de hora para esta tarea" style={{ padding: 8 }}>
-                  <Ionicons name="calendar-outline" size={22} color={PURPLE} />
-                </Pressable>
-              </View>
-
-              <Text style={styles.timeText} accessibilityLiveRegion="polite" accessibilityLabel={selectedTime ? `Hora seleccionada: ${selectedTime}` : 'Sin hora seleccionada'}>
-                {selectedTime ? `Hora: ${selectedTime}` : 'Sin hora seleccionada'}
-              </Text>
-
-              {showPicker && Platform.OS !== 'web' && (
-                <View>
-                  <DateTimePicker value={tempTime} mode="time" is24Hour display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={handleTimeChange} />
-                  {Platform.OS === 'ios' && (
-                    <Pressable onPress={() => setShowPicker(false)} style={{ alignSelf: 'flex-end', paddingHorizontal: 16, paddingVertical: 6 }} accessible accessibilityRole="button" accessibilityLabel="Confirmar hora">
-                      <Text style={{ color: '#A77BBE', fontWeight: '700', fontSize: 15 }}>Listo</Text>
-                    </Pressable>
-                  )}
-                </View>
-              )}
-              {showPicker && Platform.OS === 'web' && (
-                <input type="time" onChange={(e) => { setSelectedTime(e.target.value); setShowPicker(false); }} style={{ marginTop: 10, padding: 8, fontSize: 16 }} />
-              )}
-
-              {/* ── Selector de pictogramas ── */}
-              {pictogramas.length > 0 && (
-                <View style={{ marginTop: 16 }}>
-                  <Text style={styles.pictoLabel}>Elige un pictograma:</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 4 }}>
-                    {pictogramas.map((id, i) => (
-                      <Pressable
-                        key={id}
-                        onPress={() => setPictogramId(id)}
-                        style={[
-                          styles.pictoOpcion,
-                          pictogramId === id && styles.pictoOpcionSelec,
-                        ]}
-                        accessible
-                        accessibilityRole="button"
-                        accessibilityLabel={`Pictograma opción ${i + 1}`}
-                        accessibilityState={{ selected: pictogramId === id }}
-                      >
-                        <Image
-                          source={{ uri: `https://static.arasaac.org/pictograms/${id}/${id}_300.png` }}
-                          style={styles.pictoImg}
-                          accessibilityIgnoresInvertColors
-                        />
-                      </Pressable>
-                    ))}
-                 
-                    <Pressable
-                      onPress={() => setPictogramId(null)}
-                      style={[styles.pictoOpcion, styles.pictoNinguno, pictogramId === null && styles.pictoOpcionSelec]}
-                      accessible
-                      accessibilityRole="button"
-                      accessibilityLabel="Sin pictograma"
-                      accessibilityState={{ selected: pictogramId === null }}
-                    >
-                      <Ionicons name="close" size={24} color={pictogramId === null ? PURPLE : '#CCC'} />
-                      <Text style={[styles.pictoNingunoTxt, pictogramId === null && { color: PURPLE }]}>Ninguno</Text>
-                    </Pressable>
-                  </ScrollView>
-                </View>
-              )}
-
-              <Pressable
-                onPress={() => {
-                  if (titulo.trim()) {
-                    const newTask = {
-                      id: `${hoyAppStr()}_${ahoraAppMs()}_${Math.random().toString(36).slice(2, 8)}`,
-                      title: titulo, pictogramId: pictogramId ?? null,
-                      hora: selectedTime ?? 'Sin hora', completed: false, stars: 0,
-                      repeticion,
-                    };
-                    insertTarea(newTask);
-                    setTasks(prev => [...prev, { ...newTask, fechaDia: hoyAppStr() }]);
-                    AccessibilityInfo.announceForAccessibility(`Tarea ${titulo} añadida`);
-                    cerrarModalAnadir();
-                  }
-                }}
-                style={styles.btnPrimary}
-                accessible accessibilityRole="button"
-                accessibilityLabel="Añadir tarea"
-                accessibilityHint={titulo.trim() ? `Guardará la tarea ${titulo}` : 'Escribe un título primero'}
-              >
-                <Text style={styles.btnPrimaryText}>Añadir ✓</Text>
-              </Pressable>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal visible={taskModalVisible} transparent animationType="slide" onRequestClose={() => setTaskModalVisible(false)} accessibilityViewIsModal>
-     
-        <Pressable style={styles.overlay} onPress={() => setTaskModalVisible(false)} accessible={false}>
-    
-          <Pressable style={[styles.modalBox, { alignItems: 'center' }]} onPress={e => e.stopPropagation()} accessible={false} importantForAccessibility="yes">
-
-            <Pressable onPress={() => setTaskModalVisible(false)} style={{ position: 'absolute', top: 14, right: 14, zIndex: 10, padding: 8 }} accessible accessibilityRole="button" accessibilityLabel="Cerrar detalle de tarea">
-              <Ionicons name="close" size={26} color={PURPLE} accessibilityElementsHidden importantForAccessibility="no" />
-            </Pressable>
-
-            <View style={[styles.modalTopBar, { justifyContent: 'center' }]} accessible={false}>
-              <Text style={styles.modalTopTitle} accessibilityRole="header">{selectedTask?.title}</Text>
-            </View>
-
-            {selectedTask?.pictogramId ? (
-              <Image source={{ uri: `https://static.arasaac.org/pictograms/${selectedTask.pictogramId}/${selectedTask.pictogramId}_300.png` }} style={styles.detailPicto} accessibilityLabel={`Pictograma de ${selectedTask?.title}`} accessibilityIgnoresInvertColors />
-            ) : (
-              <View style={styles.detailPictoEmpty} accessibilityElementsHidden importantForAccessibility="no">
-                <Ionicons name="document-outline" size={60} color="#CCC" accessibilityElementsHidden importantForAccessibility="no" />
-              </View>
-            )}
-
-
-            <View style={{ marginBottom: 12, padding: 8 }} accessible accessibilityLabel={selectedTask?.hora && selectedTask.hora !== 'Sin hora' ? `Hora: ${selectedTask.hora}` : 'Sin hora asignada'}>
-              <Text style={styles.detailTime} accessibilityElementsHidden importantForAccessibility="no">🕐 {selectedTask?.hora ?? 'Sin hora'}</Text>
-            </View>
-
-            {tareaSeleccionada && tareaSeleccionada.completed ? (
-              <View style={styles.detailDoneBox} accessible accessibilityLabel={`Tarea completada con ${tareaSeleccionada.stars ?? 5} de 5 estrellas`}>
-                <StarRow count={tareaSeleccionada.stars ?? 5} size={30} />
-                <Text style={{ color: GREEN, fontWeight: '700', marginTop: 8, fontSize: 15 }} accessibilityElementsHidden importantForAccessibility="no">¡Tarea completada!</Text>
-              </View>
-            ) : (
-              <View style={{ width: '100%', gap: 8 }} accessible={false}>
-                <Pressable
-                  onPress={() => handleTareaCompletada(tareaSeleccionada!)}
-                  style={styles.btnPrimary}
-                  accessible accessibilityRole="button"
-                  accessibilityLabel={`Marcar como realizada la tarea ${tareaSeleccionada?.title}`}
-                  accessibilityHint="Marca la tarea como completada y suma estrellas"
-                >
-                  <Text style={styles.btnPrimaryText} accessibilityElementsHidden importantForAccessibility="no">Realizada ✓</Text>
-                </Pressable>
-                <Pressable
-                  onPress={handleAbrirEdicion}
-                  style={[styles.btnPrimary, { backgroundColor: '#E8F4FD' }]}
-                  accessible accessibilityRole="button"
-                  accessibilityLabel={`Editar la tarea ${tareaSeleccionada?.title}`}
-                  accessibilityHint="Cambia el nombre o el pictograma de la tarea"
-                >
-                  <Text style={[styles.btnPrimaryText, { color: '#2980B9' }]} accessibilityElementsHidden importantForAccessibility="no">Editar tarea
-                    <Ionicons name="pencil" size={16} color="#2980B9" style={{ marginLeft: 6 }} accessibilityElementsHidden importantForAccessibility="no" />  
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => handleDeleteTask(tareaSeleccionada!)}
-                  style={[styles.btnPrimary, { backgroundColor: '#FDE8E8' }]}
-                  accessible accessibilityRole="button"
-                  accessibilityLabel={`Eliminar la tarea ${tareaSeleccionada?.title}`}
-                  accessibilityHint="Elimina la tarea y la mueve al historial como cancelada"
-                >
-                  <Text style={[styles.btnPrimaryText, { color: RED }]} accessibilityElementsHidden importantForAccessibility="no">Eliminar tarea ✕</Text>
-                </Pressable>
-              </View>
-            )}
-          </Pressable>
-        </Pressable>
-      </Modal>
-      {/* ── MODAL: EDITAR TAREA ── */}
-      <Modal visible={editModalVisible} transparent animationType="slide" onRequestClose={() => setEditModalVisible(false)} accessibilityViewIsModal>
-        <View style={styles.overlay} accessible={false}>
-          <View style={styles.modalBox} accessible={false} importantForAccessibility="yes">
-            <ScrollView keyboardShouldPersistTaps="handled" accessible={false}>
-
-              <View style={styles.modalTopBar} accessible={false}>
-                <Pressable onPress={() => setEditModalVisible(false)} accessible accessibilityRole="button" accessibilityLabel="Cerrar edición" style={{ padding: 8 }}>
-                  <Ionicons name="close" size={26} color={PURPLE} accessibilityElementsHidden importantForAccessibility="no" />
-                </Pressable>
-                <Text style={styles.modalTopTitle} accessibilityRole="header">Editar tarea</Text>
-              </View>
-
+      <ModalNuevaTarea
+        visible={modalVisible}
+        onCerrar={() => setModalVisible(false)}
+        onGuardar={(tarea) => {
+          insertTarea(tarea);
+          setTasks(prev => [...prev, { ...tarea, fechaDia: hoyAppStr() } as Tarea]);
+        }}
+      />
+      {/* ── MODAL: DETALLE TAREA ── */}
+      <ModalDetalleTarea
+        visible={taskModalVisible}
+        tarea={selectedTask}
+        onCerrar={() => setTaskModalVisible(false)}
+        onCompletar={handleTareaCompletada}
+        onEditar={handleAbrirEdicion}
+        onEliminar={handleDeleteTask}
+      />          
       
-              <View style={styles.inputRow} accessible={false}>
-                <TextInput
-                  value={editTitulo}
-                  onChangeText={async (texto) => {
-                    setEditTitulo(texto);
-                    if (texto.trim().length >= 2) {
-                      const ids = await buscarPictogramas(texto, 6);
-                      setEditPictogramas(ids);
-                    }
-                  }}
-                  style={{ flex: 1, paddingVertical: 10, fontSize: 16 }}
-                  accessibilityLabel="Título de la tarea"
-                  returnKeyType="done"
-                  clearButtonMode="while-editing"
-                  autoFocus
-                />
-              </View>
+      {/* ── MODAL: EDITAR TAREA ── */}
+      <ModalEditarTarea
+          visible={editModalVisible}
+          tarea={selectedTask}
+          onCerrar={() => setEditModalVisible(false)}
+          onGuardar={(titulo, pictogramId, hora) => {
+            if (!selectedTask) return;
+            const horaFinal = hora ?? 'Sin hora';
+            const esInstanciaRepetitiva = !!selectedTask.tareaBaseId && selectedTask.tareaBaseId !== '';
+            const esTareaBase = selectedTask.repeticion && selectedTask.repeticion !== 'ninguna' && !esInstanciaRepetitiva;
 
-              {/* Selector de pictogramas */}
-              {editPictogramas.length > 0 && (
-                <View style={{ marginTop: 16 }} accessible={false}>
-                  <Text style={styles.pictoLabel} accessibilityRole="header">Elige un pictograma</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 4 }} accessible={false}>
-                    {editPictogramas.map((id, i) => (
-                      <Pressable
-                        key={id}
-                        onPress={() => setEditPictogramId(id)}
-                        style={[styles.pictoOpcion, editPictogramId === id && styles.pictoOpcionSelec]}
-                        accessible accessibilityRole="button"
-                        accessibilityLabel={`Pictograma opción ${i + 1}${editPictogramId === id ? ', seleccionado' : ''}`}
-                        accessibilityState={{ selected: editPictogramId === id }}
-                      >
-                        <Image source={{ uri: `https://static.arasaac.org/pictograms/${id}/${id}_300.png` }} style={styles.pictoImg} accessibilityIgnoresInvertColors />
-                      </Pressable>
-                    ))}
-                    <Pressable
-                      onPress={() => setEditPictogramId(null)}
-                      style={[styles.pictoOpcion, styles.pictoNinguno, editPictogramId === null && styles.pictoOpcionSelec]}
-                      accessible accessibilityRole="button"
-                      accessibilityLabel={`Sin pictograma${editPictogramId === null ? ', seleccionado' : ''}`}
-                      accessibilityState={{ selected: editPictogramId === null }}
-                    >
-                      <Ionicons name="close" size={24} color={editPictogramId === null ? PURPLE : '#CCC'} accessibilityElementsHidden importantForAccessibility="no" />
-                      <Text style={[styles.pictoNingunoTxt, editPictogramId === null && { color: PURPLE }]} accessibilityElementsHidden importantForAccessibility="no">Ninguno</Text>
-                    </Pressable>
-                  </ScrollView>
-                </View>
-              )}
-
-              {/* ── Hora ── */}
-              <Text style={[styles.pictoLabel, { marginTop: 16 }]}>Hora (opcional)</Text>
-              {Platform.OS === 'web' ? (
-                <input
-                  type="time"
-                  value={editHora ?? ''}
-                  onChange={e => setEditHora(e.target.value || null)}
-                  style={{ padding: 10, fontSize: 15, borderRadius: 10, marginBottom: 8 }}
-                />
-              ) : (
-                <>
-                  <Pressable
-                    onPress={() => setShowEditPicker(true)}
-                    style={[styles.inputRow, { marginBottom: showEditPicker ? 8 : 16 }]}
-                    accessible accessibilityRole="button"
-                    accessibilityLabel={editHora ? `Hora: ${editHora}. Pulsa para cambiar` : 'Seleccionar hora, opcional'}
-                  >
-                    <Ionicons name="time-outline" size={18} color={PURPLE} style={{ marginRight: 8 }} accessibilityElementsHidden importantForAccessibility="no" />
-                    <Text style={[styles.inputRow, { color: editHora ? '#333' : '#AAA', flex: 1, borderWidth: 0, paddingVertical: 12 }]} accessibilityElementsHidden importantForAccessibility="no">
-                      {editHora ?? 'Sin hora seleccionada'}
-                    </Text>
-                    {editHora && (
-                      <Pressable onPress={() => { setEditHora(null); setShowEditPicker(false); }} accessible accessibilityRole="button" accessibilityLabel="Quitar hora" style={{ padding: 4 }}>
-                        <Ionicons name="close-circle" size={18} color="#CCC" accessibilityElementsHidden importantForAccessibility="no" />
-                      </Pressable>
-                    )}
-                  </Pressable>
-                  {showEditPicker && (
-                    <View style={{ marginBottom: 8 }} accessible={false}>
-                      <DateTimePicker
-                        value={editTempTime}
-                        mode="time"
-                        is24Hour
-                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                        onChange={(event, date) => {
-                          if (Platform.OS === 'android') setShowEditPicker(false);
-                          if (date) {
-                            setEditTempTime(date);
-                            setEditHora(date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-                          }
-                        }}
-                      />
-                      {Platform.OS === 'ios' && (
-                        <Pressable onPress={() => setShowEditPicker(false)} style={{ alignSelf: 'flex-end', paddingHorizontal: 16, paddingVertical: 6 }} accessible accessibilityRole="button" accessibilityLabel="Confirmar hora">
-                          <Text style={{ color: PURPLE, fontWeight: '700', fontSize: 15 }}>Listo</Text>
-                        </Pressable>
-                      )}
-                    </View>
-                  )}
-                </>
-              )}
-
-              <Pressable
-                onPress={handleGuardarEdicion}
-                style={[styles.btnPrimary, !editTitulo.trim() && { opacity: 0.4 }]}
-                accessible accessibilityRole="button"
-                accessibilityLabel={editTitulo.trim() ? `Guardar cambios en ${editTitulo}` : 'Escribe un título primero'}
-              >
-                <Text style={styles.btnPrimaryText} accessibilityElementsHidden importantForAccessibility="no">Guardar cambios ✓</Text>
-              </Pressable>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+            if (esInstanciaRepetitiva || esTareaBase) {
+              setEditModalVisible(false);
+              setTimeout(async () => {
+                const opcion = await mostrarConfirm(
+                  'Editar tarea repetitiva', '¿Qué quieres cambiar?',
+                  [
+                    { texto: 'Cancelar',       valor: null },
+                    { texto: 'Solo esta vez',  valor: 'esta' },
+                    { texto: 'Todas las veces', valor: 'todas' },
+                  ]
+                );
+                if (!opcion) return;
+                if (opcion === 'esta') {
+                  updateTareaTituloPicto(selectedTask.id, titulo, pictogramId);
+                  updateTareaHora(selectedTask.id, horaFinal);
+                  setTasks(prev => prev.map(t =>
+                    t.id === selectedTask.id ? { ...t, title: titulo, pictogramId, hora: horaFinal } : t
+                  ));
+                } else {
+                  const baseId = esInstanciaRepetitiva ? selectedTask.tareaBaseId : selectedTask.id;
+                  updateTareaBaseCompleta(baseId, titulo, pictogramId, horaFinal);
+                  setTasks(prev => prev.map(t =>
+                    (t.id === baseId || t.tareaBaseId === baseId)
+                      ? { ...t, title: titulo, pictogramId, hora: horaFinal } : t
+                  ));
+                }
+                setSelectedTask(prev => prev ? { ...prev, title: titulo, pictogramId, hora: horaFinal } : prev);
+              }, 300);
+            } else {
+              updateTareaTituloPicto(selectedTask.id, titulo, pictogramId);
+              updateTareaHora(selectedTask.id, horaFinal);
+              setTasks(prev => prev.map(t =>
+                t.id === selectedTask.id ? { ...t, title: titulo, pictogramId, hora: horaFinal } : t
+              ));
+              setSelectedTask(prev => prev ? { ...prev, title: titulo, pictogramId, hora: horaFinal } : prev);
+              setEditModalVisible(false);
+            }
+          }}
+        />
    
       {confirmVisible && confirmConfig && (
-        <Modal visible={confirmVisible} transparent animationType="fade" accessibilityViewIsModal>
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 32 }}>
-            <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 24, width: '100%', maxWidth: 340 }}>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: '#333', marginBottom: 8 }}>{confirmConfig.titulo}</Text>
-              <Text style={{ fontSize: 15, color: '#666', marginBottom: 24, lineHeight: 22 }}>{confirmConfig.mensaje}</Text>
-              <View style={{ gap: 10 }}>
-                {confirmConfig.opciones.map((op, i) => (
-                  <Pressable
-                    key={i}
-                    onPress={() => {
-                      setConfirmVisible(false);
-                      confirmResolveRef.current?.(op.valor);
-                    }}
-                    style={{
-                      paddingVertical: 12, borderRadius: 12, alignItems: 'center',
-                      backgroundColor: op.destructivo ? '#FDE8E8' : op.valor === null ? '#f5f5f5' : PURPLE_BG,
-                      borderWidth: 1,
-                      borderColor: op.destructivo ? '#E4A0A0' : op.valor === null ? '#ddd' : PURPLE_LT,
-                    }}
-                    accessible accessibilityRole="button" accessibilityLabel={op.texto}
-                  >
-                    <Text style={{ fontWeight: '700', fontSize: 15, color: op.destructivo ? RED : op.valor === null ? '#888' : PURPLE }}>
-                      {op.texto}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-          </View>
-        </Modal>
+        <ModalConfirm
+          visible={confirmVisible}
+          titulo={confirmConfig.titulo}
+          mensaje={confirmConfig.mensaje}
+          opciones={confirmConfig.opciones}
+          onOpcion={(valor) => {
+            setConfirmVisible(false);
+            confirmResolveRef.current?.(valor);
+          }}
+        />
       )}
     </View>
   );
 }
 
-function parseTiempoLim(hora: string | undefined | null): Date | null {
-  if (!hora || hora === 'Sin hora') return null;
-  const [h, m] = hora.split(':').map(Number);
-  if (isNaN(h) || isNaN(m)) return null;
-  const d = fechaAppDate(hoyAppStr());
-  d.setHours(h, m, 0, 0);
-  return d;
-}
+
 
 const styles = StyleSheet.create({
 
   title:    { fontSize: 30, fontWeight: '800', color: PURPLE, textAlign: 'center', marginBottom: 6 },
   dateText: { textAlign: 'center', color: '#888', marginBottom: 20, fontSize: 17 },
-
-  fullNotifOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F9FBF8', zIndex: 9999, elevation: 9999 },
-  fullNotifCard:    { width: '100%', backgroundColor: '#F9FBF8', borderRadius: 28, paddingVertical: 28, paddingHorizontal: 24, alignItems: 'center', justifyContent: 'center', elevation: 12, flexShrink: 1 },
-  fullNotifImg:     { width: '70%', aspectRatio: 1, maxHeight: 280, backgroundColor: '#F9FBF8', marginBottom: 16 },
-  fullNotifText:    { fontSize: 24, fontWeight: '800', textAlign: 'center', lineHeight: 32, flexShrink: 1 },
-
-  rachaNotif:        { ...StyleSheet.absoluteFillObject, zIndex: 9999, elevation: 9999, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(26,26,26,0.96)' },
-  rachaNotifCard:    { width: '100%', backgroundColor: '#222', justifyContent: 'center', alignItems: 'center', paddingVertical: 28, paddingHorizontal: 24, elevation: 18, flexShrink: 1 },
-  rachaNotifFire:    { fontSize: 70, marginBottom: 10 },
-  rachaNotifTextCol: { flexDirection: 'column', gap: 2, alignItems: 'center', flexShrink: 1 },
-  rachaNotifLabel:   { fontSize: 24, color: '#FFB085', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, textAlign: 'center', flexShrink: 1 },
-  rachaNotifCount:   { fontSize: 24, color: '#fff', fontWeight: '600', textAlign: 'center', flexShrink: 1 },
-  rachaNotifNum:     { fontSize: 46, color: ORANGE, fontWeight: '800' },
 
   searchBar:    { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f3f2f2', borderRadius: 25, paddingHorizontal: 15, paddingVertical: 10, marginBottom: 20, minHeight: 44 },
   emptyBox:     { alignItems: 'center', paddingVertical: 40, width: '100%', height: 200 },
@@ -1200,27 +595,5 @@ const styles = StyleSheet.create({
   pictogram:     { width: 40, height: 40, marginRight: 10, borderRadius: 6 },
   taskTitle:     { fontSize: 17, flex: 1, color: '#333' },
   taskTime:      { color: '#888', fontSize: 13 },
-
-  overlay:       { flex: 1, backgroundColor: 'rgba(0,0,0,0.28)', justifyContent: 'center', alignItems: 'center' },
-  modalBox:      { backgroundColor: PURPLE_BG, borderRadius: 22, padding: 20, width: '90%' },
-  modalTopBar:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
-  modalTopTitle: { fontSize: 20, fontWeight: '600', color: PURPLE, flex: 1, textAlign: 'center', marginHorizontal: 8 },
-  inputRow:      { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#DDD', borderRadius: 12, paddingHorizontal: 12, backgroundColor: 'white', minHeight: 44 },
-  timeText:      { marginTop: 8, textAlign: 'center', color: '#888', fontSize: 13 },
-
-
-  pictoLabel:       { fontSize: 12, fontWeight: '700', color: '#999', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10 },
-  pictoOpcion:      { width: 80, height: 80, borderRadius: 14, borderWidth: 2, borderColor: '#E5E5E5', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', padding: 4 },
-  pictoOpcionSelec: { borderColor: PURPLE, borderWidth: 3, backgroundColor: PURPLE_BG },
-  pictoImg:         { width: 68, height: 68, borderRadius: 10 },
-  pictoNinguno:     { gap: 2 },
-  pictoNingunoTxt:  { fontSize: 10, color: '#CCC', fontWeight: '600' },
-
-  btnPrimary:     { backgroundColor: PURPLE_LT, padding: 15, borderRadius: 15, alignItems: 'center', marginTop: 16, minHeight: 44 },
-  btnPrimaryText: { fontSize: 20, color: PURPLE, fontWeight: '600' },
-
-  detailPicto:      { width: 160, height: 160, marginVertical: 16, borderRadius: 12 },
-  detailPictoEmpty: { width: 160, height: 160, marginVertical: 16, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f3f2f2', borderRadius: 12 },
-  detailTime:       { color: '#888', fontSize: 20 },
-  detailDoneBox:    { alignItems: 'center', paddingVertical: 16, width: '100%' },
+  
 });

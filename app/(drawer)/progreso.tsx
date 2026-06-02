@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  AccessibilityInfo,
   Animated,
   PixelRatio,
   Platform,
@@ -12,12 +11,17 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
+import { BarraProgreso } from '../../components/ui/BarraProgreso';
 import { getTareas } from '../../database/database';
 import { useGamificacion } from '../../hooks/useGamificacion';
+import { useReduceMotion } from '../../hooks/useReduceMotion';
 import { Tarea } from '../../types/tarea';
 import { ahoraApp } from '../../utils/fecha';
+import { toLocalDateStr } from '../../utils/fechaFormato';
+import { calcularProgresos } from '../../utils/gamificacion';
+
 
 const PURPLE    = '#A77BBE';
 const PURPLE_LT = '#E5D9EE';
@@ -27,46 +31,8 @@ const ORANGE    = '#FF6B35';
 const ORANGE_LT = '#FFF2EC';
 const ORANGE_BG = '#FFF7F0';
 
-// ─── Hook Reduce Motion ────
-function useReduceMotion() {
-  const [reducida, setReducida] = useState(false);
-  useEffect(() => {
-    AccessibilityInfo.isReduceMotionEnabled().then(setReducida);
-    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReducida);
-    return () => sub.remove();
-  }, []);
-  return reducida;
-}
 
 
-// ─── Barra animada ────
-function BarraProgreso({ pct, color }: { pct: number; color: string }) {
-  const reduceMotion = useReduceMotion();
-  const anim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(anim, {
-      toValue: pct / 100,
-      duration: reduceMotion ? 0 : 700,
-      useNativeDriver: false,
-    }).start();
-  }, [pct]);
-
-  return (
-    <View
-      style={styles.barBg}
-      accessible
-      accessibilityRole="progressbar"
-      accessibilityValue={{ min: 0, max: 100, now: Math.round(pct) }}
-      accessibilityLabel={`Progreso: ${Math.round(pct)} por ciento`}
-    >
-      <Animated.View style={[styles.barFill, {
-        backgroundColor: color,
-        width: anim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
-      }]} />
-    </View>
-  );
-}
 
 // ─── Medalla Card ───────────
 function MedalCard({ type, progreso }: { type: 'bronce' | 'plata' | 'oro'; progreso: number }) {
@@ -111,24 +77,12 @@ function MedalCard({ type, progreso }: { type: 'bronce' | 'plata' | 'oro'; progr
 }
 
 
-
-function calcularProgresos(estrellas: number) {
-  const progresBronce = Math.min(estrellas, 100);
-  const progresPlata  = estrellas >= 100 ? Math.min(estrellas - 100, 200) : 0;
-  const progresOro    = estrellas >= 300 ? Math.min(estrellas - 300, 300) : 0;
-  return { progresBronce, progresPlata, progresOro };
-}
-
-function localDateStr(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-
 function getUltimos7Dias(): string[] {
   const dias: string[] = [];
   const hoy = ahoraApp();
   for (let i = 6; i >= 0; i--) {
     const d = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - i);
-    dias.push(localDateStr(d));
+    dias.push(toLocalDateStr(d));
   }
   return dias;
 }
@@ -476,9 +430,6 @@ const styles = StyleSheet.create({
   histTime:     { color: '#888', fontSize: fs(12) },
   emptyBox:     { alignItems: 'center', paddingVertical: 30 },
   emptyText:    { fontSize: fs(15), color: '#AAA', fontWeight: '600', textAlign: 'center' },
-
-  barBg:   { height: 5, backgroundColor: '#EEE', borderRadius: 3, marginTop: 8, width: '100%', overflow: 'hidden' },
-  barFill: { height: '100%', borderRadius: 3 },
 
   fireHeroWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: 24, gap: 4 },
   fireEmoji:    { fontSize: fs(80), lineHeight: fs(90) },

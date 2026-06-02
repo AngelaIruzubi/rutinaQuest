@@ -306,15 +306,3 @@ export function getMedallas(estrellas: number): Record<NombreMedalla, boolean> {
   };
 }
 
-/**
- * Calcula el progreso hacia cada medalla en estrellas absolutas.
- * Usar en progreso.tsx para las barras de avance.
- */
-export function calcularProgresos(estrellas: number) {
-  const { bronce, plata, oro } = UMBRALES_MEDALLA;
-  return {
-    progresBronce: Math.min(estrellas, bronce),
-    progresPlata:  estrellas >= bronce ? Math.min(estrellas - bronce, plata - bronce) : 0,
-    progresOro:    estrellas >= plata  ? Math.min(estrellas - plata,  oro   - plata)  : 0,
-  };
-}
