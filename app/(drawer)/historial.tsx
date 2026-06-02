@@ -20,6 +20,7 @@ import {
   View,
 } from 'react-native';
 import ViewShot from 'react-native-view-shot';
+import { StarRow } from '../../components/ui/StarRow';
 import { DIAS_CORTOS, DIAS_LARGOS } from '../../constants/diasSemana';
 import { Colors } from '../../constants/theme';
 import { useAvatar } from '../../context/AvatarContext';
@@ -27,6 +28,7 @@ import { getTareasHistorial } from '../../database/database';
 import { useGamificacion } from '../../hooks/useGamificacion';
 import { Tarea } from '../../types/tarea';
 import { fechaAppDate, hoyAppStr } from '../../utils/fecha';
+import { diasDeSemana, etiquetaSemana, lunesDe, toLocalDateStr } from '../../utils/fechaFormato';
 
 const PURPLE    = Colors.purple;
 const ORANGE    = Colors.orange;
@@ -38,31 +40,6 @@ const GOLD      = Colors.gold;
 
 const COLORES_PELO = ['#1a1a1a', '#3B1F0E', '#8B4513', '#DAA520', '#E8C47A', '#E8E8E8'];
 
-
-
-
-function lunesDe(fecha: Date): Date {
-  const d = new Date(fecha);
-  const diff = d.getDay() === 0 ? -6 : 1 - d.getDay();
-  d.setDate(d.getDate() + diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-function toLocalDateStr(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-function diasDeSemana(lunes: Date): string[] {
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(lunes); d.setDate(d.getDate() + i); return toLocalDateStr(d);
-  });
-}
-function etiquetaSemana(lunes: Date): string {
-  const domingo = new Date(lunes); domingo.setDate(lunes.getDate() + 6);
-  const opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
-  return `${lunes.toLocaleDateString('es-ES', opts)} – ${domingo.toLocaleDateString('es-ES', opts)}`;
-}
-
-
 function fechaReferencia(t: Tarea): string {
   if (t.estado === 'completada' || (t.completed && !t.estado)) {
     return t.fechaCompletada ?? t.fechaDia ?? '';
@@ -70,18 +47,6 @@ function fechaReferencia(t: Tarea): string {
   return t.fechaDia ?? t.fechaCompletada ?? '';
 }
 
- //Dibuja las estrellas
-function StarRow({ count = 0, size = 13 }: { count: number; size?: number }) {
-  return (
-    <Text
-      style={{ fontSize: size, color: GOLD, letterSpacing: 1 }}
-      accessibilityLabel={`${Math.max(0, count)} de 5 estrellas`}
-    >
-      {'★'.repeat(Math.max(0, count))}
-      <Text style={{ color: '#DDD' }}>{'★'.repeat(Math.max(0, 5 - count))}</Text>
-    </Text>
-  );
-}
 
 //Renderiza el avata
 function AvatarMini({ avatar, size = 120 }: { avatar: any; size?: number }) {

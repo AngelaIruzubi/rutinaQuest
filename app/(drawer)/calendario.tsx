@@ -25,6 +25,7 @@ import {
 } from '../../database/database';
 import { buscarPictogramas } from '../../services/arasaac';
 import { ahoraApp, ahoraAppMs, hoyAppStr } from '../../utils/fecha';
+import { fechaLegible } from '../../utils/fechaFormato';
 
 
 const PURPLE    = Colors.purple;
@@ -35,13 +36,6 @@ const RED       = Colors.red;
 function primerDiaMes(anyo: number, mes: number): Date { return new Date(anyo, mes, 1); } //en que columna empieza
 function diasEnMes(anyo: number, mes: number): number  { return new Date(anyo, mes + 1, 0).getDate(); }
 
-// Convierte YYYY-MM-DD a texto legible: "10 de abril de 2026"
-function fechaLegible(fecha: string): string {
-  const [y, m, d] = fecha.split('-').map(Number);
-  const meses = ['enero','febrero','marzo','abril','mayo','junio',
-                 'julio','agosto','septiembre','octubre','noviembre','diciembre'];
-  return `${d} de ${meses[m - 1]} de ${y}`;
-}
 
 // ─── Calendario mensual ───
 function CalendarioMes({
