@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { NombreMedalla, UMBRALES_MEDALLA } from '../constants/medallas';
 import { EstadoGamificacion, ResultadoCompletarTarea } from '../types/gamificacion';
 import { hoyAppStr } from '../utils/fecha';
+import { aplicarPenalizacion } from '../utils/gamificacion';
 
 // ─── Tipos internos ───────────────────────────────────────────────────────────
 
@@ -218,7 +219,7 @@ export function useGamificacion() {
 
           const penalizacion    = 10;
           const motivo          = 'Tareas sin completar';
-          const nuevasEstrellas = Math.max(0, (prev.estrellas ?? 0) - penalizacion);
+          const nuevasEstrellas = aplicarPenalizacion(prev.estrellas ?? 0, penalizacion);
           const hoyStr          = hoyAppStr();
 
           const historial = [...(prev.historialPenalizaciones ?? [])];

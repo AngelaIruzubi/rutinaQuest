@@ -22,3 +22,7 @@ export function detectarMedalla(prev: number, next: number): NombreMedalla | nul
   if (next >= UMBRALES_MEDALLA.bronce && prev < UMBRALES_MEDALLA.bronce) return 'bronce';
   return null;
 }
+
+export function aplicarPenalizacion(estrellas: number, penalizacion = 10): number {
+  return Math.max(0, estrellas - penalizacion);
+}

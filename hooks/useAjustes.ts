@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 
+
 export interface Ajustes {
   // Apariencia
   tema: 'claro' | 'oscuro' | 'auto';
