@@ -8,6 +8,7 @@
     "allowJs": true,
     "moduleResolution": "bundler",
     "skipLibCheck": true,
+    "types": ["jest"],
     "paths": {
       "@/*": ["./*"]
     }
