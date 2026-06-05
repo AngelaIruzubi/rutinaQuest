@@ -1,17 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
 import {
-    AccessibilityInfo,
-    Image,
-    Modal,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  AccessibilityInfo,
+  Image,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { Colors } from '../../constants/theme';
 import { buscarPictogramas } from '../../services/arasaac';
@@ -57,6 +58,7 @@ export function ModalEditarTarea({ visible, tarea, onCerrar, onGuardar }: ModalE
   const guardar = () => {
     if (!editTitulo.trim()) return;
     const horaFinal = editHora ?? 'Sin hora';
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onGuardar(editTitulo.trim(), editPictogramId, horaFinal);
     AccessibilityInfo.announceForAccessibility(`Tarea actualizada: ${editTitulo}`);
   };

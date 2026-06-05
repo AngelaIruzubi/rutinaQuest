@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Colors } from '../../constants/theme';
 import { Tarea } from '../../types/tarea';
@@ -91,7 +92,12 @@ export function ModalDetalleTarea({
           ) : (
             <View style={{ width: '100%', gap: 8 }} accessible={false}>
               <Pressable
-                onPress={() => tarea && onCompletar(tarea)}
+                onPress={() => {
+                  if (tarea) {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    onCompletar(tarea);
+                  }
+                }}
                 style={s.btnPrimary}
                 accessible
                 accessibilityRole="button"
@@ -116,7 +122,12 @@ export function ModalDetalleTarea({
               </Pressable>
 
               <Pressable
-                onPress={() => tarea && onEliminar(tarea)}
+                onPress={() => {
+                  if (tarea) {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                    onEliminar(tarea);
+                  }
+                }}
                 style={[s.btnPrimary, { backgroundColor: '#FDE8E8' }]}
                 accessible
                 accessibilityRole="button"
