@@ -1,4 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Audio } from 'expo-av';
+import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { useEffect, useRef, useState } from 'react';
 import { ModalDetalleTarea } from '../../components/modals/ModalDetalleTarea';
@@ -48,9 +50,15 @@ import { ahoraApp, ahoraAppMs, hoyAppStr, setFechaSimulada, setHoraSimulada } fr
 import { detectarMedalla } from '../../utils/gamificacion';
 
 if (__DEV__) {
-  setFechaSimulada('2026-09-17');
+  setFechaSimulada('2026-09-26');
   setHoraSimulada(12, 0);
 }
+const SONIDOS: Record<string, any> = {
+  'success.mp3': require('../../assets/sounds/success.mp3'),
+  'error.mp3':   require('../../assets/sounds/error.mp3'),
+  'goalmet.mp3': require('../../assets/sounds/goalmet.mp3'),
+  'racha.mp3':   require('../../assets/sounds/racha.mp3'),
+};
 
 const PURPLE    = Colors.purple;
 const ORANGE    = Colors.orange;
@@ -160,6 +168,7 @@ export default function Home() {
       const prevEstrellas = gami.estrellas;
       const res = await gami.penalizarFinDia(vencidasAyer) as any;
       if (res?.penalizacion > 0) {
+         if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         disparaNotif('penal10');
         const nuevasEstrellas = prevEstrellas - res.penalizacion;
         if (prevEstrellas >= 600 && nuevasEstrellas < 600) setTimeout(() => disparaNotif('bajaOroPlata'), 4000);
@@ -245,18 +254,50 @@ export default function Home() {
     return () => clearInterval(checkTimer.current);
   }, [tasks, gami.tareasCompletasHoy, gami.penalizacionAplicada, gami.estrellas]);
 
+ async function reproducirSonido(archivo: string) {
+  if (Platform.OS === 'web') return;
+  try {
+    const { sound } = await Audio.Sound.createAsync(
+      SONIDOS[archivo],
+      { shouldPlay: true, volume: 1.0 }
+    );
+    sound.setOnPlaybackStatusUpdate(status => {
+      if (status.isLoaded && status.didJustFinish) sound.unloadAsync();
+    });
+  } catch (e) {
+    console.warn('Error al reproducir sonido:', e);
+  }
+}
+
   const disparaNotif = (type: string) => {
-    if (notifTimer.current) clearTimeout(notifTimer.current);
-    setNotifType(type); setShowNotif(true);
-    notifTimer.current = setTimeout(() => setShowNotif(false), 4500);
-  };
+  if (notifTimer.current) clearTimeout(notifTimer.current);
+  if (Platform.OS !== 'web') {
+    const esMedalla     = type === 'oro' || type === 'plata' || type === 'bronce';
+    const esBajaMedalla = type === 'bajaOroPlata' || type === 'bajaPlatabronce' || type === 'bajaBronceSin';
+    const esEliminar    = type === 'eliminada' || type === 'saltadas';
+    const esPenal       = type === 'penal10';
+    const esGoalmet     = type === 'goalmet';
 
-  const disparaRachaNotif = (racha: number) => {
-    if (rachaNotifTimer.current) clearTimeout(rachaNotifTimer.current);
-    setRachaNotifVal(racha); setShowRachaNotif(true);
-    rachaNotifTimer.current = setTimeout(() => setShowRachaNotif(false), 4500);
-  };
+    if      (esMedalla)     { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); reproducirSonido('success.mp3'); }
+    else if (esBajaMedalla) { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);   reproducirSonido('error.mp3'); }
+    else if (esPenal)       { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);   reproducirSonido('error.mp3'); }
+    else if (esGoalmet)     { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); reproducirSonido('goalmet.mp3'); }
+    else if (esEliminar)    { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning); }
+    else                    { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }
+  }
+  setNotifType(type); setShowNotif(true);
+  notifTimer.current = setTimeout(() => setShowNotif(false), 4500);
+};
 
+const disparaRachaNotif = (racha: number) => {
+  if (rachaNotifTimer.current) clearTimeout(rachaNotifTimer.current);
+  if (Platform.OS !== 'web') {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    reproducirSonido('racha.mp3');
+  }
+  setRachaNotifVal(racha); setShowRachaNotif(true);
+  rachaNotifTimer.current = setTimeout(() => setShowRachaNotif(false), 4500);
+};
   const today          = ahoraApp();
 
   const formattedToday = `${capitalize(today.toLocaleDateString('es-ES', { weekday: 'long' }))}, ${today.getDate()} de ${capitalize(today.toLocaleDateString('es-ES', { month: 'long' }))} de ${today.getFullYear()}`;
@@ -269,6 +310,10 @@ export default function Home() {
 
     updateTareaCompletada(task.id, true, pts);
     if (ajustes.vibracion && Platform.OS !== 'web') Vibration.vibrate(enTiempo ? [0, 80, 60, 120] : [0, 60]);
+    if (Platform.OS !== 'web') {
+      if (pts === 5) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      else           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
 
     setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed: true, stars: pts } : t));
     saltadasRef.current = 0;
@@ -331,7 +376,7 @@ export default function Home() {
       );
 
       if (!opcion) return;
-
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       if (opcion === 'esta') {
         if (!task.completed) {
           cancelarTarea(task.id);
@@ -374,6 +419,7 @@ export default function Home() {
       );
 
       if (!confirmado) return;
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
 
       if (!task.completed) {
         cancelarTarea(task.id);
@@ -554,6 +600,7 @@ export default function Home() {
                   ]
                 );
                 if (!opcion) return;
+                if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
                 if (opcion === 'esta') {
                   updateTareaTituloPicto(selectedTask.id, titulo, pictogramId);
                   updateTareaHora(selectedTask.id, horaFinal);

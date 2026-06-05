@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 import { Modal, Pressable, Text, View } from 'react-native';
 import { Colors } from '../../constants/theme';
 
@@ -26,7 +27,14 @@ export function ModalConfirm({ visible, titulo, mensaje, opciones, onOpcion }: M
             {opciones.map((op, i) => (
               <Pressable
                 key={i}
-                onPress={() => onOpcion(op.valor)}
+                onPress={() => {
+                  if (op.destructivo) {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                  } else {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }
+                  onOpcion(op.valor);
+                }}
                 style={{
                   paddingVertical: 12, borderRadius: 12, alignItems: 'center',
                   backgroundColor: op.destructivo ? '#FDE8E8' : op.valor === null ? '#f5f5f5' : Colors.purpleBg,
