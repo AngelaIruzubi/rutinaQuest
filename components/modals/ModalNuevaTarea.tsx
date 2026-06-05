@@ -1,17 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
 import {
-    AccessibilityInfo,
-    Image,
-    Modal,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  AccessibilityInfo,
+  Image,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { Colors } from '../../constants/theme';
 import { buscarPictogramas } from '../../services/arasaac';
@@ -37,22 +38,29 @@ export function ModalNuevaTarea({ visible, onCerrar, onGuardar }: ModalNuevaTare
   const [showPicker,  setShowPicker]  = useState(false);
   const [tempTime]                    = useState(fechaAppDate());
 
-  const buscarImagen = async (texto: string) => {
-    setTitulo(texto);
-    if (texto.trim().length < 2) {
-      setPictogramas([]);
-      setPictogramId(null);
-      return;
-    }
-    const ids = await buscarPictogramas(texto, 6);
-    if (ids.length > 0) {
-      setPictogramas(ids);
-      setPictogramId(ids[0]);
-    } else {
-      setPictogramas([]);
-      setPictogramId(null);
-    }
-  };
+ const buscarImagen = (texto: string) => {
+  const capitalizado = texto.length > 0
+    ? texto.charAt(0).toUpperCase() + texto.slice(1)
+    : texto;
+  setTitulo(capitalizado);
+  buscarPictogramasDebounced(capitalizado);
+};
+
+const buscarPictogramasDebounced = async (texto: string) => {
+  if (texto.trim().length < 2) {
+    setPictogramas([]);
+    setPictogramId(null);
+    return;
+  }
+  const ids = await buscarPictogramas(texto, 6);
+  if (ids.length > 0) {
+    setPictogramas(ids);
+    setPictogramId(ids[0]);
+  } else {
+    setPictogramas([]);
+    setPictogramId(null);
+  }
+};
 
   const handleTimeChange = (event: any, date?: Date) => {
     if (Platform.OS === 'android') setShowPicker(false);
@@ -80,6 +88,7 @@ export function ModalNuevaTarea({ visible, onCerrar, onGuardar }: ModalNuevaTare
       stars:       0,
       repeticion,
     };
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onGuardar(newTask);
     AccessibilityInfo.announceForAccessibility(`Tarea ${titulo} añadida`);
     cerrar();
@@ -121,6 +130,7 @@ export function ModalNuevaTarea({ visible, onCerrar, onGuardar }: ModalNuevaTare
                 accessibilityLabel="Título de la tarea"
                 accessibilityHint="Escribe el nombre de la tarea. Se buscarán pictogramas automáticamente"
                 returnKeyType="done"
+                autoCapitalize="sentences"
                 clearButtonMode="while-editing"
                 autoFocus
               />

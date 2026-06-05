@@ -19,6 +19,10 @@
         "backgroundImage": "./assets/images/icono.png",
         "monochromeImage": "./assets/images/icono.png"
       },
+      "notification": {
+        "icon": "./assets/images/notification-icon.png",
+        "color": "#A77BBE"
+      },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Animated, StyleSheet, Text } from 'react-native';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 
 interface AnimatedCounterProps {
   anim: Animated.Value;
@@ -8,19 +8,36 @@ interface AnimatedCounterProps {
 
 export function AnimatedCounter({ anim, max }: AnimatedCounterProps) {
   const [display, setDisplay] = useState(Math.max(0, max - 1));
+
   useEffect(() => {
     const id = anim.addListener(({ value }) => setDisplay(Math.round(value)));
     return () => anim.removeListener(id);
   }, [anim]);
+
   return (
-    <Text style={s.count}>
+    <View style={s.wrap}>
       <Text style={s.num}>{display}</Text>
-      <Text>{' días seguidos'}</Text>
-    </Text>
+      <Text style={s.unit}>días seguidos</Text>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  count: { fontSize: 24, color: '#fff', fontWeight: '600', textAlign: 'center', flexShrink: 1 },
-  num:   { fontSize: 46, color: '#FF6B35', fontWeight: '800' },
+  wrap: {
+    alignItems: 'center',
+  },
+  num: {
+    fontSize: 72,
+    color: '#fff',
+    fontWeight: '900',
+    lineHeight: 78,
+    textAlign: 'center',
+  },
+  unit: {
+    fontSize: 17,
+    color: '#888',
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: 2,
+  },
 });

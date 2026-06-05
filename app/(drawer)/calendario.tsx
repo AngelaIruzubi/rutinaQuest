@@ -240,6 +240,7 @@ function ModalNuevaTarea({
               onChangeText={buscar}
               style={s.input}
               accessibilityLabel="Título de la tarea"
+              autoCapitalize="sentences"
               accessibilityHint="Escribe el nombre. Se buscarán pictogramas automáticamente"
               returnKeyType="done"
               clearButtonMode="while-editing"
@@ -599,9 +600,9 @@ const s = StyleSheet.create({
   headerTitle:  { fontSize: 30, fontWeight: '800', color: PURPLE, textAlign: 'center', marginBottom: 6 },
 
   // Cabecera mes
-  mesHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  mesBtn:    { padding: 10, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  mesTitulo: { fontSize: 26, fontWeight: '700', color: PURPLE },
+  mesHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20,marginTop: 16, marginBottom: 8 },
+  mesBtn:    {marginBottom: 76, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  mesTitulo: { fontSize: 26, fontWeight: '700', color: PURPLE ,  marginBottom: 82},
 
   // Calendario
   semanaCab:    { flexDirection: 'row', marginBottom: 6 },
