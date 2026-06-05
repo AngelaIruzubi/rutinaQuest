@@ -78,18 +78,17 @@ export default function Layout() {
   const titleSize = Math.max(16, Math.min(30, (width * 0.072) / clampedScale));
 
   useEffect(() => {
-    async function prepare() {
-      try {
-        initDB();
-
-      } catch (e) {
-        console.warn('Error en carga inicial:', e);
-      } finally {
-        await SplashScreen.hideAsync();
-      }
+  async function prepare() {
+    try {
+      initDB();
+    } catch (e) {
+      console.warn('Error en carga inicial:', e);
+    } finally {
+      await SplashScreen.hideAsync();
     }
-    prepare();
-  }, []);
+  }
+  prepare();
+}, []);
 
   return (
     <AjustesProvider>

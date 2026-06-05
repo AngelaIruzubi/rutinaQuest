@@ -48,7 +48,7 @@ import { ahoraApp, ahoraAppMs, hoyAppStr, setFechaSimulada, setHoraSimulada } fr
 import { detectarMedalla } from '../../utils/gamificacion';
 
 if (__DEV__) {
-  setFechaSimulada('2026-08-11');
+  setFechaSimulada('2026-09-17');
   setHoraSimulada(12, 0);
 }
 
@@ -61,19 +61,37 @@ async function pedirPermisosNotificaciones() {
   const { status } = await Notifications.requestPermissionsAsync();
   if (status !== 'granted') console.warn('Permisos de notificación denegados');
 }
+async function configurarCanalAndroid() {
+  if (Platform.OS !== 'android') return;
+  await Notifications.setNotificationChannelAsync('default', {
+    name: 'RutinaQuest',
+    importance: Notifications.AndroidImportance.HIGH,
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: '#A77BBE',
+
+  });
+}
 
 async function enviarNotifSistema(titulo: string, cuerpo: string) {
   if (Platform.OS === 'web') return;
   try {
     await Notifications.scheduleNotificationAsync({
-      content: { title: titulo, body: cuerpo, sound: false },
-      trigger: null,
+      content: {
+        title: titulo,
+        body: cuerpo,
+        sound: true,
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+        color: '#A77BBE',
+        badge: 1,
+      },
+      trigger: Platform.OS === 'android'
+    ? { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 1, channelId: 'default' }
+    : null,
     });
   } catch (e) {
     console.warn('Error al enviar notificación del sistema:', e);
   }
 }
-
 
 export default function Home() {
 
@@ -146,6 +164,7 @@ export default function Home() {
         const nuevasEstrellas = prevEstrellas - res.penalizacion;
         if (prevEstrellas >= 600 && nuevasEstrellas < 600) setTimeout(() => disparaNotif('bajaOroPlata'), 4000);
         else if (prevEstrellas >= 300 && nuevasEstrellas < 300) setTimeout(() => disparaNotif('bajaPlatabronce'), 4000);
+        else if (prevEstrellas >= 100 && nuevasEstrellas < 100) setTimeout(() => disparaNotif('bajaBronceSin'), 4000);
       }
       pendientesPenalRef.current = { vencidasAyer: 0 };
     }, 300);
@@ -158,6 +177,7 @@ export default function Home() {
 
   useEffect(() => {
     pedirPermisosNotificaciones();
+    configurarCanalAndroid();
     checkTimer.current = setInterval(async () => {
       const now     = ahoraApp();
       const hora    = now.getHours();
@@ -187,6 +207,8 @@ export default function Home() {
               setTimeout(() => disparaNotif('bajaOroPlata'), 4000);
             else if (prevEstrellas >= 300 && nuevasEstrellas < 300)
               setTimeout(() => disparaNotif('bajaPlatabronce'), 4000);
+            else if (prevEstrellas >= 100 && nuevasEstrellas < 100)
+              setTimeout(() => disparaNotif('bajaBronceSin'), 4000);
           }
         }
 
@@ -226,13 +248,13 @@ export default function Home() {
   const disparaNotif = (type: string) => {
     if (notifTimer.current) clearTimeout(notifTimer.current);
     setNotifType(type); setShowNotif(true);
-    notifTimer.current = setTimeout(() => setShowNotif(false), 3500);
+    notifTimer.current = setTimeout(() => setShowNotif(false), 4500);
   };
 
   const disparaRachaNotif = (racha: number) => {
     if (rachaNotifTimer.current) clearTimeout(rachaNotifTimer.current);
     setRachaNotifVal(racha); setShowRachaNotif(true);
-    rachaNotifTimer.current = setTimeout(() => setShowRachaNotif(false), 3500);
+    rachaNotifTimer.current = setTimeout(() => setShowRachaNotif(false), 4500);
   };
 
   const today          = ahoraApp();
@@ -384,9 +406,8 @@ export default function Home() {
   return (
     <View style={{ flex: 1, backgroundColor: '#ffffff', paddingHorizontal: 20 }}>
 
-      <PerezosoNotif type={notifType} show={showNotif} />
-  
-      <RachaNotif show={showRachaNotif && !showNotif} racha={rachaNotifVal} />
+     <PerezosoNotif type={notifType} show={showNotif} onClose={() => setShowNotif(false)} />
+    <RachaNotif show={showRachaNotif && !showNotif} racha={rachaNotifVal} onClose={() => setShowRachaNotif(false)} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" accessible={false}>
 
