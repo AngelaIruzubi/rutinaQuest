@@ -50,7 +50,7 @@ import { ahoraApp, ahoraAppMs, hoyAppStr, setFechaSimulada, setHoraSimulada } fr
 import { detectarMedalla } from '../../utils/gamificacion';
 
 if (__DEV__) {
-  setFechaSimulada('2026-09-26');
+  setFechaSimulada('2026-09-28');
   setHoraSimulada(12, 0);
 }
 const SONIDOS: Record<string, any> = {
@@ -150,7 +150,8 @@ export default function Home() {
   const pendientesPenalRef = useRef<any>({ vencidasAyer: 0 });
 
   const gami         = useGamificacion();
-  const { ajustes }  = useAjustesCtx();
+  const { ajustes, escala } = useAjustesCtx();
+  const fs = (n: number) => Math.round(n * escala);
   const reduceMotion = useReduceMotion();
   
   const penalizacionDisparadaRef = useRef(false);
@@ -463,8 +464,8 @@ const disparaRachaNotif = (racha: number) => {
           <View style={{ flexDirection: 'column', padding: 40, justifyContent: 'center', alignItems: 'center', gap: 20 }}
             accessible accessibilityRole="header" accessibilityLabel={`Mis Tareas. ${formattedToday}`}>
             <View accessible={false}>
-              <Text style={styles.title} accessibilityElementsHidden importantForAccessibility="no">Mis Tareas</Text>
-              <Text style={styles.dateText} accessibilityElementsHidden importantForAccessibility="no">{formattedToday}</Text>
+              <Text style={[styles.title, { fontSize: fs(30) }]} accessibilityElementsHidden importantForAccessibility="no">Mis Tareas</Text>
+              <Text style={[styles.dateText, { fontSize: fs(17) }]} accessibilityElementsHidden importantForAccessibility="no">{formattedToday}</Text>
             </View>
           </View>
         
@@ -491,13 +492,13 @@ const disparaRachaNotif = (racha: number) => {
             {totalToday > 0 && doneToday === totalToday ? (
               <>
                 <Image source={PEREZOSO_IMAGENES.celebrando} accessibilityLabel="Perezoso celebrando" accessibilityIgnoresInvertColors />
-                <Text style={styles.emptyText}>¡Todo completado hoy!</Text>
+                <Text style={[styles.emptyText, { fontSize: fs(26) }]}>¡Todo completado hoy!</Text>
               </>
             ) : (
               <>
                 <Image source={PEREZOSO_IMAGENES.llorando} accessibilityLabel="Perezoso triste" accessibilityIgnoresInvertColors />
-                <Text style={styles.emptyText} accessibilityLabel="No tienes tareas para hoy">No tienes tareas para hoy</Text>
-                <Text style={styles.emptySubText} accessibilityLabel="Pulsa + para añadir una tarea">Pulsa + para añadir una tarea</Text>
+                <Text style={[styles.emptyText, { fontSize: fs(26) }]} accessibilityLabel="No tienes tareas para hoy">No tienes tareas para hoy</Text>
+                <Text style={[styles.emptySubText, { fontSize: fs(20) }]} accessibilityLabel="Pulsa + para añadir una tarea">Pulsa + para añadir una tarea</Text>
               </>
             )}
           </View>
@@ -524,7 +525,7 @@ const disparaRachaNotif = (racha: number) => {
                       <Image source={{ uri: `https://static.arasaac.org/pictograms/${item.pictogramId}/${item.pictogramId}_300.png` }} style={styles.pictogram} accessibilityLabel={`Pictograma de ${item.title}`} accessibilityIgnoresInvertColors />
                     )}
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.taskTitle} numberOfLines={1}>{item.title}</Text>
+                      <Text style={[styles.taskTitle, { fontSize: fs(17) }]} numberOfLines={1}>{item.title}</Text>
                       {item.repeticion && item.repeticion !== 'ninguna' && (
                         <Text style={{ fontSize: 10, color: PURPLE, fontWeight: '600' }}>
                           {item.repeticion === 'diaria' ? '📅 Diaria' : '📆 Semanal'}
@@ -536,7 +537,7 @@ const disparaRachaNotif = (racha: number) => {
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     {item.hora && item.hora !== 'Sin hora' && (
-                      <Text style={[styles.taskTime, vencida && { color: RED }]} accessibilityElementsHidden importantForAccessibility="no">{item.hora}</Text>
+                      <Text style={[styles.taskTime, { fontSize: fs(13) }, vencida && { color: RED }]} accessibilityElementsHidden importantForAccessibility="no">{item.hora}</Text>
                     )}
                     <Ionicons name="chevron-forward" size={16} color="#CCC" accessibilityElementsHidden importantForAccessibility="no" />
                   </View>

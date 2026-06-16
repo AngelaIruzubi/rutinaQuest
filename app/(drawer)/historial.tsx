@@ -1,8 +1,7 @@
-
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   Alert,
@@ -23,6 +22,7 @@ import ViewShot from 'react-native-view-shot';
 import { StarRow } from '../../components/ui/StarRow';
 import { DIAS_CORTOS, DIAS_LARGOS } from '../../constants/diasSemana';
 import { Colors } from '../../constants/theme';
+import { useAjustesCtx } from '../../context/AjustesContext';
 import { useAvatar } from '../../context/AvatarContext';
 import { getTareasHistorial } from '../../database/database';
 import { useGamificacion } from '../../hooks/useGamificacion';
@@ -140,6 +140,14 @@ const tc = StyleSheet.create({
 
 
 export default function Historial() {
+  const { escala, colores } = useAjustesCtx();
+  const ts = useMemo(() => ({
+    titulo: { fontSize: Math.round(30 * escala) },
+    seccionTitulo: { fontSize: Math.round(11 * escala) },
+    tareaTitle: { fontSize: Math.round(14 * escala) },
+    tareaHora: { fontSize: Math.round(12 * escala) },
+    tareaStars: { fontSize: Math.round(13 * escala) },
+  }), [escala]);
   const router     = useRouter();
   const gami       = useGamificacion();
   const { avatar } = useAvatar();
@@ -305,7 +313,7 @@ export default function Historial() {
         keyboardShouldPersistTaps="handled"
         accessible={false}
       >
-        <Text style={styles.titulo} accessibilityRole="header">Historial</Text>
+        <Text style={[styles.titulo, ts.titulo, ts.titulo]} accessibilityRole="header">Historial</Text>
 
         
 
@@ -488,10 +496,10 @@ export default function Historial() {
                     {item.pictogramId && (
                       <Image source={{ uri: `https://static.arasaac.org/pictograms/${item.pictogramId}/${item.pictogramId}_300.png` }} style={styles.pictogram} accessibilityElementsHidden importantForAccessibility="no" accessibilityIgnoresInvertColors />
                     )}
-                    <Text style={styles.tareaTitle} numberOfLines={2} accessibilityElementsHidden importantForAccessibility="no">{item.title}</Text>
+                    <Text style={[styles.tareaTitle, ts.tareaTitle, ts.tareaTitle]} numberOfLines={2} accessibilityElementsHidden importantForAccessibility="no">{item.title}</Text>
                     <StarRow count={item.stars ?? 5} size={12} />
                     {item.hora && item.hora !== 'Sin hora' && (
-                      <Text style={styles.tareaHora} accessibilityElementsHidden importantForAccessibility="no">{item.hora}</Text>
+                      <Text style={[styles.tareaHora, ts.tareaHora, ts.tareaHora]} accessibilityElementsHidden importantForAccessibility="no">{item.hora}</Text>
                     )}
                   </View>
                 ))
@@ -516,12 +524,12 @@ export default function Historial() {
                       {item.pictogramId && (
                         <Image source={{ uri: `https://static.arasaac.org/pictograms/${item.pictogramId}/${item.pictogramId}_300.png` }} style={styles.pictogram} accessibilityElementsHidden importantForAccessibility="no" accessibilityIgnoresInvertColors />
                       )}
-                      <Text style={[styles.tareaTitle, { textDecorationLine: 'line-through', color: '#888' }]} numberOfLines={2} accessibilityElementsHidden importantForAccessibility="no">
+                      <Text style={[styles.tareaTitle, ts.tareaTitle, { textDecorationLine: 'line-through', color: '#888' }]} numberOfLines={2} accessibilityElementsHidden importantForAccessibility="no">
                         {item.title}
                       </Text>
-                      <Text style={{ fontSize: 10, color: RED, fontWeight: '600', marginTop: 2 }} accessibilityElementsHidden importantForAccessibility="no">Eliminada</Text>
+                      <Text style={{ fontSize: fs(10), color: RED, fontWeight: '600', marginTop: 2 }} accessibilityElementsHidden importantForAccessibility="no">Eliminada</Text>
                       {item.hora && item.hora !== 'Sin hora' && (
-                        <Text style={styles.tareaHora} accessibilityElementsHidden importantForAccessibility="no">{item.hora}</Text>
+                        <Text style={[styles.tareaHora, ts.tareaHora, ts.tareaHora]} accessibilityElementsHidden importantForAccessibility="no">{item.hora}</Text>
                       )}
                     </View>
                   ))}
@@ -532,12 +540,12 @@ export default function Historial() {
                       {item.pictogramId && (
                         <Image source={{ uri: `https://static.arasaac.org/pictograms/${item.pictogramId}/${item.pictogramId}_300.png` }} style={styles.pictogram} accessibilityElementsHidden importantForAccessibility="no" accessibilityIgnoresInvertColors />
                       )}
-                      <Text style={[styles.tareaTitle, { textDecorationLine: 'line-through', color: '#888' }]} numberOfLines={2} accessibilityElementsHidden importantForAccessibility="no">
+                      <Text style={[styles.tareaTitle, ts.tareaTitle, { textDecorationLine: 'line-through', color: '#888' }]} numberOfLines={2} accessibilityElementsHidden importantForAccessibility="no">
                         {item.title}
                       </Text>
-                      <Text style={{ fontSize: 10, color: ORANGE, fontWeight: '600', marginTop: 2 }} accessibilityElementsHidden importantForAccessibility="no">Saltada</Text>
+                      <Text style={{ fontSize: fs(10), color: ORANGE, fontWeight: '600', marginTop: 2 }} accessibilityElementsHidden importantForAccessibility="no">Saltada</Text>
                       {item.hora && item.hora !== 'Sin hora' && (
-                        <Text style={styles.tareaHora} accessibilityElementsHidden importantForAccessibility="no">{item.hora}</Text>
+                        <Text style={[styles.tareaHora, ts.tareaHora, ts.tareaHora]} accessibilityElementsHidden importantForAccessibility="no">{item.hora}</Text>
                       )}
                     </View>
                   ))}
@@ -555,52 +563,52 @@ export default function Historial() {
 const fs = (size: number) => Math.round(size * Math.min(PixelRatio.getFontScale(), 1.4));
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#fff', paddingTop: Platform.OS === 'ios' ? 60 : 40, paddingHorizontal: 20 },
+  root: { flex: 1, backgroundColor: '#fff', paddingTop:20, paddingHorizontal: 20 },
 
   modalCapturaOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
   capturaLoading:      { position: 'absolute', bottom: 40, backgroundColor: PURPLE, borderRadius: 20, paddingHorizontal: 20, paddingVertical: 10 },
-  capturaLoadingTxt:   { color: '#fff', fontWeight: '700', fontSize: fs(14) },
+  capturaLoadingTxt:   { color: '#fff', fontWeight: '700', fontSize: 14 },
 
-  btnInicio:    { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: PURPLE + '18', borderRadius: 20, alignSelf: 'center', minHeight: 40 },
-  btnInicioTxt: { color: PURPLE, fontWeight: '600', fontSize: fs(13) },
-  titulo:       { fontSize: fs(30), fontWeight: '800', color: PURPLE, marginBottom: 16, textAlign: 'center' },
+  btnInicio:    { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: PURPLE + '18', borderRadius: 20, alignSelf: 'flex-start', minHeight: 40 },
+  btnInicioTxt: { color: PURPLE, fontWeight: '600', fontSize: 13 },
+  titulo:       { fontSize: 30, fontWeight: '800', color: PURPLE, marginBottom: 24, textAlign: 'center' },
 
   shareRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 8 },
   shareBtnsRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
   shareBtn:     { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 22, minHeight: 40, flexShrink: 1 },
-  shareBtnTxt:  { color: '#fff', fontWeight: '700', fontSize: fs(12), flexShrink: 1 },
+  shareBtnTxt:  { color: '#fff', fontWeight: '700', fontSize: 12, flexShrink: 1 },
 
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f3f2f2', borderRadius: 25, paddingHorizontal: 15, paddingVertical: 10, marginBottom: 20, minHeight: 44 },
 
   weekSelector: { flexDirection: 'row', alignItems: 'center', backgroundColor: PURPLE_BG, borderRadius: 16, paddingVertical: 10, paddingHorizontal: 6, marginBottom: 12, borderWidth: 1.5, borderColor: PURPLE_LT },
   weekArrow:    { padding: 6 },
-  weekLabel:    { fontSize: fs(16), fontWeight: '700', color: PURPLE, textAlign: 'center', flexShrink: 1 },
+  weekLabel:    { fontSize: 16, fontWeight: '700', color: PURPLE, textAlign: 'center', flexShrink: 1 },
 
   daysStrip: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FAFAFA', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 8, marginBottom: 20, borderWidth: 1, borderColor: '#EEE' },
   dayBtn:    { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 8, borderRadius: 12, marginHorizontal: 2, minHeight: 50 },
   dayBtnSel: { backgroundColor: PURPLE },
   dayBtnHoy: { backgroundColor: PURPLE_LT },
-  dayBtnLbl: { fontSize: fs(11), color: '#AAA', fontWeight: '600' },
+  dayBtnLbl: { fontSize: 11, color: '#AAA', fontWeight: '600' },
   dot:       { width: 5, height: 5, borderRadius: 3 },
 
   diaHeader:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  diaNombre:    { fontSize: fs(13), fontWeight: '700', color: '#555', flex: 1, textTransform: 'capitalize', flexShrink: 1 },
+  diaNombre:    { fontSize: 13, fontWeight: '700', color: '#555', flex: 1, textTransform: 'capitalize', flexShrink: 1 },
   diaBadgesRow: { flexDirection: 'row', gap: 6 },
   diaBadge:     { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
-  diaBadgeText: { fontSize: fs(12), fontWeight: '700' },
+  diaBadgeText: { fontSize: 12, fontWeight: '700' },
 
   columnasRow:       { flexDirection: 'row', gap: 12 },
   columna:           { flex: 1 },
   columnaHeader:     { borderRadius: 10, borderWidth: 1.5, paddingVertical: 7, alignItems: 'center', marginBottom: 10 },
-  columnaHeaderText: { fontSize: fs(12), fontWeight: '700' },
-  colEmpty:          { fontSize: fs(12), color: '#CCC', textAlign: 'center', marginTop: 12 },
+  columnaHeaderText: { fontSize: 12, fontWeight: '700' },
+  colEmpty:          { fontSize: 12, color: '#CCC', textAlign: 'center', marginTop: 12 },
 
   tareaCard:  { backgroundColor: '#FAFAFA', borderRadius: 12, padding: 10, marginBottom: 8, borderLeftWidth: 3 },
   pictogram:  { width: 36, height: 36, borderRadius: 6, marginBottom: 6 },
-  tareaTitle: { fontSize: fs(12), color: '#333', fontWeight: '600', marginBottom: 4, flexShrink: 1 },
-  tareaHora:  { fontSize: fs(11), color: '#AAA', marginTop: 2 },
+  tareaTitle: { fontSize: 12, color: '#333', fontWeight: '600', marginBottom: 4, flexShrink: 1 },
+  tareaHora:  { fontSize: 11, color: '#AAA', marginTop: 2 },
 
   emptyBox:     { alignItems: 'center', paddingVertical: 30 },
-  emptyText:    { fontSize: fs(16), color: '#AAA', fontWeight: '600', textAlign: 'center' },
-  emptySubText: { fontSize: fs(13), color: '#CCC', marginTop: 6 },
+  emptyText:    { fontSize: 16, color: '#AAA', fontWeight: '600', textAlign: 'center' },
+  emptySubText: { fontSize: 13, color: '#CCC', marginTop: 6 },
 });

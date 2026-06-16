@@ -576,7 +576,14 @@ export function PerezosoNotif({
   }, [show, type]);
 
   return (
-    <Modal visible={show} transparent animationType="none" statusBarTranslucent accessibilityViewIsModal={false}>
+    <>
+      {/* Precarga: renderiza imágenes invisibles fuera del Modal para cachearlas */}
+      <View style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }}>
+        {Object.values(PEREZOSO_IMAGENES).map((src, i) => (
+          <Image key={i} source={src} style={{ width: 1, height: 1 }} />
+        ))}
+      </View>
+      <Modal visible={show} transparent animationType="none" statusBarTranslucent accessibilityViewIsModal={false}>
       {esBajada ? (
         <NotifBajada  type={type} cfg={cfg} show={show} reduceMotion={reduceMotion} onClose={onClose} />
       ) : esMedalla ? (
@@ -584,7 +591,8 @@ export function PerezosoNotif({
       ) : (
         <NotifNormal cfg={cfg} opacityAnim={opacityAnim} slideAnim={slideAnim} scaleAnim={scaleAnim} bounceAnim={bounceAnim} onClose={onClose} />
       )}
-    </Modal>
+      </Modal>
+    </>
   );
 }
 
@@ -592,14 +600,14 @@ export function PerezosoNotif({
 
 const estilo = StyleSheet.create({
   // Normal
-  overlay:  { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', zIndex: 9999, elevation: 9999 },
-  card:     { width: '100%', borderRadius: 28, paddingVertical: 32, paddingHorizontal: 24, alignItems: 'center', justifyContent: 'center', elevation: 12, flexShrink: 1 },
-  img:      { width: '70%', aspectRatio: 1, maxHeight: 280, marginBottom: 20 },
+  overlay:  { ...StyleSheet.absoluteFillObject, flex: 1, justifyContent: 'center', alignItems: 'center', zIndex: 9999, elevation: 9999 },
+  card:     { width: '100%', flex: 1, paddingVertical: 32, paddingHorizontal: 24, alignItems: 'center', justifyContent: 'center', elevation: 12 },
+  img:      { width: 240, height: 240, marginBottom: 20 },
   text:     { fontSize: 26, fontWeight: '800', textAlign: 'center', lineHeight: 34, flexShrink: 1 },
   sub:      { fontSize: 15, fontWeight: '500', textAlign: 'center', marginTop: 10, flexShrink: 1 },
 
   // Shared full-screen
-  screen:    { ...StyleSheet.absoluteFillObject, zIndex: 9999, elevation: 9999, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 },
+  screen:    { ...StyleSheet.absoluteFillObject, flex: 1, zIndex: 9999, elevation: 9999, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 },
   bgGlow:    { position: 'absolute', width: 340, height: 340, borderRadius: 170, top: '20%' },
   mascotWrap:{ alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
   halo:      { position: 'absolute', width: 260, height: 260 },

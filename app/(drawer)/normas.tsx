@@ -3,15 +3,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
 import {
-  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
-  View,
+  View
 } from 'react-native';
 import { UMBRALES_MEDALLA } from '../../constants/medallas';
+import { useAjustesCtx } from '../../context/AjustesContext';
 
 type ColorPair = { bg: string; text: string };
 const C = {
@@ -25,10 +25,12 @@ const C = {
 
 
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
+function SectionTitle({ 
+children }: { children: React.ReactNode }) {
+  const { escala } = useAjustesCtx();
   return (
     <Text
-      style={estilos.sectionTitle}
+      style={[estilos.sectionTitle, { fontSize: Math.round(11 * escala) }]}
       accessibilityRole="header"
     >
       {children}
@@ -36,10 +38,12 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Badge({ label }: { label: string }) {
+function Badge({ 
+label }: { label: string }) {
+  const { escala } = useAjustesCtx();
   return (
     <View style={estilos.badge} accessibilityElementsHidden importantForAccessibility="no">
-      <Text style={estilos.badgeText}>{label}</Text>
+      <Text style={[estilos.badgeText, { fontSize: Math.round(12 * escala) }]}>{label}</Text>
     </View>
   );
 }
@@ -51,7 +55,9 @@ type RuleRowProps = {
   subtitle?: string;
 };
 
-function RuleRow({ title, badge, subtitle, last = false }: RuleRowProps) {
+function RuleRow({ 
+title, badge, subtitle, last = false }: RuleRowProps) {
+  const { escala } = useAjustesCtx();
 
   const a11yLabel = subtitle ? `${title}. ${subtitle}. ${badge}` : `${title}. ${badge}`;
 
@@ -62,9 +68,9 @@ function RuleRow({ title, badge, subtitle, last = false }: RuleRowProps) {
       accessibilityLabel={a11yLabel}
     >
       <View style={estilos.rowContent}>
-        <Text style={estilos.rowTitle} accessibilityElementsHidden importantForAccessibility="no">{title}</Text>
+        <Text style={[estilos.rowTitle, { fontSize: Math.round(14 * escala) }]} accessibilityElementsHidden importantForAccessibility="no">{title}</Text>
         {subtitle && (
-          <Text style={estilos.rowSubtitle} accessibilityElementsHidden importantForAccessibility="no">{subtitle}</Text>
+          <Text style={[estilos.rowSubtitle, { fontSize: Math.round(12 * escala) }]} accessibilityElementsHidden importantForAccessibility="no">{subtitle}</Text>
         )}
       </View>
       <Badge label={badge} />
@@ -84,7 +90,9 @@ function Card({ children, a11yLabel }: { children: React.ReactNode; a11yLabel?: 
   );
 }
 
-function MedalCard({ icon, name, req }: { icon: string; name: string; req: string }) {
+function MedalCard({ 
+icon, name, req }: { icon: string; name: string; req: string }) {
+  const { escala } = useAjustesCtx();
   return (
     <View
       style={estilos.medalCard}
@@ -92,8 +100,8 @@ function MedalCard({ icon, name, req }: { icon: string; name: string; req: strin
       accessibilityLabel={`Medalla de ${name}, se consigue con ${req}`}
     >
       <Text style={estilos.medalIcon} accessibilityElementsHidden importantForAccessibility="no">{icon}</Text>
-      <Text style={estilos.medalName} accessibilityElementsHidden importantForAccessibility="no">{name}</Text>
-      <Text style={estilos.medalReq}  accessibilityElementsHidden importantForAccessibility="no">{req}</Text>
+      <Text style={[estilos.medalName, { fontSize: Math.round(13 * escala) }]} accessibilityElementsHidden importantForAccessibility="no">{name}</Text>
+      <Text style={[estilos.medalReq, { fontSize: Math.round(12 * escala) }]}  accessibilityElementsHidden importantForAccessibility="no">{req}</Text>
     </View>
   );
 }
@@ -101,6 +109,7 @@ function MedalCard({ icon, name, req }: { icon: string; name: string; req: strin
 
 
 export default function NormasJuego() {
+  const { escala, colores } = useAjustesCtx();
   return (
     <SafeAreaView style={estilos.safe}>
       <ScrollView
@@ -110,7 +119,7 @@ export default function NormasJuego() {
         accessible={false}
       >
         {/* Cabecera */}
-        <Text style={estilos.headerTitle} accessibilityRole="header">
+        <Text style={[estilos.headerTitle, { fontSize: Math.round(30 * escala) }]} accessibilityRole="header">
           Normas del juego
         </Text>
 
@@ -203,14 +212,14 @@ const estilos = StyleSheet.create({
   scroll:    { flex: 1 },
   container: {
     backgroundColor: '#fff',
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingTop: 20,
     paddingHorizontal: 20,
-    paddingBottom: 60,
+
   },
 
   headerTitle: {
     fontSize: 30, fontWeight: '800',
-    color: C.purple.text, textAlign: 'center', marginBottom: 4,
+    color: C.purple.text, textAlign: 'center', marginBottom: 24,
   },
 
   sectionTitle: {
@@ -223,15 +232,9 @@ const estilos = StyleSheet.create({
     backgroundColor: C.surface, borderRadius: 14,
     borderWidth: 0.5, borderColor: C.border, overflow: 'hidden',
   },
-
-  btnInicio: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 12, paddingVertical: 7,
-    backgroundColor: Colors.purple + '18', borderRadius: 20,
-    alignSelf: 'flex-start', marginBottom: 8,
-    minHeight: 44,
-  },
+   btnInicio:    { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: Colors.purple + '18', borderRadius: 20, alignSelf: 'flex-start', marginBottom: 20, minHeight: 44 },
   btnInicioTxt: { color: Colors.purple, fontWeight: '600', fontSize: 13 },
+
 
   row: {
     flexDirection: 'row', alignItems: 'center',
@@ -258,4 +261,3 @@ const estilos = StyleSheet.create({
   medalName: { fontSize: 13, fontWeight: '600', color: C.textPrimary, marginBottom: 2 },
   medalReq:  { fontSize: 12, color: C.textMuted },
 });
-
