@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ModalDetalleTarea } from '../../components/modals/ModalDetalleTarea';
 import { ModalNuevaTarea } from '../../components/modals/ModalNuevaTarea';
 import { Colors } from '../../constants/theme';
@@ -150,18 +150,9 @@ export default function Home() {
   const pendientesPenalRef = useRef<any>({ vencidasAyer: 0 });
 
   const gami         = useGamificacion();
-  const { ajustes }  = useAjustesCtx();
-  const reduceMotion = useReduceMotion();
-  const { escala, colores } = useAjustesCtx();
+  const { ajustes, escala } = useAjustesCtx();
   const fs = (n: number) => Math.round(n * escala);
-  const ts = useMemo(() => ({
-    title: { fontSize: Math.round(30 * escala) },
-    dateText: { fontSize: Math.round(17 * escala) },
-    taskTitle: { fontSize: Math.round(16 * escala) },
-    taskTime: { fontSize: Math.round(13 * escala) },
-    emptyText: { fontSize: Math.round(26 * escala) },
-    emptySubText: { fontSize: Math.round(20 * escala) },
-  }), [escala]);
+  const reduceMotion = useReduceMotion();
   
   const penalizacionDisparadaRef = useRef(false);
   useEffect(() => {
@@ -473,8 +464,8 @@ const disparaRachaNotif = (racha: number) => {
           <View style={{ flexDirection: 'column', padding: 40, justifyContent: 'center', alignItems: 'center', gap: 20 }}
             accessible accessibilityRole="header" accessibilityLabel={`Mis Tareas. ${formattedToday}`}>
             <View accessible={false}>
-              <Text style={[styles.title, ts.title, ts.title]} accessibilityElementsHidden importantForAccessibility="no">Mis Tareas</Text>
-              <Text style={[styles.dateText, ts.dateText, ts.dateText]} accessibilityElementsHidden importantForAccessibility="no">{formattedToday}</Text>
+              <Text style={[styles.title, { fontSize: fs(30) }]} accessibilityElementsHidden importantForAccessibility="no">Mis Tareas</Text>
+              <Text style={[styles.dateText, { fontSize: fs(17) }]} accessibilityElementsHidden importantForAccessibility="no">{formattedToday}</Text>
             </View>
           </View>
         
@@ -501,13 +492,13 @@ const disparaRachaNotif = (racha: number) => {
             {totalToday > 0 && doneToday === totalToday ? (
               <>
                 <Image source={PEREZOSO_IMAGENES.celebrando} accessibilityLabel="Perezoso celebrando" accessibilityIgnoresInvertColors />
-                <Text style={[styles.emptyText, ts.emptyText, ts.emptyText]}>¡Todo completado hoy!</Text>
+                <Text style={[styles.emptyText, { fontSize: fs(26) }]}>¡Todo completado hoy!</Text>
               </>
             ) : (
               <>
                 <Image source={PEREZOSO_IMAGENES.llorando} accessibilityLabel="Perezoso triste" accessibilityIgnoresInvertColors />
-                <Text style={[styles.emptyText, ts.emptyText, ts.emptyText]} accessibilityLabel="No tienes tareas para hoy">No tienes tareas para hoy</Text>
-                <Text style={[styles.emptySubText, ts.emptySubText, ts.emptySubText]} accessibilityLabel="Pulsa + para añadir una tarea">Pulsa + para añadir una tarea</Text>
+                <Text style={[styles.emptyText, { fontSize: fs(26) }]} accessibilityLabel="No tienes tareas para hoy">No tienes tareas para hoy</Text>
+                <Text style={[styles.emptySubText, { fontSize: fs(20) }]} accessibilityLabel="Pulsa + para añadir una tarea">Pulsa + para añadir una tarea</Text>
               </>
             )}
           </View>
@@ -534,7 +525,7 @@ const disparaRachaNotif = (racha: number) => {
                       <Image source={{ uri: `https://static.arasaac.org/pictograms/${item.pictogramId}/${item.pictogramId}_300.png` }} style={styles.pictogram} accessibilityLabel={`Pictograma de ${item.title}`} accessibilityIgnoresInvertColors />
                     )}
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.taskTitle, ts.taskTitle, ts.taskTitle]} numberOfLines={1}>{item.title}</Text>
+                      <Text style={[styles.taskTitle, { fontSize: fs(17) }]} numberOfLines={1}>{item.title}</Text>
                       {item.repeticion && item.repeticion !== 'ninguna' && (
                         <Text style={{ fontSize: 10, color: PURPLE, fontWeight: '600' }}>
                           {item.repeticion === 'diaria' ? '📅 Diaria' : '📆 Semanal'}
@@ -546,7 +537,7 @@ const disparaRachaNotif = (racha: number) => {
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     {item.hora && item.hora !== 'Sin hora' && (
-                      <Text style={[styles.taskTime, ts.taskTime, vencida && { color: RED }]} accessibilityElementsHidden importantForAccessibility="no">{item.hora}</Text>
+                      <Text style={[styles.taskTime, { fontSize: fs(13) }, vencida && { color: RED }]} accessibilityElementsHidden importantForAccessibility="no">{item.hora}</Text>
                     )}
                     <Ionicons name="chevron-forward" size={16} color="#CCC" accessibilityElementsHidden importantForAccessibility="no" />
                   </View>
