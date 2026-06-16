@@ -1,9 +1,10 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { memo, useCallback, useState } from 'react';
 import {
   Image, Pressable, ScrollView,
   StyleSheet, Text, useWindowDimensions, View,
 } from 'react-native';
+import { useAjustesCtx } from '../../context/AjustesContext';
 import { useAvatar } from '../../context/AvatarContext';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -79,7 +80,7 @@ interface TabBarProps {
 // ─── AvatarPreview ────────────────────────────────────────────────────────────
 // Fuera de Perfil para que React no la desmonte/remonte en cada render del padre
 
-function AvatarPreview({
+const AvatarPreview = memo(function AvatarPreview({
   size = 290,
   si,
   shirt,
@@ -124,12 +125,12 @@ function AvatarPreview({
       )}
     </View>
   );
-}
+});
 
 // ─── TabBar ───────────────────────────────────────────────────────────────────
 // Fuera de Perfil por el mismo motivo que AvatarPreview
 
-function TabBar({ tabActivo, onTabPress }: TabBarProps) {
+const TabBar = memo(function TabBar({ tabActivo, onTabPress, escala = 1 }: TabBarProps & { escala?: number }) {
   return (
     <View style={estilos.tabBar} accessible={false} accessibilityRole="tablist">
       {TABS.map(tab => (
@@ -142,7 +143,7 @@ function TabBar({ tabActivo, onTabPress }: TabBarProps) {
           accessibilityLabel={tab.title}
           accessibilityState={{ selected: tabActivo === tab.id }}
         >
-          <Text style={[estilos.tabEmoji, tabActivo === tab.id && { opacity: 1 }]}>
+          <Text style={[estilos.tabEmoji, { fontSize: Math.round(22 * escala) }, tabActivo === tab.id && { opacity: 1 }]}>
             <MaterialCommunityIcons
               name={tab.icon as any}
               size={24}
@@ -161,30 +162,33 @@ function TabBar({ tabActivo, onTabPress }: TabBarProps) {
       ))}
     </View>
   );
-}
+});
 
 // ─── Perfil ───────────────────────────────────────────────────────────────────
 
 export default function Perfil() {
+  const { escala, colores } = useAjustesCtx();
+  const fs = (n: number) => Math.round(n * escala);
   const { width }  = useWindowDimensions();
   const isTablet   = width >= 768;
   const { avatar, updateAvatar } = useAvatar();
   const { tonoPiel, cara, colorPelo, peloCorto, peloLargo, shirt } = avatar;
 
   const [tabActivo, setTabActivo] = useState('piel');
+  const handleTabPress = useCallback((id: string) => setTabActivo(id), []);
 
   const si: 0 | 1        = tonoPiel === 1 ? 1 : 0;
   const colorPeloSeguro  = COLORES_PELO[colorPelo] ?? COLORES_PELO[0];
 
-  // ── Opciones según tab activo ──────────────────────────────────────────────
+  // ── Opciones según tab activo (useMemo evita re-render innecesario al cambiar avatar) ──
 
-  const renderOpciones = () => {
+  const renderOpciones = useCallback(() => {
     switch (tabActivo) {
 
       case 'piel':
         return (
           <>
-            <Text style={estilos.opcionTitulo} accessibilityRole="header">Tono de piel</Text>
+            <Text style={[estilos.opcionTitulo, { fontSize: Math.round(16 * escala) }]} accessibilityRole="header">Tono de piel</Text>
             <View style={estilos.gridColores} accessible={false}>
               {TONOS_PIEL.map((color, i) => (
                 <Pressable
@@ -204,7 +208,7 @@ export default function Perfil() {
       case 'cara':
         return (
           <>
-            <Text style={estilos.opcionTitulo} accessibilityRole="header">Cara</Text>
+            <Text style={[estilos.opcionTitulo, { fontSize: Math.round(16 * escala) }]} accessibilityRole="header">Cara</Text>
             <View style={estilos.gridImagenes} accessible={false}>
               {CARAS[si].map((img, i) => (
                 <Pressable
@@ -232,7 +236,7 @@ export default function Perfil() {
       case 'pelo':
         return (
           <>
-            <Text style={estilos.opcionTitulo} accessibilityRole="header">Pelo corto</Text>
+            <Text style={[estilos.opcionTitulo, { fontSize: Math.round(16 * escala) }]} accessibilityRole="header">Pelo corto</Text>
             <View style={estilos.gridImagenes} accessible={false}>
               {PELO_CORTO_OPTIONS.map((img, i) => (
                 <Pressable
@@ -255,7 +259,7 @@ export default function Perfil() {
               ))}
             </View>
 
-            <Text style={[estilos.opcionTitulo, { marginTop: 20 }]} accessibilityRole="header">Pelo largo</Text>
+            <Text style={[estilos.opcionTitulo, { fontSize: Math.round(16 * escala) }, { marginTop: 20 }]} accessibilityRole="header">Pelo largo</Text>
             <View style={estilos.gridImagenes} accessible={false}>
               {PELO_LARGO_OPTIONS.map((img, i) => (
                 <Pressable
@@ -283,7 +287,7 @@ export default function Perfil() {
       case 'colorPelo':
         return (
           <>
-            <Text style={estilos.opcionTitulo} accessibilityRole="header">Color de pelo</Text>
+            <Text style={[estilos.opcionTitulo, { fontSize: Math.round(16 * escala) }]} accessibilityRole="header">Color de pelo</Text>
             <View style={estilos.gridColores} accessible={false}>
               {COLORES_PELO.map((color, i) => (
                 <Pressable
@@ -303,7 +307,7 @@ export default function Perfil() {
       case 'camiseta':
         return (
           <>
-            <Text style={estilos.opcionTitulo} accessibilityRole="header">Camiseta</Text>
+            <Text style={[estilos.opcionTitulo, { fontSize: Math.round(16 * escala) }]} accessibilityRole="header">Camiseta</Text>
             <View style={estilos.gridImagenes} accessible={false}>
               {CAMISETAS[si].map((img, i) => (
                 <Pressable
@@ -330,7 +334,7 @@ export default function Perfil() {
 
       default: return null;
     }
-  };
+  }, [tabActivo, si, tonoPiel, cara, peloCorto, peloLargo, colorPeloSeguro, shirt, updateAvatar]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -351,7 +355,7 @@ export default function Perfil() {
           </View>
         </View>
         <View style={estilos.rightPanel}>
-          <TabBar tabActivo={tabActivo} onTabPress={setTabActivo} />
+          <TabBar tabActivo={tabActivo} onTabPress={handleTabPress} escala={escala} />
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={estilos.opcionesScroll}
@@ -374,7 +378,7 @@ export default function Perfil() {
         <AvatarPreview {...avatarProps} size={180} />
       </View>
       <View style={estilos.bottomPanel}>
-        <TabBar tabActivo={tabActivo} onTabPress={setTabActivo} />
+        <TabBar tabActivo={tabActivo} onTabPress={handleTabPress} escala={escala} />
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={estilos.opcionesScroll}

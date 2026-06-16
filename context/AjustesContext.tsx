@@ -1,6 +1,6 @@
 // context/AjustesContext.tsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Platform, useColorScheme } from 'react-native';
+import { PixelRatio, Platform, useColorScheme } from 'react-native';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 export type Tema = 'claro' | 'oscuro' | 'auto';
@@ -199,7 +199,7 @@ export function AjustesProvider({ children }: { children: React.ReactNode }) {
     : temaActivo === 'oscuro' ? COLORES_OSCURO
     : COLORES_CLARO;
 
-  const escala = ESCALA[ajustes.tamanoTexto];
+  const escala = Math.min(PixelRatio.getFontScale(), 1.4);
 
   return (
     <Ctx.Provider value={{ ajustes, temaActivo, escala, colores, actualizar, reset }}>

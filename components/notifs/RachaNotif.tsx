@@ -252,6 +252,7 @@ const ORANGE_LIGHT = '#FF9F0A';
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
+    flex: 1,
     zIndex: 9999,
     elevation: 9999,
     justifyContent: 'center',

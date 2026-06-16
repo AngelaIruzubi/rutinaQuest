@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -15,6 +16,7 @@ import {
   View,
 } from 'react-native';
 import { BarraProgreso } from '../../components/ui/BarraProgreso';
+import { useAjustesCtx } from '../../context/AjustesContext';
 import { getTareas } from '../../database/database';
 import { useGamificacion } from '../../hooks/useGamificacion';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
@@ -32,7 +34,7 @@ const ORANGE    = '#FF6B35';
 const ORANGE_LT = '#FFF2EC';
 const ORANGE_BG = '#FFF7F0';
 
-const fs = (size: number) => Math.round(size * Math.min(PixelRatio.getFontScale(), 1.4));
+const fs = (size: number) => Math.round(size * Math.min(PixelRatio.getFontScale(), 1.4)); // módulo-level fallback
 
 // ─── Helpers fecha ────────────────────────────────────────────────────────────
 function getUltimos7Dias(): string[] {
@@ -65,6 +67,8 @@ function AnimatedRachaNum({ anim }: { anim: Animated.Value }) {
 // ─── FireHero — estilo Duolingo ───────────────────────────────────────────────
 function FireHero({ racha }: { racha: number }) {
   const reduceMotion = useReduceMotion();
+  const { escala, colores } = useAjustesCtx();
+  const fs = (n: number) => Math.round(n * escala); // override con escala de ajustes
   const scaleAnim   = useRef(new Animated.Value(0.6)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim   = useRef(new Animated.Value(1)).current;
@@ -345,7 +349,7 @@ export default function Progreso() {
     <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
       <View style={s.root}>
 
-        <Text style={s.title} accessibilityRole="header">Progreso</Text>
+        <Text style={[s.title]} accessibilityRole="header">Progreso</Text>
 
         <Pressable onPress={() => router.replace('/')} style={s.btnInicio} accessible accessibilityRole="button" accessibilityLabel="Ir a Inicio">
           <Ionicons name="home-outline" size={16} color={PURPLE} accessibilityElementsHidden importantForAccessibility="no" />
@@ -374,27 +378,27 @@ export default function Progreso() {
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 80 }} accessible={false}>
             <View style={s.bigStatsRow}>
               <View style={s.bigStat} accessible accessibilityLabel={`${gami.estrellas ?? 0} estrellas totales`}>
-                <Text style={s.bigStatNum} accessibilityElementsHidden importantForAccessibility="no">{gami.estrellas ?? 0}</Text>
-                <Text style={s.bigStatLabel} accessibilityElementsHidden importantForAccessibility="no">⭐ Estrellas totales</Text>
+                <Text style={[s.bigStatNum]} accessibilityElementsHidden importantForAccessibility="no">{gami.estrellas ?? 0}</Text>
+                <Text style={[s.bigStatLabel]} accessibilityElementsHidden importantForAccessibility="no">⭐ Estrellas totales</Text>
               </View>
             </View>
 
-            <Text style={s.sectionLabel} accessibilityRole="header">Estadísticas</Text>
+            <Text style={[s.sectionLabel]} accessibilityRole="header">Estadísticas</Text>
 
             <View style={s.statCard} accessible accessibilityLabel={mejorDia ? `Mejor día: ${mejorDia.fecha}, ${mejorDia.estrellas} estrellas` : 'Mejor día: sin datos aún'}>
               <View style={s.statCardLeft}>
                 <Text style={s.statCardEmoji} accessibilityElementsHidden importantForAccessibility="no">🏅</Text>
                 <View>
-                  <Text style={s.statCardTitle} accessibilityElementsHidden importantForAccessibility="no">Mejor día</Text>
-                  <Text style={s.statCardSub} accessibilityElementsHidden importantForAccessibility="no">{mejorDia ? mejorDia.fecha : 'Sin datos aún'}</Text>
+                  <Text style={[s.statCardTitle]} accessibilityElementsHidden importantForAccessibility="no">Mejor día</Text>
+                  <Text style={[s.statCardSub]} accessibilityElementsHidden importantForAccessibility="no">{mejorDia ? mejorDia.fecha : 'Sin datos aún'}</Text>
                 </View>
               </View>
-              <Text style={s.statCardVal} accessibilityElementsHidden importantForAccessibility="no">{mejorDia ? `${mejorDia.estrellas} ⭐` : '—'}</Text>
+              <Text style={[s.statCardVal]} accessibilityElementsHidden importantForAccessibility="no">{mejorDia ? `${mejorDia.estrellas} ⭐` : '—'}</Text>
             </View>
 
             {completadas.length === 0 && (
               <View style={s.emptyBox} accessible accessibilityLiveRegion="polite">
-                <Text style={s.emptyText}>Completa tareas para ver tus estadísticas</Text>
+                <Text style={[s.emptyText]}>Completa tareas para ver tus estadísticas</Text>
               </View>
             )}
           </ScrollView>
@@ -405,7 +409,7 @@ export default function Progreso() {
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 80 }} accessible={false}>
             <FireHero racha={gami.racha} />
 
-            <Text style={s.sectionLabel} accessibilityRole="header">Esta semana</Text>
+            <Text style={[s.sectionLabel]} accessibilityRole="header">Esta semana</Text>
             <View style={s.semanaCard}>
               <SemanaRacha racha={gami.racha} />
             </View>
@@ -414,7 +418,7 @@ export default function Progreso() {
               <View style={s.rachaInfoBox}>
                 <Text style={s.rachaInfoEmoji}>🎯</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.rachaInfoTitle}>¡Vas muy bien!</Text>
+                  <Text style={[s.rachaInfoTitle]}>¡Vas muy bien!</Text>
                   <Text style={s.rachaInfoSub}>
                     {gami.racha >= 7
                       ? '¡Una semana completa! Eres increíble 🏆'
@@ -467,7 +471,7 @@ export default function Progreso() {
             )}
 
             {gami.estrellas >= 100 && (
-              <Text style={s.sectionLabel} accessibilityRole="header">Conseguidas</Text>
+              <Text style={[s.sectionLabel]} accessibilityRole="header">Conseguidas</Text>
             )}
 
             {/* Tarjetas verticales */}
@@ -488,40 +492,42 @@ export default function Progreso() {
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   root:  { flex: 1, backgroundColor: '#fff', paddingTop: Platform.OS === 'ios' ? 20 : 40, paddingHorizontal: 18 },
-  title: { fontSize: fs(30), fontWeight: '800', color: PURPLE, textAlign: 'center', marginBottom: 16 },
-
-  btnInicio:    { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: PURPLE + '18', borderRadius: 20, alignSelf: 'flex-start', marginBottom: 8, minHeight: 44 },
-  btnInicioTxt: { color: PURPLE, fontWeight: '600', fontSize: fs(13) },
-
+   btnInicio:    { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: Colors.purple + '18', borderRadius: 20, alignSelf: 'flex-start', marginBottom: 20, minHeight: 44 },
+    btnInicioTxt: { color: Colors.purple, fontWeight: '600', fontSize: 13 },
+    title: {
+      fontSize: 30, fontWeight: '800',
+      color: Colors.purple, textAlign: 'center', marginBottom: 24,
+    },
+  
   tabRow:         { flexDirection: 'row', backgroundColor: PURPLE_BG, borderRadius: 14, padding: 3, marginBottom: 20 },
   tabBtn:         { flex: 1, paddingVertical: 8, borderRadius: 11, alignItems: 'center', minHeight: 44 },
   tabBtnActive:   { backgroundColor: '#fff', borderWidth: 0.5, borderColor: PURPLE_LT },
-  tabLabel:       { fontSize: fs(14), color: '#999' },
+  tabLabel:       { fontSize: 14, color: '#999' },
   tabLabelActive: { color: PURPLE, fontWeight: '600' },
 
   // Estrellas
   bigStatsRow:  { flexDirection: 'column', gap: 10, marginBottom: 18 },
   bigStat:      { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: PURPLE_BG, borderRadius: 16, padding: 18, alignItems: 'center' },
-  bigStatNum:   { fontSize: fs(26), fontWeight: '700', color: PURPLE, lineHeight: fs(42) },
-  bigStatLabel: { fontSize: fs(14), color: '#888', textAlign: 'center', flexShrink: 1 },
-  sectionLabel: { fontSize: fs(11), color: '#BBB', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10, marginTop: 4 },
+  bigStatNum:   { fontSize: 26, fontWeight: '700', color: PURPLE, lineHeight: 42 },
+  bigStatLabel: { fontSize: 14, color: '#888', textAlign: 'center', flexShrink: 1 },
+  sectionLabel: { fontSize: 11, color: '#BBB', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10, marginTop: 4 },
   emptyBox:     { alignItems: 'center', paddingVertical: 30 },
-  emptyText:    { fontSize: fs(15), color: '#AAA', fontWeight: '600', textAlign: 'center' },
+  emptyText:    { fontSize: 15, color: '#AAA', fontWeight: '600', textAlign: 'center' },
   statCard:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: PURPLE_BG, borderRadius: 16, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: PURPLE_LT },
   statCardLeft:  { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  statCardEmoji: { fontSize: fs(28) },
-  statCardTitle: { fontSize: fs(14), fontWeight: '700', color: '#333', flexShrink: 1 },
-  statCardSub:   { fontSize: fs(12), color: '#AAA', marginTop: 2 },
-  statCardVal:   { fontSize: fs(20), fontWeight: '800', color: PURPLE },
+  statCardEmoji: { fontSize: 28 },
+  statCardTitle: { fontSize: 14, fontWeight: '700', color: '#333', flexShrink: 1 },
+  statCardSub:   { fontSize: 12, color: '#AAA', marginTop: 2 },
+  statCardVal:   { fontSize: 20, fontWeight: '800', color: PURPLE },
 
   // Racha Hero
   fireHeroWrap: { alignItems: 'center', paddingVertical: 28, gap: 6 },
   fireGlow:     { position: 'absolute', width: 160, height: 160, borderRadius: 80, backgroundColor: ORANGE, opacity: 0.1, top: 18 },
-  fireEmoji:    { fontSize: fs(86), lineHeight: fs(96) },
-  fireNum:      { fontSize: fs(80), fontWeight: '900', color: ORANGE, lineHeight: fs(88), letterSpacing: -3 },
-  fireSubLabel: { fontSize: fs(16), color: '#999', fontWeight: '500' },
+  fireEmoji:    { fontSize: 86, lineHeight: 96 },
+  fireNum:      { fontSize: 80, fontWeight: '900', color: ORANGE, lineHeight: 88, letterSpacing: -3 },
+  fireSubLabel: { fontSize: 16, color: '#999', fontWeight: '500' },
   rachaBadge:   { marginTop: 8, backgroundColor: ORANGE_BG, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6, borderWidth: 1, borderColor: '#FFD0A8' },
-  rachaBadgeTxt:{ fontSize: fs(13), color: ORANGE, fontWeight: '700' },
+  rachaBadgeTxt:{ fontSize: 13, color: ORANGE, fontWeight: '700' },
 
   // Semana racha
   semanaCard:     { backgroundColor: ORANGE_BG, borderRadius: 18, paddingVertical: 20, paddingHorizontal: 12, borderWidth: 1, borderColor: '#FFE0CC', marginBottom: 12 },
@@ -530,36 +536,36 @@ const s = StyleSheet.create({
   diaDot:         { width: 44, height: 44, borderRadius: 22, backgroundColor: '#EEE', alignItems: 'center', justifyContent: 'center' },
   diaDotActivo:   { backgroundColor: ORANGE, shadowColor: ORANGE, shadowOpacity: 0.5, shadowRadius: 8, elevation: 6 },
   diaDotHoy:      { borderWidth: 2.5, borderColor: ORANGE, backgroundColor: ORANGE_LT },
-  diaFire:        { fontSize: fs(22) },
-  diaLetra:       { fontSize: fs(13), fontWeight: '700', color: '#CCC' },
-  diaNombreLetra: { fontSize: fs(10), color: '#AAA', fontWeight: '600' },
+  diaFire:        { fontSize: 22 },
+  diaLetra:       { fontSize: 13, fontWeight: '700', color: '#CCC' },
+  diaNombreLetra: { fontSize: 10, color: '#AAA', fontWeight: '600' },
 
   rachaInfoBox:    { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: ORANGE_BG, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#FFD0A8', marginTop: 4 },
-  rachaInfoEmoji:  { fontSize: fs(28) },
-  rachaInfoTitle:  { fontSize: fs(14), fontWeight: '700', color: '#333' },
-  rachaInfoSub:    { fontSize: fs(12), color: '#888', marginTop: 2, lineHeight: fs(18) },
+  rachaInfoEmoji:  { fontSize: 28 },
+  rachaInfoTitle:  { fontSize: 14, fontWeight: '700', color: '#333' },
+  rachaInfoSub:    { fontSize: 12, color: '#888', marginTop: 2, lineHeight: 18 },
   rachaVaciaBox:   { alignItems: 'center', paddingVertical: 24, gap: 8, backgroundColor: '#F8F8F8', borderRadius: 16, marginTop: 12 },
-  rachaVaciaEmoji: { fontSize: fs(36) },
-  rachaVaciaText:  { fontSize: fs(14), color: '#AAA', textAlign: 'center', lineHeight: fs(22) },
+  rachaVaciaEmoji: { fontSize: 36 },
+  rachaVaciaText:  { fontSize: 14, color: '#AAA', textAlign: 'center', lineHeight: 22 },
 
   // Medallas
   medalsCol:   { flexDirection: 'column', gap: 12, marginBottom: 18 },
   medalCard:   { flexDirection: 'row', alignItems: 'center', gap: 16, borderRadius: 18, padding: 16, overflow: 'hidden' },
   medalGlow:   { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 18 },
-  medalEmoji:  { fontSize: fs(44), width: 54, textAlign: 'center' },
+  medalEmoji:  { fontSize: 44, width: 54, textAlign: 'center' },
   medalInfo:   { flex: 1 },
-  medalLabel:  { fontSize: fs(18), fontWeight: '800' },
+  medalLabel:  { fontSize: 18, fontWeight: '800' },
   medalBadge:  { flexShrink: 1, alignSelf: 'flex-start', marginTop: 4, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20, borderWidth: 1 },
-  medalBadgeTxt:{ fontSize: fs(11), fontWeight: '700' },
-  medalPending:{ fontSize: fs(12), color: '#AAA', marginTop: 4 },
-  medalCount:  { fontSize: fs(12), fontWeight: '600', marginTop: 4 },
+  medalBadgeTxt:{ fontSize: 11, fontWeight: '700' },
+  medalPending:{ fontSize: 12, color: '#AAA', marginTop: 4 },
+  medalCount:  { fontSize: 12, fontWeight: '600', marginTop: 4 },
 
   // Siguiente medalla
   nextBox:      { borderRadius: 18, padding: 18, marginBottom: 16, borderWidth: 2, alignItems: 'center', gap: 4, backgroundColor: '#fff' },
-  nextLabel:    { fontSize: fs(10), fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase', opacity: 0.7 },
-  nextTitle:    { fontSize: fs(24), fontWeight: '900' },
+  nextLabel:    { fontSize: 10, fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase', opacity: 0.7 },
+  nextTitle:    { fontSize: 24, fontWeight: '900' },
   nextFooter:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginTop: 4 },
-  nextDetailBig:{ fontSize: fs(15), fontWeight: '700' },
+  nextDetailBig:{ fontSize: 15, fontWeight: '700' },
   nextPill:     { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
-  nextPillTxt:  { fontSize: fs(12), fontWeight: '700' },
+  nextPillTxt:  { fontSize: 12, fontWeight: '700' },
 });

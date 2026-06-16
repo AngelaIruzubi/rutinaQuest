@@ -1,4 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
   Platform,
@@ -12,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { Colors } from '../../constants/theme';
+import { useAjustesCtx } from '../../context/AjustesContext';
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -197,6 +200,13 @@ const modal = StyleSheet.create({
 const CONFIG_DEFAULT: ConfigTiempo = { horas: 0, minutos: 25, segundos: 0 };
 
 export default function Temporizador() {
+  const router = useRouter();
+  const { escala, colores } = useAjustesCtx();
+  const ts = useMemo(() => ({
+    title: { fontSize: Math.round(30 * escala) },
+    estadoLabel: { fontSize: Math.round(13 * escala) },
+  }), [escala]);
+  const fs = (n: number) => Math.round(n * escala);
   const [modo,         setModo]        = useState<Modo>('countdown');
   const [estado,       setEstado]      = useState<EstadoTimer>('idle');
   const [config,       setConfig]      = useState<ConfigTiempo>(CONFIG_DEFAULT);
@@ -265,7 +275,19 @@ export default function Temporizador() {
     <SafeAreaView style={estilos.safe}>
       <ScrollView contentContainerStyle={estilos.container} showsVerticalScrollIndicator={false}>
 
-        <Text style={estilos.title}>Temporizador</Text>
+        <Text style={[estilos.title, ts.title, ts.title]}>Temporizador</Text>
+
+        {/* Botón Inicio */}
+        <Pressable
+          onPress={() => router.replace('/')}
+          style={estilos.btnInicio}
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel="Ir a Inicio"
+        >
+          <Ionicons name="home-outline" size={16} color={Colors.purple} />
+          <Text style={estilos.btnInicioTxt}>Inicio</Text>
+        </Pressable>
 
         {/* Selector de modo */}
         <View style={estilos.modoWrap}>
@@ -296,7 +318,7 @@ export default function Temporizador() {
             <Text style={[estilos.timeText, { color: colorDisplay }]}>
               {formatTime(tiempoActual)}
             </Text>
-            <Text style={estilos.estadoLabel}>
+            <Text style={[estilos.estadoLabel, ts.estadoLabel, ts.estadoLabel]}>
               {estado === 'idle'     ? (modo === 'countdown' ? 'Listo' : 'En espera') :
                estado === 'running' ? 'En curso' :
                estado === 'paused'  ? 'Pausado' :
@@ -322,29 +344,29 @@ export default function Temporizador() {
         <View style={estilos.controls}>
           {/* Reset */}
           <TouchableOpacity style={estilos.btnSecondary} onPress={handleReset}>
-            <Text style={estilos.btnSecondaryIcon}>↺</Text>
+            <Ionicons name="refresh-outline" size={22} color={C.textMuted} />
           </TouchableOpacity>
 
           {/* Play / Pause */}
           {estado === 'running' ? (
-            <TouchableOpacity style={estilos.btnPrimary} onPress={handlePause}>
-              <Text style={estilos.btnPrimaryText}>⏸</Text>
-            </TouchableOpacity>
+            <Pressable style={estilos.btnPrimary} onPress={handlePause}>
+              <Ionicons name="pause" size={30} color={Colors.white} />
+            </Pressable>
           ) : (
-            <TouchableOpacity
+            <Pressable
               style={[estilos.btnPrimary, estado === 'finished' && estilos.btnFinished]}
               onPress={handlePlay}
               disabled={estado === 'finished'}
             >
-              <Text style={estilos.btnPrimaryText}>▶</Text>
-            </TouchableOpacity>
+              <Ionicons name="play" size={30} color={Colors.white} />
+            </Pressable>
           )}
 
           {/* Config (solo countdown) */}
           {modo === 'countdown' ? (
-            <TouchableOpacity style={estilos.btnSecondary} onPress={() => setModalVisible(true)}>
-              <Text style={estilos.btnSecondaryIcon}>⚙</Text>
-            </TouchableOpacity>
+            <Pressable style={estilos.btnSecondary} onPress={() => setModalVisible(true)}>
+              <Ionicons name="settings-outline" size={20} color={C.textMuted} />
+            </Pressable>
           ) : (
             <View style={estilos.btnSecondaryPlaceholder} />
           )}
@@ -378,12 +400,12 @@ export default function Temporizador() {
 
 const estilos = StyleSheet.create({
   safe:      { flex: 1, backgroundColor: C.bg },
-  container: { paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 40, alignItems: 'center' },
+  container: { paddingHorizontal: 20, paddingTop: 20, alignItems: 'center' },
 
   title: {
-    fontSize: 30, fontWeight: '600',
+    fontSize: 30, fontWeight: '800',
     color: Colors.purple,
-    textAlign: 'center', marginBottom: 20,
+    textAlign: 'center', marginBottom: 24,
   },
 
   // Selector modo
@@ -424,6 +446,10 @@ const estilos = StyleSheet.create({
   configInfo:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 14, backgroundColor: C.surface, borderRadius: 10, borderWidth: 0.5, borderColor: C.border, marginBottom: 28 },
   configInfoText: { fontSize: 13, color: C.textMuted },
   configInfoEdit: { fontSize: 13, color: Colors.purple, fontWeight: '500' },
+
+  // Botón inicio
+  btnInicio:    { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: Colors.purple + '18', borderRadius: 20, alignSelf: 'flex-start', marginBottom: 20, minHeight: 44 },
+  btnInicioTxt: { color: Colors.purple, fontWeight: '600', fontSize: 13 },
 
   // Tarjetas info
   infoGrid:  { width: '100%', gap: 10 },
