@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import * as Haptics from 'expo-haptics';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
@@ -423,6 +424,7 @@ export default function Calendario() {
   useFocusEffect(cargar);
 
   const seleccionarFecha = (fecha: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setFechaSelec(fecha);
     const todas = getTareasPorFecha(fecha) as any[];
     setTareasDia(todas.filter((t: any) => t.estado === 'pendiente' || (!t.estado && t.completed !== 1)));
@@ -461,8 +463,13 @@ export default function Calendario() {
 
   return (
     <View style={s.root}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ flexGrow: 1 }}
+        keyboardShouldPersistTaps="handled"
+      >
 
-      <Text style={[s.headerTitle, { fontSize: Math.round(30 * escala) }]} accessibilityRole="header">Calendario</Text>
+      <Text style={s.headerTitle}  accessibilityRole="header">Calendario</Text>
 
       <Pressable
         onPress={() => router.replace('/')}
@@ -480,7 +487,7 @@ export default function Calendario() {
         <Pressable onPress={mesAnterior} style={s.mesBtn} accessible accessibilityRole="button" accessibilityLabel="Mes anterior">
           <Ionicons name="chevron-back" size={22} color={PURPLE} />
         </Pressable>
-        <Text style={[s.mesTitulo, { fontSize: Math.round(16 * escala) }]} accessibilityRole="header" accessibilityLabel={`${MESES[mes]} de ${anyo}`}>
+        <Text style={s.mesTitulo} allowFontScaling={false} accessibilityRole="header" accessibilityLabel={`${MESES[mes]} de ${anyo}`}>
           {MESES[mes]} {anyo}
         </Text>
         <Pressable onPress={mesSiguiente} style={s.mesBtn} accessible accessibilityRole="button" accessibilityLabel="Mes siguiente">
@@ -501,12 +508,12 @@ export default function Calendario() {
         <View style={s.diaPanel} accessible={false}>
           <View style={s.diaPanelHeader}>
             <View>
-              <Text style={[s.diaPanelFecha, { fontSize: Math.round(15 * escala) }]} accessibilityLabel={`Día seleccionado: ${fechaLegible(fechaSelec)}${esHoy ? ', hoy' : ''}`}>
+              <Text style={s.diaPanelFecha} allowFontScaling={false} accessibilityLabel={`Día seleccionado: ${fechaLegible(fechaSelec)}${esHoy ? ', hoy' : ''}`}>
                 {fechaLegible(fechaSelec)}
               </Text>
               {esHoy && (
                 <View style={s.hoyBadge}>
-                  <Text style={s.hoyBadgeTxt}>Hoy</Text>
+                  <Text style={s.hoyBadgeTxt} allowFontScaling={false}>Hoy</Text>
                 </View>
               )}
             </View>
@@ -525,7 +532,7 @@ export default function Calendario() {
             )}
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} accessible={false}>
+          <ScrollView showsVerticalScrollIndicator={false} accessible={false} style={{ maxHeight: 300 }}>
             {tareasDia.length === 0 ? (
               <View
                 style={s.emptyDia}
@@ -534,7 +541,7 @@ export default function Calendario() {
                 accessibilityLabel={esFuturo || esHoy ? 'Sin tareas pendientes. Pulsa el botón más para añadir' : 'Sin tareas pendientes este día'}
               >
                 <Ionicons name={esFuturo || esHoy ? 'add-circle-outline' : 'checkmark-circle-outline'} size={32} color="#DDD" />
-                <Text style={[s.emptyDiaTxt, { fontSize: Math.round(13 * escala) }]}>
+                <Text style={s.emptyDiaTxt} allowFontScaling={false}>
                   {esFuturo || esHoy ? 'Sin tareas · pulsa + para añadir' : 'Sin tareas este día'}
                 </Text>
               </View>
@@ -552,9 +559,9 @@ export default function Calendario() {
                       <Ionicons name="ellipse" size={8} color={PURPLE} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={[s.tareaTitulo, { fontSize: Math.round(14 * escala) }]} numberOfLines={1}>{t.title}</Text>
+                      <Text style={s.tareaTitulo} allowFontScaling={false} numberOfLines={1}>{t.title}</Text>
                       {t.hora && t.hora !== 'Sin hora' && (
-                        <Text style={[s.tareaHora, { fontSize: Math.round(12 * escala) }]} accessibilityElementsHidden importantForAccessibility="no">
+                        <Text style={s.tareaHora} allowFontScaling={false} accessibilityElementsHidden importantForAccessibility="no">
                           🕐 {t.hora}
                         </Text>
                       )}
@@ -578,6 +585,8 @@ export default function Calendario() {
         </View>
       )}
 
+      </ScrollView>
+
       <ModalNuevaTarea
         visible={modalVisible}
         fecha={fechaSelec || ''}
@@ -595,17 +604,17 @@ const s = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 20 : 16,
     paddingHorizontal: 14,
   },
-    btnInicio:    { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: Colors.purple + '18', borderRadius: 20, alignSelf: 'flex-start', marginBottom: 20, minHeight: 44 },
-  btnInicioTxt: { color: Colors.purple, fontWeight: '600', fontSize: 13 },
+    btnInicio:    { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 18, paddingVertical: 7, backgroundColor: Colors.purple + '18', borderRadius: 20, alignSelf: 'flex-start', marginBottom: 20, minHeight: 44 },
+  btnInicioTxt: { color: Colors.purple, fontWeight: '600', fontSize: 15 },
   headerTitle: {
     fontSize: 30, fontWeight: '800',
     color: Colors.purple, textAlign: 'center', marginBottom: 24,
   },
 
   // Cabecera mes
-  mesHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20,marginTop: 16, marginBottom: 8 },
-  mesBtn:    {marginBottom: 76, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  mesTitulo: { fontSize: 26, fontWeight: '700', color: Colors.purple ,  marginBottom: 82},
+  mesHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20,marginTop: 16, marginBottom: 16 },
+  mesBtn:    { minWidth: 49, height: 49, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  mesTitulo: { fontSize: 29, fontWeight: '700', color: Colors.purple },
 
   // Calendario
   semanaCab:    { flexDirection: 'row', marginBottom: 6 },
@@ -622,7 +631,7 @@ const s = StyleSheet.create({
 
   // Panel día
   diaPanel: {
-    flex: 1, marginTop: 16,
+    minHeight: 200, marginTop: 16,
     backgroundColor: Colors.purpleBg, borderRadius: 20,
     padding: 14, borderWidth: 1, borderColor: Colors.purpleLt,
   },

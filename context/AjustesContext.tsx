@@ -199,7 +199,7 @@ export function AjustesProvider({ children }: { children: React.ReactNode }) {
     : temaActivo === 'oscuro' ? COLORES_OSCURO
     : COLORES_CLARO;
 
-  const escala = Math.min(PixelRatio.getFontScale(), 1.4);
+  const escala = Math.min(PixelRatio.getFontScale(), 1.15);
 
   return (
     <Ctx.Provider value={{ ajustes, temaActivo, escala, colores, actualizar, reset }}>

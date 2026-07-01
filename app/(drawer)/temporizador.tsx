@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -75,15 +76,15 @@ function NumPicker({ value, min, max, label, onChange }: NumPickerProps) {
 
   return (
     <View style={p.wrap}>
-      <Text style={p.label}>{label}</Text>
+      <Text allowFontScaling={false} style={p.label}>{label}</Text>
       <TouchableOpacity onPress={inc} style={p.arrow}>
-        <Text style={p.arrowText}>▲</Text>
+        <Text allowFontScaling={false} style={p.arrowText}>▲</Text>
       </TouchableOpacity>
       <View style={p.numBox}>
-        <Text style={p.num}>{pad(value)}</Text>
+        <Text maxFontSizeMultiplier={1} style={p.num}>{pad(value)}</Text>
       </View>
       <TouchableOpacity onPress={dec} style={p.arrow}>
-        <Text style={p.arrowText}>▼</Text>
+        <Text allowFontScaling={false} style={p.arrowText}>▼</Text>
       </TouchableOpacity>
     </View>
   );
@@ -124,12 +125,13 @@ function ModalConfig({ visible, config, onConfirm, onClose }: ModalConfigProps) 
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={modal.overlay} onPress={onClose}>
         <Pressable style={modal.sheet} onPress={e => e.stopPropagation()}>
-          <Text style={modal.title}>Configurar tiempo</Text>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <Text  style={modal.title}>Configurar tiempo</Text>
           <View style={modal.pickers}>
             <NumPicker label="Horas"   value={local.horas}    min={0} max={23} onChange={set('horas')} />
-            <Text style={modal.sep}>:</Text>
+            <Text allowFontScaling={false} style={modal.sep}>:</Text>
             <NumPicker label="Min"     value={local.minutos}  min={0} max={59} onChange={set('minutos')} />
-            <Text style={modal.sep}>:</Text>
+            <Text allowFontScaling={false} style={modal.sep}>:</Text>
             <NumPicker label="Seg"     value={local.segundos} min={0} max={59} onChange={set('segundos')} />
           </View>
 
@@ -161,15 +163,16 @@ function ModalConfig({ visible, config, onConfirm, onClose }: ModalConfigProps) 
 
           <View style={modal.actions}>
             <TouchableOpacity style={modal.btnCancel} onPress={onClose}>
-              <Text style={modal.btnCancelText}>Cancelar</Text>
+              <Text allowFontScaling={false} style={modal.btnCancelText}>Cancelar</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[modal.btnConfirm, configToSeg(local) === 0 && modal.btnDisabled]}
               onPress={handleConfirm}
             >
-              <Text style={modal.btnConfirmText}>Aplicar</Text>
+              <Text allowFontScaling={false} style={modal.btnConfirmText}>Aplicar</Text>
             </TouchableOpacity>
           </View>
+          </ScrollView>
         </Pressable>
       </Pressable>
     </Modal>
@@ -178,7 +181,7 @@ function ModalConfig({ visible, config, onConfirm, onClose }: ModalConfigProps) 
 
 const modal = StyleSheet.create({
   overlay:        { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  sheet:          { backgroundColor: C.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 36 },
+  sheet:          { backgroundColor: C.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 36, maxHeight: '85%' },
   title:          { fontSize: 17, fontWeight: '600', color: C.textPrimary, textAlign: 'center', marginBottom: 24 },
   pickers:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 20 },
   sep:            { fontSize: 28, fontWeight: '300', color: C.textHint, marginTop: 16 },
@@ -250,6 +253,7 @@ export default function Temporizador() {
   const handlePlay  = () => { if (estado !== 'finished') setEstado('running'); };
   const handlePause = () => setEstado('paused');
   const handleReset = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setEstado('idle');
     setTiempoActual(modo === 'countdown' ? configToSeg(config) : 0);
   };
@@ -275,7 +279,7 @@ export default function Temporizador() {
     <SafeAreaView style={estilos.safe}>
       <ScrollView contentContainerStyle={estilos.container} showsVerticalScrollIndicator={false}>
 
-        <Text style={[estilos.title, ts.title, ts.title]}>Temporizador</Text>
+        <Text style={estilos.title} >Temporizador</Text>
 
         {/* Botón Inicio */}
         <Pressable
@@ -297,7 +301,7 @@ export default function Temporizador() {
               style={[estilos.modoBtn, modo === m && estilos.modoBtnActive]}
               onPress={() => handleModo(m)}
             >
-              <Text style={[estilos.modoBtnText, modo === m && estilos.modoBtnTextActive]}>
+              <Text  style={[estilos.modoBtnText, modo === m && estilos.modoBtnTextActive]}>
                 {m === 'countdown' ? ' Cuenta atrás' : ' Cronómetro'}
               </Text>
             </TouchableOpacity>
@@ -315,10 +319,10 @@ export default function Temporizador() {
             </View>
           )}
           <View style={estilos.clockContent}>
-            <Text style={[estilos.timeText, { color: colorDisplay }]}>
+            <Text allowFontScaling={false} style={[estilos.timeText, { color: colorDisplay }]}>
               {formatTime(tiempoActual)}
             </Text>
-            <Text style={[estilos.estadoLabel, ts.estadoLabel, ts.estadoLabel]}>
+            <Text allowFontScaling={false} style={estilos.estadoLabel}>
               {estado === 'idle'     ? (modo === 'countdown' ? 'Listo' : 'En espera') :
                estado === 'running' ? 'En curso' :
                estado === 'paused'  ? 'Pausado' :
@@ -336,7 +340,7 @@ export default function Temporizador() {
                 backgroundColor: estado === 'finished' ? C.green.solid : Colors.purple,
               }]} />
             </View>
-            <Text style={estilos.progressLabel}>{Math.round(progreso * 100)}%</Text>
+            <Text allowFontScaling={false} style={estilos.progressLabel}>{Math.round(progreso * 100)}%</Text>
           </View>
         )}
 
@@ -375,7 +379,7 @@ export default function Temporizador() {
         {/* Info del tiempo configurado */}
         {modo === 'countdown' && (
           <TouchableOpacity style={estilos.configInfo} onPress={() => setModalVisible(true)}>
-            <Text style={estilos.configInfoText}>
+            <Text style={estilos.configInfoText} allowFontScaling={false}>
               Tiempo configurado: {config.horas > 0 ? `${config.horas}h ` : ''}
               {config.minutos > 0 ? `${config.minutos}min ` : ''}
               {config.segundos > 0 ? `${config.segundos}seg` : ''}

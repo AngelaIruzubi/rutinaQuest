@@ -105,7 +105,7 @@ function CorazonRoto({ color }: { color: string }) {
       accessibilityElementsHidden
       importantForAccessibility="no"
     >
-      <Text style={{ fontSize: 72, lineHeight: 80 }}>💔</Text>
+      <Text allowFontScaling={false} style={{ fontSize: 72, lineHeight: 80 }}>💔</Text>
     </Animated.View>
   );
 }
@@ -150,7 +150,7 @@ function NotifNormal({
         { transform: [{ translateY: slideAnim }, { scale: Animated.multiply(scaleAnim, bounceAnim) as any }] },
       ]}>
         <Image source={PEREZOSO_IMAGENES[cfg.asset]} style={estilo.img} resizeMode="contain" accessibilityIgnoresInvertColors />
-        <Text style={[estilo.text, { color: cfg.color }]}>{cfg.msg}</Text>
+        <Text allowFontScaling={false} style={[estilo.text, { color: cfg.color }]}>{cfg.msg}</Text>
         {cfg.sub && (
           <TouchableOpacity
             style={[estilo.ctaBtn, { backgroundColor: cfg.color }]}
@@ -159,7 +159,7 @@ function NotifNormal({
             accessibilityRole="button"
             accessibilityLabel={cfg.sub}
           >
-            <Text style={estilo.ctaText}>{cfg.sub}</Text>
+            <Text allowFontScaling={false} style={estilo.ctaText}>{cfg.sub}</Text>
           </TouchableOpacity>
         )}
       </Animated.View>
@@ -301,14 +301,14 @@ function NotifMedalla({
         <Image source={PEREZOSO_IMAGENES[cfg.asset]} style={estilo.mascot} resizeMode="contain" accessibilityIgnoresInvertColors />
       </Animated.View>
       <Animated.View style={[estilo.textBlock, { opacity: textOpacity, transform: [{ translateY: textY }] }]}>
-        <Text style={[estilo.medalLabel, { color: theme.color }]}>{theme.label}</Text>
-        <Text style={estilo.msg}>{cfg.msg}</Text>
-        <Text style={[estilo.subtitle, { color: theme.color + '99' }]}>¡Nueva medalla conseguida!</Text>
+        <Text allowFontScaling={false} style={[estilo.medalLabel, { color: theme.color }]}>{theme.label}</Text>
+        <Text allowFontScaling={false} style={estilo.msg}>{cfg.msg}</Text>
+        <Text allowFontScaling={false} style={[estilo.subtitle, { color: theme.color + '99' }]}>¡Nueva medalla conseguida!</Text>
       </Animated.View>
       <Animated.View style={[estilo.ctaWrap, { opacity: ctaOpacity, transform: [{ scale: ctaScale }] }]}>
         <TouchableOpacity style={[estilo.ctaBtn, { backgroundColor: theme.color }]} activeOpacity={0.8} onPress={onClose}
           accessibilityRole="button" accessibilityLabel="Cerrar notificación de medalla">
-          <Text style={estilo.ctaText}>¡A por la siguiente!</Text>
+          <Text allowFontScaling={false} style={estilo.ctaText}>¡A por la siguiente!</Text>
         </TouchableOpacity>
       </Animated.View>
     </Animated.View>
@@ -509,9 +509,9 @@ function NotifBajada({
 
       {/* Texto */}
       <Animated.View style={[estilo.textBlock, { opacity: textOpacity, transform: [{ translateY: textY }] }]}>
-        <Text style={[estilo.medalLabel, { color: theme.color }]}>{theme.label}</Text>
-        <Text style={estilo.msg}>{cfg.msg}</Text>
-        <Text style={[estilo.subtitle, { color: theme.color + '88' }]}>Completa tareas a tiempo para recuperarla</Text>
+        <Text allowFontScaling={false} style={[estilo.medalLabel, { color: theme.color }]}>{theme.label}</Text>
+        <Text allowFontScaling={false} style={estilo.msg}>{cfg.msg}</Text>
+        <Text allowFontScaling={false} style={[estilo.subtitle, { color: theme.color + '88' }]}>Completa tareas a tiempo para recuperarla</Text>
       </Animated.View>
 
       {/* CTA */}
@@ -521,7 +521,7 @@ function NotifBajada({
           activeOpacity={0.8} onPress={onClose}
           accessibilityRole="button" accessibilityLabel="Cerrar notificación de bajada de medalla"
         >
-          <Text style={[estilo.ctaText, { color: theme.color }]}>Voy a recuperarla</Text>
+          <Text allowFontScaling={false} style={[estilo.ctaText, { color: theme.color }]}>Voy a recuperarla</Text>
         </TouchableOpacity>
       </Animated.View>
     </Animated.View>
@@ -576,14 +576,7 @@ export function PerezosoNotif({
   }, [show, type]);
 
   return (
-    <>
-      {/* Precarga: renderiza imágenes invisibles fuera del Modal para cachearlas */}
-      <View style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }}>
-        {Object.values(PEREZOSO_IMAGENES).map((src, i) => (
-          <Image key={i} source={src} style={{ width: 1, height: 1 }} />
-        ))}
-      </View>
-      <Modal visible={show} transparent animationType="none" statusBarTranslucent accessibilityViewIsModal={false}>
+    <Modal visible={show} transparent animationType="none" statusBarTranslucent accessibilityViewIsModal={false}>
       {esBajada ? (
         <NotifBajada  type={type} cfg={cfg} show={show} reduceMotion={reduceMotion} onClose={onClose} />
       ) : esMedalla ? (
@@ -591,8 +584,7 @@ export function PerezosoNotif({
       ) : (
         <NotifNormal cfg={cfg} opacityAnim={opacityAnim} slideAnim={slideAnim} scaleAnim={scaleAnim} bounceAnim={bounceAnim} onClose={onClose} />
       )}
-      </Modal>
-    </>
+    </Modal>
   );
 }
 
@@ -602,12 +594,12 @@ const estilo = StyleSheet.create({
   // Normal
   overlay:  { ...StyleSheet.absoluteFillObject, flex: 1, justifyContent: 'center', alignItems: 'center', zIndex: 9999, elevation: 9999 },
   card:     { width: '100%', flex: 1, paddingVertical: 32, paddingHorizontal: 24, alignItems: 'center', justifyContent: 'center', elevation: 12 },
-  img:      { width: 240, height: 240, marginBottom: 20 },
+  img:      { width: '70%', aspectRatio: 1, maxHeight: 280, marginBottom: 20 },
   text:     { fontSize: 26, fontWeight: '800', textAlign: 'center', lineHeight: 34, flexShrink: 1 },
   sub:      { fontSize: 15, fontWeight: '500', textAlign: 'center', marginTop: 10, flexShrink: 1 },
 
   // Shared full-screen
-  screen:    { ...StyleSheet.absoluteFillObject, flex: 1, zIndex: 9999, elevation: 9999, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 },
+  screen:    { ...StyleSheet.absoluteFillObject, zIndex: 9999, elevation: 9999, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 },
   bgGlow:    { position: 'absolute', width: 340, height: 340, borderRadius: 170, top: '20%' },
   mascotWrap:{ alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
   halo:      { position: 'absolute', width: 260, height: 260 },

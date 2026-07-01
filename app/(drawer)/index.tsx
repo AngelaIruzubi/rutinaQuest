@@ -12,6 +12,7 @@ import { capitalize } from '../../utils/fechaFormato';
 import { minutosRestantes, parseTiempoLim } from '../../utils/tiempo';
 
 import {
+  AccessibilityInfo,
   Alert,
   Image,
   Platform,
@@ -50,7 +51,7 @@ import { ahoraApp, ahoraAppMs, hoyAppStr, setFechaSimulada, setHoraSimulada } fr
 import { detectarMedalla } from '../../utils/gamificacion';
 
 if (__DEV__) {
-  setFechaSimulada('2026-09-28');
+  setFechaSimulada('2026-09-29');
   setHoraSimulada(12, 0);
 }
 const SONIDOS: Record<string, any> = {
@@ -315,6 +316,11 @@ const disparaRachaNotif = (racha: number) => {
       if (pts === 5) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       else           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
+    AccessibilityInfo.announceForAccessibility(
+      pts === 5
+        ? `Tarea completada. +5 estrellas`
+        : `Tarea completada tarde. +3 estrellas`
+    );
 
     setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed: true, stars: pts } : t));
     saltadasRef.current = 0;
@@ -474,7 +480,7 @@ const disparaRachaNotif = (racha: number) => {
               placeholder="Buscar tarea.."
               value={search}
               onChangeText={setSearch}
-              style={{ flex: 1, fontSize: 16 }}
+              style={{ flex: 1, fontSize: fs(16) }}
               returnKeyType="search"
               accessibilityLabel="Buscar tarea"
               accessibilityHint="Escribe para filtrar las tareas de hoy"
@@ -491,14 +497,14 @@ const disparaRachaNotif = (racha: number) => {
           <View style={styles.emptyBox} accessible accessibilityLiveRegion="polite">
             {totalToday > 0 && doneToday === totalToday ? (
               <>
-                <Image source={PEREZOSO_IMAGENES.celebrando} accessibilityLabel="Perezoso celebrando" accessibilityIgnoresInvertColors />
-                <Text style={[styles.emptyText, { fontSize: fs(26) }]}>¡Todo completado hoy!</Text>
+                <Image source={PEREZOSO_IMAGENES.celebrando}  accessibilityLabel="Perezoso celebrando" accessibilityIgnoresInvertColors />
+                <Text style={[styles.emptyText, { fontSize: fs(26) }]} allowFontScaling={false}>¡Todo completado hoy!</Text>
               </>
             ) : (
               <>
-                <Image source={PEREZOSO_IMAGENES.llorando} accessibilityLabel="Perezoso triste" accessibilityIgnoresInvertColors />
-                <Text style={[styles.emptyText, { fontSize: fs(26) }]} accessibilityLabel="No tienes tareas para hoy">No tienes tareas para hoy</Text>
-                <Text style={[styles.emptySubText, { fontSize: fs(20) }]} accessibilityLabel="Pulsa + para añadir una tarea">Pulsa + para añadir una tarea</Text>
+                <Image source={PEREZOSO_IMAGENES.llorando}  accessibilityLabel="Perezoso triste" accessibilityIgnoresInvertColors />
+                <Text style={[styles.emptyText, { fontSize: fs(26) }]} allowFontScaling={false} accessibilityLabel="No tienes tareas para hoy">No tienes tareas para hoy</Text>
+                <Text style={[styles.emptySubText, { fontSize: fs(20) }]} allowFontScaling={false} accessibilityLabel="Pulsa + para añadir una tarea">Pulsa + para añadir una tarea</Text>
               </>
             )}
           </View>
@@ -654,7 +660,7 @@ const styles = StyleSheet.create({
   dateText: { textAlign: 'center', color: '#888', marginBottom: 20, fontSize: 17 },
 
   searchBar:    { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f3f2f2', borderRadius: 25, paddingHorizontal: 15, paddingVertical: 10, marginBottom: 20, minHeight: 44 },
-  emptyBox:     { alignItems: 'center', paddingVertical: 40, width: '100%', height: 200 },
+  emptyBox:     { alignItems: 'center', paddingVertical: 24, width: '100%' },
   emptyText:    { fontSize: 26, color: PURPLE, fontWeight: '600', marginTop: 14, textAlign: 'center' },
   emptySubText: { fontSize: 20, color: '#AAA', marginTop: 6 },
 

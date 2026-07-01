@@ -378,8 +378,8 @@ export default function Progreso() {
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 80 }} accessible={false}>
             <View style={s.bigStatsRow}>
               <View style={s.bigStat} accessible accessibilityLabel={`${gami.estrellas ?? 0} estrellas totales`}>
-                <Text style={[s.bigStatNum]} accessibilityElementsHidden importantForAccessibility="no">{gami.estrellas ?? 0}</Text>
-                <Text style={[s.bigStatLabel]} accessibilityElementsHidden importantForAccessibility="no">⭐ Estrellas totales</Text>
+                <Text maxFontSizeMultiplier={1} style={s.bigStatNum} accessibilityElementsHidden importantForAccessibility="no">{gami.estrellas ?? 0}</Text>
+                <Text maxFontSizeMultiplier={1} style={s.bigStatLabel} accessibilityElementsHidden importantForAccessibility="no">⭐ Estrellas totales</Text>
               </View>
             </View>
 
@@ -389,11 +389,11 @@ export default function Progreso() {
               <View style={s.statCardLeft}>
                 <Text style={s.statCardEmoji} accessibilityElementsHidden importantForAccessibility="no">🏅</Text>
                 <View>
-                  <Text style={[s.statCardTitle]} accessibilityElementsHidden importantForAccessibility="no">Mejor día</Text>
-                  <Text style={[s.statCardSub]} accessibilityElementsHidden importantForAccessibility="no">{mejorDia ? mejorDia.fecha : 'Sin datos aún'}</Text>
+                  <Text maxFontSizeMultiplier={1} style={s.statCardTitle} accessibilityElementsHidden importantForAccessibility="no">Mejor día</Text>
+                  <Text maxFontSizeMultiplier={1} style={s.statCardSub} accessibilityElementsHidden importantForAccessibility="no">{mejorDia ? mejorDia.fecha : 'Sin datos aún'}</Text>
                 </View>
               </View>
-              <Text style={[s.statCardVal]} accessibilityElementsHidden importantForAccessibility="no">{mejorDia ? `${mejorDia.estrellas} ⭐` : '—'}</Text>
+              <Text maxFontSizeMultiplier={1} style={s.statCardVal} accessibilityElementsHidden importantForAccessibility="no">{mejorDia ? `${mejorDia.estrellas} ⭐` : '—'}</Text>
             </View>
 
             {completadas.length === 0 && (

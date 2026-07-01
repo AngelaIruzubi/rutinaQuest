@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { Colors } from '../../constants/theme';
+import { useAjustesCtx } from '../../context/AjustesContext';
 import { buscarPictogramas } from '../../services/arasaac';
 import { Tarea } from '../../types/tarea';
 import { fechaAppDate } from '../../utils/fecha';
@@ -32,6 +33,8 @@ interface ModalEditarTareaProps {
 // ─── Componente ───────────────────────────────────────────────────────────────
 
 export function ModalEditarTarea({ visible, tarea, onCerrar, onGuardar }: ModalEditarTareaProps) {
+  const { escala } = useAjustesCtx();
+  const fs = (n: number) => Math.round(n * escala);
   const [editTitulo,      setEditTitulo]      = useState('');
   const [editPictogramas, setEditPictogramas] = useState<number[]>([]);
   const [editPictogramId, setEditPictogramId] = useState<number | null>(null);
@@ -86,7 +89,7 @@ export function ModalEditarTarea({ visible, tarea, onCerrar, onGuardar }: ModalE
               >
                 <Ionicons name="close" size={26} color={Colors.purple} accessibilityElementsHidden importantForAccessibility="no" />
               </Pressable>
-              <Text style={s.topTitle} accessibilityRole="header">Editar tarea</Text>
+              <Text style={[s.topTitle, { fontSize: fs(20) }]} accessibilityRole="header">Editar tarea</Text>
             </View>
 
             {/* Título */}
@@ -100,7 +103,7 @@ export function ModalEditarTarea({ visible, tarea, onCerrar, onGuardar }: ModalE
                     setEditPictogramas(ids);
                   }
                 }}
-                style={{ flex: 1, paddingVertical: 10, fontSize: 16 }}
+                style={{ flex: 1, paddingVertical: 10, fontSize: fs(16) }}
                 accessibilityLabel="Título de la tarea"
                 returnKeyType="done"
                 clearButtonMode="while-editing"
@@ -229,7 +232,7 @@ export function ModalEditarTarea({ visible, tarea, onCerrar, onGuardar }: ModalE
               accessibilityRole="button"
               accessibilityLabel={editTitulo.trim() ? `Guardar cambios en ${editTitulo}` : 'Escribe un título primero'}
             >
-              <Text style={s.btnPrimaryText} accessibilityElementsHidden importantForAccessibility="no">
+              <Text style={[s.btnPrimaryText, { fontSize: fs(20) }]} accessibilityElementsHidden importantForAccessibility="no">
                 Guardar cambios ✓
               </Text>
             </Pressable>
@@ -245,7 +248,7 @@ export function ModalEditarTarea({ visible, tarea, onCerrar, onGuardar }: ModalE
 
 const s = StyleSheet.create({
   overlay:         { flex: 1, backgroundColor: 'rgba(0,0,0,0.28)', justifyContent: 'center', alignItems: 'center' },
-  modalBox:        { backgroundColor: Colors.purpleBg, borderRadius: 22, padding: 20, width: '90%' },
+  modalBox:        { backgroundColor: Colors.purpleBg, borderRadius: 22, padding: 20, width: '90%', maxHeight: '90%' },
   topBar:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
   topTitle:        { fontSize: 20, fontWeight: '600', color: Colors.purple, flex: 1, textAlign: 'center', marginHorizontal: 8 },
   inputRow:        { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#DDD', borderRadius: 12, paddingHorizontal: 12, backgroundColor: 'white', minHeight: 44 },

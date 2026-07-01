@@ -16,8 +16,8 @@ export function AnimatedCounter({ anim, max }: AnimatedCounterProps) {
 
   return (
     <View style={s.wrap}>
-      <Text style={s.num}>{display}</Text>
-      <Text style={s.unit}>días seguidos</Text>
+      <Text allowFontScaling={false} style={s.num}>{display}</Text>
+      <Text allowFontScaling={false} style={s.unit}>días seguidos</Text>
     </View>
   );
 }

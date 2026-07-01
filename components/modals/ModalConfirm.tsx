@@ -1,6 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { Modal, Pressable, Text, View } from 'react-native';
 import { Colors } from '../../constants/theme';
+import { useAjustesCtx } from '../../context/AjustesContext';
 
 interface Opcion {
   texto:       string;
@@ -17,12 +18,14 @@ interface ModalConfirmProps {
 }
 
 export function ModalConfirm({ visible, titulo, mensaje, opciones, onOpcion }: ModalConfirmProps) {
+  const { escala } = useAjustesCtx();
+  const fs = (n: number) => Math.round(n * escala);
   return (
     <Modal visible={visible} transparent animationType="fade" accessibilityViewIsModal>
       <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 32 }}>
         <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 24, width: '100%', maxWidth: 340 }}>
-          <Text style={{ fontSize: 18, fontWeight: '700', color: '#333', marginBottom: 8 }}>{titulo}</Text>
-          <Text style={{ fontSize: 15, color: '#666', marginBottom: 24, lineHeight: 22 }}>{mensaje}</Text>
+          <Text style={{ fontSize: fs(18), fontWeight: '700', color: '#333', marginBottom: 8 }}>{titulo}</Text>
+          <Text style={{ fontSize: fs(15), color: '#666', marginBottom: 24, lineHeight: 22 }}>{mensaje}</Text>
           <View style={{ gap: 10 }}>
             {opciones.map((op, i) => (
               <Pressable
@@ -43,7 +46,7 @@ export function ModalConfirm({ visible, titulo, mensaje, opciones, onOpcion }: M
                 }}
                 accessible accessibilityRole="button" accessibilityLabel={op.texto}
               >
-                <Text style={{ fontWeight: '700', fontSize: 15, color: op.destructivo ? Colors.red : op.valor === null ? '#888' : Colors.purple }}>
+                <Text style={{ fontWeight: '700', fontSize: fs(15), color: op.destructivo ? Colors.red : op.valor === null ? '#888' : Colors.purple }}>
                   {op.texto}
                 </Text>
               </Pressable>

@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { memo, useCallback, useState } from 'react';
 import {
   Image, Pressable, ScrollView,
@@ -175,7 +176,10 @@ export default function Perfil() {
   const { tonoPiel, cara, colorPelo, peloCorto, peloLargo, shirt } = avatar;
 
   const [tabActivo, setTabActivo] = useState('piel');
-  const handleTabPress = useCallback((id: string) => setTabActivo(id), []);
+  const handleTabPress = useCallback((id: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setTabActivo(id);
+  }, []);
 
   const si: 0 | 1        = tonoPiel === 1 ? 1 : 0;
   const colorPeloSeguro  = COLORES_PELO[colorPelo] ?? COLORES_PELO[0];
