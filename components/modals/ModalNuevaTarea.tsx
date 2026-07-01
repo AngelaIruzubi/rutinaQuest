@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { Colors } from '../../constants/theme';
+import { useAjustesCtx } from '../../context/AjustesContext';
 import { buscarPictogramas } from '../../services/arasaac';
 import { Tarea } from '../../types/tarea';
 import { ahoraAppMs, fechaAppDate, hoyAppStr } from '../../utils/fecha';
@@ -30,6 +31,8 @@ interface ModalNuevaTareaProps {
 // ─── Componente ───────────────────────────────────────────────────────────────
 
 export function ModalNuevaTarea({ visible, onCerrar, onGuardar }: ModalNuevaTareaProps) {
+  const { escala } = useAjustesCtx();
+  const fs = (n: number) => Math.round(n * escala);
   const [titulo,      setTitulo]      = useState('');
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [pictogramas, setPictogramas] = useState<number[]>([]);
@@ -117,7 +120,7 @@ const buscarPictogramasDebounced = async (texto: string) => {
               >
                 <Ionicons name="close" size={26} color={Colors.purple} />
               </Pressable>
-              <Text style={s.topTitle} accessibilityRole="header">Nueva tarea</Text>
+              <Text style={[s.topTitle, { fontSize: fs(20) }]} accessibilityRole="header">Nueva tarea</Text>
             </View>
 
             {/* Título */}
@@ -126,7 +129,7 @@ const buscarPictogramasDebounced = async (texto: string) => {
                 placeholder="Escribe tu tarea..."
                 value={titulo}
                 onChangeText={buscarImagen}
-                style={{ flex: 1, paddingVertical: 10, fontSize: 16 }}
+                style={{ flex: 1, paddingVertical: 10, fontSize: fs(16) }}
                 accessibilityLabel="Título de la tarea"
                 accessibilityHint="Escribe el nombre de la tarea. Se buscarán pictogramas automáticamente"
                 returnKeyType="done"
@@ -240,7 +243,7 @@ const buscarPictogramasDebounced = async (texto: string) => {
               accessibilityLabel="Añadir tarea"
               accessibilityHint={titulo.trim() ? `Guardará la tarea ${titulo}` : 'Escribe un título primero'}
             >
-              <Text style={s.btnPrimaryText}>Añadir ✓</Text>
+              <Text style={[s.btnPrimaryText, { fontSize: fs(20) }]}>Añadir ✓</Text>
             </Pressable>
 
           </ScrollView>
@@ -254,7 +257,7 @@ const buscarPictogramasDebounced = async (texto: string) => {
 
 const s = StyleSheet.create({
   overlay:         { flex: 1, backgroundColor: 'rgba(0,0,0,0.28)', justifyContent: 'center', alignItems: 'center' },
-  modalBox:        { backgroundColor: Colors.purpleBg, borderRadius: 22, padding: 20, width: '90%' },
+  modalBox:        { backgroundColor: Colors.purpleBg, borderRadius: 22, padding: 20, width: '90%', maxHeight: '90%' },
   topBar:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
   topTitle:        { fontSize: 20, fontWeight: '600', color: Colors.purple, flex: 1, textAlign: 'center', marginHorizontal: 8 },
   inputRow:        { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#DDD', borderRadius: 12, paddingHorizontal: 12, backgroundColor: 'white', minHeight: 44 },

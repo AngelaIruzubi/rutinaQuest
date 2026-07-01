@@ -12,7 +12,9 @@ import { AjustesProvider } from '../../context/AjustesContext';
 import { AvatarProvider } from '../../context/AvatarContext';
 import { initDB } from '../../database/database';
 
-if (Platform.OS !== 'web') SplashScreen.preventAutoHideAsync().catch(() => {});
+try {
+  if (Platform.OS !== 'web') SplashScreen.preventAutoHideAsync();
+} catch {} 
 
 // ─── INICIALIZACIÓN SÍNCRONA DE LA BD ────────────────────────────────────────
 // Se ejecuta cuando el módulo se importa, ANTES de cualquier render.
@@ -40,7 +42,7 @@ function DL({ icono, label, color = '#333' }: { icono: string; label: string; co
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
       <Ionicons name={icono as any} size={20} color={PURPLE} />
-      <Text style={{ fontSize: 15, fontWeight: '600', color }}>{label}</Text>
+      <Text style={{ fontSize: 15, fontWeight: '600', color }} allowFontScaling={false}>{label}</Text>
     </View>
   );
 }
@@ -102,6 +104,7 @@ export default function Layout() {
             headerTintColor:            WHITE,
             headerTitleAlign:           'center',
             headerTitleStyle:           { fontSize: titleSize, fontWeight: 'bold' },
+            headerTitleAllowFontScaling:  false,
             headerRight:                HeaderRight,
             drawerStyle:                { backgroundColor: '#fff' },
             drawerActiveTintColor:      PURPLE,

@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Colors } from '../../constants/theme';
+import { useAjustesCtx } from '../../context/AjustesContext';
 import { Tarea } from '../../types/tarea';
 import { StarRow } from '../ui/StarRow';
 
@@ -21,6 +22,8 @@ interface ModalDetalleTareaProps {
 export function ModalDetalleTarea({
   visible, tarea, onCerrar, onCompletar, onEditar, onEliminar,
 }: ModalDetalleTareaProps) {
+  const { escala } = useAjustesCtx();
+  const fs = (n: number) => Math.round(n * escala);
   return (
     <Modal
       visible={visible}
@@ -31,7 +34,7 @@ export function ModalDetalleTarea({
     >
       <Pressable style={s.overlay} onPress={onCerrar} accessible={false}>
         <Pressable
-          style={[s.modalBox, { alignItems: 'center' }]}
+          style={[s.modalBox, { alignItems: 'center', maxHeight: '85%' }]}
           onPress={e => e.stopPropagation()}
           accessible={false}
           importantForAccessibility="yes"
@@ -46,6 +49,11 @@ export function ModalDetalleTarea({
           >
             <Ionicons name="close" size={26} color={Colors.purple} accessibilityElementsHidden importantForAccessibility="no" />
           </Pressable>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ alignItems: 'center', paddingBottom: 8, width: '100%' }}
+            keyboardShouldPersistTaps="handled"
+          >
 
           {/* Título */}
           <View style={[s.topBar, { justifyContent: 'center' }]} accessible={false}>
@@ -85,7 +93,7 @@ export function ModalDetalleTarea({
               accessibilityLabel={`Tarea completada con ${tarea.stars ?? 5} de 5 estrellas`}
             >
               <StarRow count={tarea.stars ?? 5} size={30} />
-              <Text style={{ color: Colors.green, fontWeight: '700', marginTop: 8, fontSize: 15 }} accessibilityElementsHidden importantForAccessibility="no">
+              <Text style={{ color: Colors.green, fontWeight: '700', marginTop: 8, fontSize: fs(15) }} accessibilityElementsHidden importantForAccessibility="no">
                 ¡Tarea completada!
               </Text>
             </View>
@@ -140,6 +148,7 @@ export function ModalDetalleTarea({
               </Pressable>
             </View>
           )}
+          </ScrollView>
         </Pressable>
       </Pressable>
     </Modal>
@@ -157,6 +166,6 @@ const s = StyleSheet.create({
   pictoEmpty: { width: 160, height: 160, marginVertical: 16, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f3f2f2', borderRadius: 12 },
   hora:       { color: '#888', fontSize: 20 },
   doneBox:    { alignItems: 'center', paddingVertical: 16, width: '100%' },
-  btnPrimary: { backgroundColor: Colors.purpleLt, padding: 15, borderRadius: 15, alignItems: 'center', marginTop: 16, minHeight: 44 },
+  btnPrimary: { backgroundColor: Colors.purpleLt, padding: 15,paddingHorizontal: 55, borderRadius: 15, alignItems: 'center', marginTop: 16, minHeight: 44 },
   btnPrimaryText: { fontSize: 20, color: Colors.purple, fontWeight: '600' },
 });

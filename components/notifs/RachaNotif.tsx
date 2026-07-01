@@ -201,12 +201,12 @@ export function RachaNotif({ show, racha, onClose }: RachaNotifProps) {
                 },
               ]}
             >
-              <Text style={styles.fireEmoji}>🔥</Text>
+              <Text allowFontScaling={false} style={styles.fireEmoji}>🔥</Text>
             </Animated.View>
           </Animated.View>
 
           {/* ── Text ── */}
-          <Text style={styles.label}>¡Racha activa!</Text>
+          <Text allowFontScaling={false} style={styles.label}>¡Racha activa!</Text>
           <AnimatedCounter anim={count} max={racha} />
 
           {/* ── Milestones ── */}
@@ -218,11 +218,11 @@ export function RachaNotif({ show, racha, onClose }: RachaNotifProps) {
               return (
                 <View key={m} style={styles.milestone}>
                   <View style={[styles.mDot, done ? styles.mDotDone : styles.mDotNext, current && styles.mDotCurrent]}>
-                    <Text style={[styles.mDotText, done ? styles.mDotTextDone : styles.mDotTextNext]}>
+                    <Text allowFontScaling={false} style={[styles.mDotText, done ? styles.mDotTextDone : styles.mDotTextNext]}>
                       {done ? (current ? String(m) : '✓') : String(m)}
                     </Text>
                   </View>
-                  <Text style={[styles.mLabel, done && styles.mLabelDone]}>
+                  <Text allowFontScaling={false} style={[styles.mLabel, done && styles.mLabelDone]}>
                     {current ? 'HOY' : `${m}d`}
                   </Text>
                 </View>
@@ -238,7 +238,7 @@ export function RachaNotif({ show, racha, onClose }: RachaNotifProps) {
             accessibilityRole="button"
             accessibilityLabel="Cerrar notificación de racha"
           >
-            <Text style={styles.ctaText}>¡Sigue así!</Text>
+            <Text allowFontScaling={false} style={styles.ctaText}>¡Sigue así!</Text>
           </TouchableOpacity>
         </Animated.View>
       </Animated.View>
@@ -252,7 +252,6 @@ const ORANGE_LIGHT = '#FF9F0A';
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    flex: 1,
     zIndex: 9999,
     elevation: 9999,
     justifyContent: 'center',
