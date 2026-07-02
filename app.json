@@ -4,13 +4,13 @@
     "slug": "rutinaquest",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icono.gif",
+    "icon": "./assets/images/icono.png",
     "scheme": "rutinaquest",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.gestor-tareas-gamificado"
+      "bundleIdentifier": "com.rutinaquest.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -24,23 +24,24 @@
         "color": "#A77BBE"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.rutinaquest.app"
     },
     "splash": {
-      "image": "./assets/images/icono.gif",
+      "image": "./assets/images/icono.png",
       "resizeMode": "contain",
       "backgroundColor": "#F4F0F6"
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/icono.gif"
+      "favicon": "./assets/images/icono.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/icono.gif",
+          "image": "./assets/images/icono.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",

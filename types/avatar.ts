@@ -6,4 +6,5 @@ export interface EstadoAvatar {
   peloCorto: number;
   peloLargo: number;
   shirt: number;
+  genero: "hombre" | "mujer";
 }
