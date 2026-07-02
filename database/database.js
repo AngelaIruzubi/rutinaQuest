@@ -1,21 +1,21 @@
-import { Platform } from 'react-native';
-import { hoyAppStr } from '../utils/fecha';
+import { Platform } from "react-native";
+import { hoyAppStr } from "../utils/fecha";
 
 let db = null;
 
 function getDB() {
   if (!db) {
-    const SQLite = require('expo-sqlite');
-    db = SQLite.openDatabaseSync('taskmanager.db');
+    const SQLite = require("expo-sqlite");
+    db = SQLite.openDatabaseSync("taskmanager.db");
   }
   return db;
 }
 
 export function initDB() {
-  if (Platform.OS === 'web') return;
+  if (Platform.OS === "web") return;
 
-  const SQLite = require('expo-sqlite');
-  db = SQLite.openDatabaseSync('taskmanager.db');
+  const SQLite = require("expo-sqlite");
+  db = SQLite.openDatabaseSync("taskmanager.db");
 
   db.execSync(`
     CREATE TABLE IF NOT EXISTS usuario (
@@ -52,9 +52,12 @@ export function initDB() {
     `ALTER TABLE tareas ADD COLUMN estado TEXT DEFAULT 'pendiente'`,
     `ALTER TABLE tareas ADD COLUMN repeticion TEXT DEFAULT 'ninguna'`,
     `ALTER TABLE tareas ADD COLUMN tareaBaseId TEXT`,
+    `ALTER TABLE usuario ADD COLUMN genero TEXT DEFAULT 'hombre'`,
   ];
   for (const sql of migraciones) {
-    try { db.execSync(sql); } catch {}  //Si la columna ya existe lanza un error
+    try {
+      db.execSync(sql);
+    } catch {} //Si la columna ya existe lanza un error
   }
 }
 
@@ -62,56 +65,66 @@ export function initDB() {
 
 //Inicializa al usuario
 const USUARIO_DEFAULT = {
-  tonoPiel: 0, cara: 0, ojos: 0,
-  peloCorto: 0, peloLargo: -1, shirt: 0,
-  nivel: 1, puntos: 0,
+  tonoPiel: 0,
+  cara: 0,
+  ojos: 0,
+  peloCorto: 0,
+  peloLargo: -1,
+  shirt: 0,
+  genero: "hombre",
+
+  nivel: 1,
+  puntos: 0,
 };
 
 //Lee datos del avatar
 export function getUsuario() {
-  if (Platform.OS === 'web') {
-    const data = localStorage.getItem('usuario');
+  if (Platform.OS === "web") {
+    const data = localStorage.getItem("usuario");
     return data ? JSON.parse(data) : USUARIO_DEFAULT;
   }
-  return getDB().getFirstSync('SELECT * FROM usuario WHERE id = 1');
+  return getDB().getFirstSync("SELECT * FROM usuario WHERE id = 1");
 }
 
 //Escribe datos del avatar
 
 export function updateUsuario(fields) {
-  if (Platform.OS === 'web') {
+  if (Platform.OS === "web") {
     const current = getUsuario();
-    localStorage.setItem('usuario', JSON.stringify({ ...current, ...fields }));
+    localStorage.setItem("usuario", JSON.stringify({ ...current, ...fields }));
     return;
   }
-  const keys   = Object.keys(fields).map(k => `${k}=?`).join(', ');
+  const keys = Object.keys(fields)
+    .map((k) => `${k}=?`)
+    .join(", ");
   const values = Object.values(fields);
   getDB().runSync(`UPDATE usuario SET ${keys} WHERE id=1`, values);
 }
 
 // ── TAREAS ────
- //devuelve todas las tareas
+//devuelve todas las tareas
 export function getTareas() {
-  if (Platform.OS === 'web') {
-    const data = localStorage.getItem('tareas');
+  if (Platform.OS === "web") {
+    const data = localStorage.getItem("tareas");
     return data ? JSON.parse(data) : [];
   }
-  return getDB().getAllSync('SELECT * FROM tareas');
+  return getDB().getAllSync("SELECT * FROM tareas");
 }
 
 //Devuelve las tareas filtradas por completadas, canceladad o vencidad y ordenadas por fecha
 export function getTareasHistorial() {
-  if (Platform.OS === 'web') {
+  if (Platform.OS === "web") {
     return getTareas()
-      .filter(t =>
-        t.estado === 'completada' ||
-        t.estado === 'cancelada'  ||
-        t.estado === 'vencida'    ||
-        t.completed === 1
+      .filter(
+        (t) =>
+          t.estado === "completada" ||
+          t.estado === "cancelada" ||
+          t.estado === "vencida" ||
+          t.completed === 1,
       )
       .sort((a, b) => {
-        const fa = a.fechaCompletada || a.fechaDia || '';
-        const fb = b.fechaCompletada || b.fechaDia || '';
+        const fa = a.fechaCompletada || a.fechaDia || "";
+        const fb = b.fechaCompletada || b.fechaDia || "";
         return fb.localeCompare(fa);
       });
   }
@@ -125,54 +138,76 @@ export function getTareasHistorial() {
 
 //Insertat tarea nueva
 export function insertTarea(tarea, fechaDiaParam) {
-  const fechaDia   = fechaDiaParam ?? hoyAppStr();
-  const repeticion = tarea.repeticion ?? 'ninguna';
+  const fechaDia = fechaDiaParam ?? hoyAppStr();
+  const repeticion = tarea.repeticion ?? "ninguna";
   const tareaBaseId = tarea.tareaBaseId ?? null;
 
-  if (Platform.OS === 'web') {
+  if (Platform.OS === "web") {
     const tareas = getTareas();
-    localStorage.setItem('tareas', JSON.stringify([
-      ...tareas,
-      { ...tarea, fechaDia, fechaCompletada: null, stars: 0, estado: 'pendiente', repeticion, tareaBaseId },
-    ]));
+    localStorage.setItem(
+      "tareas",
+      JSON.stringify([
+        ...tareas,
+        {
+          ...tarea,
+          fechaDia,
+          fechaCompletada: null,
+          stars: 0,
+          estado: "pendiente",
+          repeticion,
+          tareaBaseId,
+        },
+      ]),
+    );
     return;
   }
   getDB().runSync(
     `INSERT INTO tareas
        (id, title, pictogramId, hora, completed, stars, fechaCompletada, fechaDia, estado, repeticion, tareaBaseId)
      VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-    [tarea.id, tarea.title, tarea.pictogramId ?? null,
-     tarea.hora ?? 'Sin hora', 0, 0, null, fechaDia, 'pendiente', repeticion, tareaBaseId]
+    [
+      tarea.id,
+      tarea.title,
+      tarea.pictogramId ?? null,
+      tarea.hora ?? "Sin hora",
+      0,
+      0,
+      null,
+      fechaDia,
+      "pendiente",
+      repeticion,
+      tareaBaseId,
+    ],
   );
 }
 
 //Inertar tarea repetitiva
 export function generarTareasRepetitivas() {
-
   const hoy = hoyAppStr();
-  const [y, m, d] = hoy.split('-').map(Number); //año , mes y día
-  const diaSemana = new Date(y, m - 1, d).getDay(); 
+  const [y, m, d] = hoy.split("-").map(Number); //año , mes y día
+  const diaSemana = new Date(y, m - 1, d).getDay();
 
-  if (Platform.OS === 'web') {
+  if (Platform.OS === "web") {
     const todas = getTareas();
     const nuevas = [];
 
-  
-    const bases = todas.filter(t =>
-      t.repeticion && t.repeticion !== 'ninguna' && !t.tareaBaseId &&
-      t.estado !== 'cancelada'
+    const bases = todas.filter(
+      (t) =>
+        t.repeticion &&
+        t.repeticion !== "ninguna" &&
+        !t.tareaBaseId &&
+        t.estado !== "cancelada",
     );
 
     for (const base of bases) {
-   
-      const yaExiste = todas.some(t =>
-        (t.tareaBaseId === base.id || t.id === base.id) && t.fechaDia === hoy
+      const yaExiste = todas.some(
+        (t) =>
+          (t.tareaBaseId === base.id || t.id === base.id) && t.fechaDia === hoy,
       );
       if (yaExiste) continue;
 
-     
-      if (base.repeticion === 'semanal') {
-        const [by, bm, bd] = (base.fechaDia ?? hoy).split('-').map(Number);
+      if (base.repeticion === "semanal") {
+        const [by, bm, bd] = (base.fechaDia ?? hoy).split("-").map(Number);
         const diaSemanaBase = new Date(by, bm - 1, bd).getDay();
         if (diaSemana !== diaSemanaBase) continue;
       }
@@ -181,39 +216,38 @@ export function generarTareasRepetitivas() {
         id: `${hoy}_rep_${base.id}_${Math.random().toString(36).slice(2, 6)}`,
         title: base.title,
         pictogramId: base.pictogramId ?? null,
-        hora: base.hora ?? 'Sin hora',
+        hora: base.hora ?? "Sin hora",
         fechaDia: hoy,
         fechaCompletada: null,
         stars: 0,
-        estado: 'pendiente',
+        estado: "pendiente",
         completed: 0,
-        repeticion: 'ninguna', 
-        tareaBaseId: base.id,  
+        repeticion: "ninguna",
+        tareaBaseId: base.id,
       });
     }
 
     if (nuevas.length > 0) {
-      localStorage.setItem('tareas', JSON.stringify([...todas, ...nuevas]));
+      localStorage.setItem("tareas", JSON.stringify([...todas, ...nuevas]));
     }
     return nuevas.length;
   }
 
-//busca las tareas que tienen repetición activa
+  //busca las tareas que tienen repetición activa
   const bases = getDB().getAllSync(
     `SELECT * FROM tareas WHERE repeticion != 'ninguna' AND (tareaBaseId IS NULL OR tareaBaseId = '')`,
   );
 
   let creadas = 0;
   for (const base of bases) {
-    
     const yaExiste = getDB().getFirstSync(
       `SELECT id FROM tareas WHERE (tareaBaseId = ? OR id = ?) AND fechaDia = ?`,
-      [base.id, base.id, hoy]
+      [base.id, base.id, hoy],
     );
     if (yaExiste) continue; //si ya existe continua sino la crea
 
-    if (base.repeticion === 'semanal') {
-      const [by, bm, bd] = (base.fechaDia ?? hoy).split('-').map(Number);
+    if (base.repeticion === "semanal") {
+      const [by, bm, bd] = (base.fechaDia ?? hoy).split("-").map(Number);
       const diaSemanaBase = new Date(by, bm - 1, bd).getDay();
       if (diaSemana !== diaSemanaBase) continue; // si es semanal mira en que semana estamos
     }
@@ -222,7 +256,14 @@ export function generarTareasRepetitivas() {
     getDB().runSync(
       `INSERT INTO tareas (id, title, pictogramId, hora, completed, stars, fechaCompletada, fechaDia, estado, repeticion, tareaBaseId)
        VALUES (?,?,?,?,0,0,null,?,'pendiente','ninguna',?)`,
-      [newId, base.title, base.pictogramId ?? null, base.hora ?? 'Sin hora', hoy, base.id]
+      [
+        newId,
+        base.title,
+        base.pictogramId ?? null,
+        base.hora ?? "Sin hora",
+        hoy,
+        base.id,
+      ],
     );
     creadas++;
   }
@@ -231,24 +272,27 @@ export function generarTareasRepetitivas() {
 
 //Devuelve una tarea por fecha sin tener en cuenta canceladas o vencidad.
 export function getTareasPorFecha(fecha) {
-  if (Platform.OS === 'web') {
-    return getTareas().filter(t =>
-      t.fechaDia === fecha && t.estado !== 'cancelada' && t.estado !== 'vencida'
+  if (Platform.OS === "web") {
+    return getTareas().filter(
+      (t) =>
+        t.fechaDia === fecha &&
+        t.estado !== "cancelada" &&
+        t.estado !== "vencida",
     );
   }
   return getDB().getAllSync(
     `SELECT * FROM tareas
      WHERE fechaDia = ? AND estado NOT IN ('cancelada','vencida')
      ORDER BY hora ASC`,
-    [fecha]
+    [fecha],
   );
 }
 
 //Devuelve el numero de tareas activas por día
 export function getFechasConTareas() {
-  if (Platform.OS === 'web') {
-    const tareas = getTareas().filter(t =>
-      t.estado !== 'cancelada' && t.estado !== 'vencida' && t.fechaDia
+  if (Platform.OS === "web") {
+    const tareas = getTareas().filter(
+      (t) => t.estado !== "cancelada" && t.estado !== "vencida" && t.fechaDia,
     );
     const fechas = {};
     for (const t of tareas) {
@@ -261,7 +305,7 @@ export function getFechasConTareas() {
     `SELECT fechaDia, COUNT(*) as count
      FROM tareas
      WHERE estado NOT IN ('cancelada','vencida') AND fechaDia IS NOT NULL
-     GROUP BY fechaDia`
+     GROUP BY fechaDia`,
   );
   const fechas = {};
   for (const r of rows) fechas[r.fechaDia] = r.count;
@@ -270,21 +314,27 @@ export function getFechasConTareas() {
 
 //marcar tarea como completada
 export function updateTareaCompletada(id, completed, stars = 5) {
-  const fecha  = completed ? hoyAppStr() : null;
-  const estado = completed ? 'completada' : 'pendiente';
+  const fecha = completed ? hoyAppStr() : null;
+  const estado = completed ? "completada" : "pendiente";
 
-  if (Platform.OS === 'web') {
-    const tareas = getTareas().map(t =>
+  if (Platform.OS === "web") {
+    const tareas = getTareas().map((t) =>
       t.id === id
-        ? { ...t, completed: completed ? 1 : 0, fechaCompletada: fecha, stars, estado }
-        : t
+        ? {
+            ...t,
+            completed: completed ? 1 : 0,
+            fechaCompletada: fecha,
+            stars,
+            estado,
+          }
+        : t,
     );
-    localStorage.setItem('tareas', JSON.stringify(tareas));
+    localStorage.setItem("tareas", JSON.stringify(tareas));
     return;
   }
   getDB().runSync(
     `UPDATE tareas SET completed=?, fechaCompletada=?, stars=?, estado=? WHERE id=?`,
-    [completed ? 1 : 0, fecha, stars, estado, id]
+    [completed ? 1 : 0, fecha, stars, estado, id],
   );
 }
 
@@ -292,162 +342,185 @@ export function updateTareaCompletada(id, completed, stars = 5) {
 export function cancelarTarea(id) {
   const hoy = hoyAppStr();
 
-  if (Platform.OS === 'web') {
-    const tareas = getTareas().map(t =>
+  if (Platform.OS === "web") {
+    const tareas = getTareas().map((t) =>
       t.id === id
-        ? { ...t, estado: 'cancelada', completed: 0, fechaCompletada: hoy }
-        : t
+        ? { ...t, estado: "cancelada", completed: 0, fechaCompletada: hoy }
+        : t,
     );
-    localStorage.setItem('tareas', JSON.stringify(tareas));
+    localStorage.setItem("tareas", JSON.stringify(tareas));
     return;
   }
   getDB().runSync(
     `UPDATE tareas SET estado='cancelada', completed=0, fechaCompletada=? WHERE id=?`,
-    [hoy, id]
+    [hoy, id],
   );
 }
 
 //Actualizar Hora
 export function updateTareaHora(id, nuevaHora) {
-  if (Platform.OS === 'web') {
-    const tareas = getTareas().map(t =>
-      t.id === id ? { ...t, hora: nuevaHora } : t
+  if (Platform.OS === "web") {
+    const tareas = getTareas().map((t) =>
+      t.id === id ? { ...t, hora: nuevaHora } : t,
     );
-    localStorage.setItem('tareas', JSON.stringify(tareas));
+    localStorage.setItem("tareas", JSON.stringify(tareas));
     return;
   }
-  getDB().runSync('UPDATE tareas SET hora=? WHERE id=?', [nuevaHora, id]);
+  getDB().runSync("UPDATE tareas SET hora=? WHERE id=?", [nuevaHora, id]);
 }
 
 //Actualizar Pictograma
 export function updateTareaTituloPicto(id, titulo, pictogramId) {
-  if (Platform.OS === 'web') {
-    const tareas = getTareas().map(t =>
-      t.id === id ? { ...t, title: titulo, pictogramId: pictogramId ?? null } : t
+  if (Platform.OS === "web") {
+    const tareas = getTareas().map((t) =>
+      t.id === id
+        ? { ...t, title: titulo, pictogramId: pictogramId ?? null }
+        : t,
     );
-    localStorage.setItem('tareas', JSON.stringify(tareas));
+    localStorage.setItem("tareas", JSON.stringify(tareas));
     return;
   }
-  getDB().runSync(
-    'UPDATE tareas SET title=?, pictogramId=? WHERE id=?',
-    [titulo, pictogramId ?? null, id]
-  );
+  getDB().runSync("UPDATE tareas SET title=?, pictogramId=? WHERE id=?", [
+    titulo,
+    pictogramId ?? null,
+    id,
+  ]);
 }
 
 //actualizar todas las tareas repetitivas al elegir todas las veces
 export function updateTareaBaseCompleta(baseId, titulo, pictogramId, hora) {
-  if (Platform.OS === 'web') {
-    const tareas = getTareas().map(t => {
-   
-      if (t.id === baseId || (t.tareaBaseId === baseId && t.estado === 'pendiente')) {
-        return { ...t, title: titulo, pictogramId: pictogramId ?? null, hora: hora ?? 'Sin hora' };
+  if (Platform.OS === "web") {
+    const tareas = getTareas().map((t) => {
+      if (
+        t.id === baseId ||
+        (t.tareaBaseId === baseId && t.estado === "pendiente")
+      ) {
+        return {
+          ...t,
+          title: titulo,
+          pictogramId: pictogramId ?? null,
+          hora: hora ?? "Sin hora",
+        };
       }
       return t;
     });
-    localStorage.setItem('tareas', JSON.stringify(tareas));
+    localStorage.setItem("tareas", JSON.stringify(tareas));
     return;
   }
 
   getDB().runSync(
-    'UPDATE tareas SET title=?, pictogramId=?, hora=? WHERE id=?',
-    [titulo, pictogramId ?? null, hora ?? 'Sin hora', baseId]
+    "UPDATE tareas SET title=?, pictogramId=?, hora=? WHERE id=?",
+    [titulo, pictogramId ?? null, hora ?? "Sin hora", baseId],
   );
 
   getDB().runSync(
     `UPDATE tareas SET title=?, pictogramId=?, hora=?
      WHERE tareaBaseId=? AND estado='pendiente'`,
-    [titulo, pictogramId ?? null, hora ?? 'Sin hora', baseId]
+    [titulo, pictogramId ?? null, hora ?? "Sin hora", baseId],
   );
 }
 //Borrar tarea
 export function deleteTarea(id) {
-  if (Platform.OS === 'web') {
-    const tareas = getTareas().filter(t => t.id !== id);
-    localStorage.setItem('tareas', JSON.stringify(tareas));
+  if (Platform.OS === "web") {
+    const tareas = getTareas().filter((t) => t.id !== id);
+    localStorage.setItem("tareas", JSON.stringify(tareas));
     return;
   }
-  getDB().runSync('DELETE FROM tareas WHERE id=?', [id]);
+  getDB().runSync("DELETE FROM tareas WHERE id=?", [id]);
 }
 
 //Elimina tarea repetitiva  futuras y actualiza a 'eliminadas' las pasadas
 export function eliminarTareaYRepetitivas(baseId) {
   const hoy = hoyAppStr();
 
-  if (Platform.OS === 'web') {
-    const tareas = getTareas().map(t => {
+  if (Platform.OS === "web") {
+    const tareas = getTareas().map((t) => {
       if (t.id !== baseId && t.tareaBaseId !== baseId) return t;
-    
-      if (t.estado === 'completada' || t.completed === 1) {
-        return { ...t, repeticion: 'ninguna' };
+
+      if (t.estado === "completada" || t.completed === 1) {
+        return { ...t, repeticion: "ninguna" };
       }
-  
-      return { ...t, estado: 'cancelada', completed: 0, fechaCompletada: hoy, repeticion: 'ninguna' };
+
+      return {
+        ...t,
+        estado: "cancelada",
+        completed: 0,
+        fechaCompletada: hoy,
+        repeticion: "ninguna",
+      };
     });
-    localStorage.setItem('tareas', JSON.stringify(tareas));
+    localStorage.setItem("tareas", JSON.stringify(tareas));
     return;
   }
-
 
   getDB().runSync(
     `UPDATE tareas SET repeticion='ninguna'
      WHERE (id=? OR tareaBaseId=?) AND (estado='completada' OR completed=1)`,
-    [baseId, baseId]
+    [baseId, baseId],
   );
 
- 
   getDB().runSync(
     `UPDATE tareas SET estado='cancelada', completed=0, fechaCompletada=fechaDia, repeticion='ninguna'
      WHERE (id=? OR tareaBaseId=?) AND estado='pendiente' AND fechaDia <= ?`,
-    [baseId, baseId, hoy]
+    [baseId, baseId, hoy],
   );
 
- 
   getDB().runSync(
     `DELETE FROM tareas WHERE (id=? OR tareaBaseId=?) AND estado='pendiente' AND fechaDia > ?`,
-    [baseId, baseId, hoy]
+    [baseId, baseId, hoy],
   );
 }
 
 // ── RESET DIARIO ─────
 
-
 //Se llama todos los dias
 
 export function limpiarTareasViejas() {
-  const hoy  = hoyAppStr();
- 
-  const [y, m, d] = hoy.split('-').map(Number);
-  const ayerDate  = new Date(y, m - 1, d - 1);
-  const ayer      = `${ayerDate.getFullYear()}-${String(ayerDate.getMonth()+1).padStart(2,'0')}-${String(ayerDate.getDate()).padStart(2,'0')}`;
+  const hoy = hoyAppStr();
 
-  if (Platform.OS === 'web') {
+  const [y, m, d] = hoy.split("-").map(Number);
+  const ayerDate = new Date(y, m - 1, d - 1);
+  const ayer = `${ayerDate.getFullYear()}-${String(ayerDate.getMonth() + 1).padStart(2, "0")}-${String(ayerDate.getDate()).padStart(2, "0")}`;
+
+  if (Platform.OS === "web") {
     const todas = getTareas();
-    const [yy, mm, dd] = hoy.split('-').map(Number);
+    const [yy, mm, dd] = hoy.split("-").map(Number);
     const diaSemana = new Date(yy, mm - 1, dd).getDay();
 
-    const actualizadas = todas.map(t => {
+    const actualizadas = todas.map((t) => {
       const fechaDia = t.fechaDia ?? hoy;
-      const estado   = t.estado ?? (t.completed === 1 ? 'completada' : 'pendiente');
-      if (fechaDia < hoy && estado === 'pendiente') {
-        return { ...t, fechaDia, estado: 'vencida', completed: 0, fechaCompletada: fechaDia };
+      const estado =
+        t.estado ?? (t.completed === 1 ? "completada" : "pendiente");
+      if (fechaDia < hoy && estado === "pendiente") {
+        return {
+          ...t,
+          fechaDia,
+          estado: "vencida",
+          completed: 0,
+          fechaCompletada: fechaDia,
+        };
       }
       return { ...t, fechaDia, estado };
     });
 
-    const bases = actualizadas.filter(t =>
-      t.repeticion && t.repeticion !== 'ninguna' && !t.tareaBaseId &&
-      t.estado !== 'cancelada'
+    const bases = actualizadas.filter(
+      (t) =>
+        t.repeticion &&
+        t.repeticion !== "ninguna" &&
+        !t.tareaBaseId &&
+        t.estado !== "cancelada",
     );
 
     const nuevas = [];
     for (const base of bases) {
-      const yaExiste = actualizadas.some(t =>
-        (t.tareaBaseId === base.id || t.id === base.id) && t.fechaDia === hoy
+      const yaExiste = actualizadas.some(
+        (t) =>
+          (t.tareaBaseId === base.id || t.id === base.id) && t.fechaDia === hoy,
       );
       if (yaExiste) continue;
 
-      if (base.repeticion === 'semanal') {
-        const [by, bm, bd] = (base.fechaDia ?? hoy).split('-').map(Number);
+      if (base.repeticion === "semanal") {
+        const [by, bm, bd] = (base.fechaDia ?? hoy).split("-").map(Number);
         const diaSemanaBase = new Date(by, bm - 1, bd).getDay();
         if (diaSemana !== diaSemanaBase) continue;
       }
@@ -456,23 +529,23 @@ export function limpiarTareasViejas() {
         id: `${hoy}_rep_${base.id}_${Math.random().toString(36).slice(2, 6)}`,
         title: base.title,
         pictogramId: base.pictogramId ?? null,
-        hora: base.hora ?? 'Sin hora',
+        hora: base.hora ?? "Sin hora",
         fechaDia: hoy,
         fechaCompletada: null,
         stars: 0,
-        estado: 'pendiente',
+        estado: "pendiente",
         completed: 0,
-        repeticion: 'ninguna',
+        repeticion: "ninguna",
         tareaBaseId: base.id,
       });
     }
 
     const final = [...actualizadas, ...nuevas];
-    localStorage.setItem('tareas', JSON.stringify(final));
+    localStorage.setItem("tareas", JSON.stringify(final));
 
-    const tareasHoy = final.filter(t => t.fechaDia === hoy);
-    const vencidasAyer = actualizadas.filter(t =>
-      t.fechaDia === ayer && t.estado === 'vencida'
+    const tareasHoy = final.filter((t) => t.fechaDia === hoy);
+    const vencidasAyer = actualizadas.filter(
+      (t) => t.fechaDia === ayer && t.estado === "vencida",
     ).length;
 
     return { tareasHoy, vencidasAyer };
@@ -486,26 +559,26 @@ export function limpiarTareasViejas() {
     WHERE estado IS NULL
   `);
 
-
   getDB().runSync(
     `UPDATE tareas
      SET estado='vencida', completed=0, fechaCompletada=fechaDia
      WHERE fechaDia < ? AND estado='pendiente'`,
-    [hoy]
+    [hoy],
   );
 
-//LLa para ver si hay tareas repetitivas
+  //LLa para ver si hay tareas repetitivas
   generarTareasRepetitivas();
 
-
-  const vencidasAyer = getDB().getFirstSync(
-    `SELECT COUNT(*) as total FROM tareas
+  const vencidasAyer =
+    getDB().getFirstSync(
+      `SELECT COUNT(*) as total FROM tareas
      WHERE fechaDia = ? AND estado = 'vencida'`,
-    [ayer]
-  )?.total ?? 0;
+      [ayer],
+    )?.total ?? 0;
 
   const tareasHoy = getDB().getAllSync(
-    `SELECT * FROM tareas WHERE fechaDia = ? ORDER BY id DESC`, [hoy]
+    `SELECT * FROM tareas WHERE fechaDia = ? ORDER BY id DESC`,
+    [hoy],
   );
 
   //devuelve si hay alguna vencida para calcular penalizaciones
