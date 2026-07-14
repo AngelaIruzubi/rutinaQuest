@@ -7,7 +7,7 @@
     "icon": "./assets/images/icono.png",
     "scheme": "rutinaquest",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.rutinaquest.app"
