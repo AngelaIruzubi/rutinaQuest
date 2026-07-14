@@ -19,10 +19,6 @@
         "backgroundImage": "./assets/images/icono.png",
         "monochromeImage": "./assets/images/icono.png"
       },
-      "notification": {
-        "icon": "./assets/images/notification-icon.png",
-        "color": "#A77BBE"
-      },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.rutinaquest.app"
@@ -59,7 +55,8 @@
         }
       ],
       "@react-native-community/datetimepicker",
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
