@@ -21,7 +21,8 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.rutinaquest.app"
+      "package": "com.rutinaquest.app",
+      "jsEngine": "jsc"
     },
     "splash": {
       "image": "./assets/images/icono.png",
