@@ -253,7 +253,7 @@ export default function Home() {
 
         for (const t of pending) {
           const mins = minutosRestantes(t.hora);
-          if (mins !== null && mins > 0 && mins <= 5) {
+          if (mins !== null && mins > 0 && mins <= 6) {
             const key = `cincoMin_${t.id}`;
             if (!notifEnviadasHoy.current.has(key)) {
               notifEnviadasHoy.current.add(key);
@@ -268,7 +268,7 @@ export default function Home() {
 
         if (
           hora === 12 &&
-          minutos === 0 &&
+          minutos <= 1 &&
           gami.tareasCompletasHoy === 0 &&
           pending.length > 0 &&
           !notifEnviadasHoy.current.has("mitadDia")
@@ -282,7 +282,7 @@ export default function Home() {
 
         if (
           hora === 21 &&
-          minutos === 0 &&
+          minutos <= 1 &&
           pending.length > 0 &&
           !notifEnviadasHoy.current.has("finDia")
         ) {
@@ -410,9 +410,10 @@ export default function Home() {
     const newTotal = nuevoEstado.totalHecho;
     const newRacha = nuevoEstado.racha;
 
+    const rachaKey = `rachaHoy_${hoy}`;
     const debeMostrarRacha =
-      newRacha >= 1 && !notifEnviadasHoy.current.has("rachaHoy");
-    if (debeMostrarRacha) notifEnviadasHoy.current.add("rachaHoy");
+      newRacha >= 1 && !notifEnviadasHoy.current.has(rachaKey);
+    if (debeMostrarRacha) notifEnviadasHoy.current.add(rachaKey);
 
     const todasCompletadas = pendingAntes.length === 0 && totalDeHoy > 0;
     let delay = 0;

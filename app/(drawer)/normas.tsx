@@ -1,32 +1,29 @@
-import { Colors } from '@/constants/theme';
-import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import React from 'react';
+import { Colors } from "@/constants/theme";
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import React from "react";
 import {
   Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
-  View
-} from 'react-native';
-import { UMBRALES_MEDALLA } from '../../constants/medallas';
-import { useAjustesCtx } from '../../context/AjustesContext';
+  View,
+} from "react-native";
+import { UMBRALES_MEDALLA } from "../../constants/medallas";
+import { useAjustesCtx } from "../../context/AjustesContext";
 
 type ColorPair = { bg: string; text: string };
 const C = {
-  bg:          '#F5F4F0',
-  surface:     '#FFFFFF',
-  border:      'rgba(0,0,0,0.08)',
-  textPrimary: '#1A1A1A',
-  textMuted:   '#7A7A7A',
-  purple: { bg: '#EEEDFE', text: '#A77BBE' } as ColorPair,
+  bg: "#F5F4F0",
+  surface: "#FFFFFF",
+  border: "rgba(0,0,0,0.08)",
+  textPrimary: "#1A1A1A",
+  textMuted: "#7A7A7A",
+  purple: { bg: "#EEEDFE", text: "#A77BBE" } as ColorPair,
 };
 
-
-
-function SectionTitle({ 
-children }: { children: React.ReactNode }) {
+function SectionTitle({ children }: { children: React.ReactNode }) {
   const { escala } = useAjustesCtx();
   return (
     <Text
@@ -38,12 +35,17 @@ children }: { children: React.ReactNode }) {
   );
 }
 
-function Badge({ 
-label }: { label: string }) {
+function Badge({ label }: { label: string }) {
   const { escala } = useAjustesCtx();
   return (
-    <View style={estilos.badge} accessibilityElementsHidden importantForAccessibility="no">
-      <Text style={[estilos.badgeText, { fontSize: Math.round(12 * escala) }]}>{label}</Text>
+    <View
+      style={estilos.badge}
+      accessibilityElementsHidden
+      importantForAccessibility="no"
+    >
+      <Text style={[estilos.badgeText, { fontSize: Math.round(12 * escala) }]}>
+        {label}
+      </Text>
     </View>
   );
 }
@@ -55,11 +57,12 @@ type RuleRowProps = {
   subtitle?: string;
 };
 
-function RuleRow({ 
-title, badge, subtitle, last = false }: RuleRowProps) {
+function RuleRow({ title, badge, subtitle, last = false }: RuleRowProps) {
   const { escala } = useAjustesCtx();
 
-  const a11yLabel = subtitle ? `${title}. ${subtitle}. ${badge}` : `${title}. ${badge}`;
+  const a11yLabel = subtitle
+    ? `${title}. ${subtitle}. ${badge}`
+    : `${title}. ${badge}`;
 
   return (
     <View
@@ -68,9 +71,21 @@ title, badge, subtitle, last = false }: RuleRowProps) {
       accessibilityLabel={a11yLabel}
     >
       <View style={estilos.rowContent}>
-        <Text style={[estilos.rowTitle, { fontSize: Math.round(14 * escala) }]} accessibilityElementsHidden importantForAccessibility="no">{title}</Text>
+        <Text
+          style={[estilos.rowTitle, { fontSize: Math.round(14 * escala) }]}
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+        >
+          {title}
+        </Text>
         {subtitle && (
-          <Text style={[estilos.rowSubtitle, { fontSize: Math.round(12 * escala) }]} accessibilityElementsHidden importantForAccessibility="no">{subtitle}</Text>
+          <Text
+            style={[estilos.rowSubtitle, { fontSize: Math.round(12 * escala) }]}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+          >
+            {subtitle}
+          </Text>
         )}
       </View>
       <Badge label={badge} />
@@ -78,7 +93,13 @@ title, badge, subtitle, last = false }: RuleRowProps) {
   );
 }
 
-function Card({ children, a11yLabel }: { children: React.ReactNode; a11yLabel?: string }) {
+function Card({
+  children,
+  a11yLabel,
+}: {
+  children: React.ReactNode;
+  a11yLabel?: string;
+}) {
   return (
     <View
       style={estilos.card}
@@ -90,8 +111,15 @@ function Card({ children, a11yLabel }: { children: React.ReactNode; a11yLabel?: 
   );
 }
 
-function MedalCard({ 
-icon, name, req }: { icon: string; name: string; req: string }) {
+function MedalCard({
+  icon,
+  name,
+  req,
+}: {
+  icon: string;
+  name: string;
+  req: string;
+}) {
   const { escala } = useAjustesCtx();
   return (
     <View
@@ -99,14 +127,30 @@ icon, name, req }: { icon: string; name: string; req: string }) {
       accessible
       accessibilityLabel={`Medalla de ${name}, se consigue con ${req}`}
     >
-      <Text style={estilos.medalIcon} accessibilityElementsHidden importantForAccessibility="no">{icon}</Text>
-      <Text style={[estilos.medalName, { fontSize: Math.round(13 * escala) }]} accessibilityElementsHidden importantForAccessibility="no">{name}</Text>
-      <Text style={[estilos.medalReq, { fontSize: Math.round(12 * escala) }]}  accessibilityElementsHidden importantForAccessibility="no">{req}</Text>
+      <Text
+        style={estilos.medalIcon}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      >
+        {icon}
+      </Text>
+      <Text
+        style={[estilos.medalName, { fontSize: Math.round(13 * escala) }]}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      >
+        {name}
+      </Text>
+      <Text
+        style={[estilos.medalReq, { fontSize: Math.round(12 * escala) }]}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      >
+        {req}
+      </Text>
     </View>
   );
 }
-
-
 
 export default function NormasJuego() {
   const { escala, colores } = useAjustesCtx();
@@ -119,27 +163,33 @@ export default function NormasJuego() {
         accessible={false}
       >
         {/* Cabecera */}
-        <Text style={[estilos.headerTitle, { fontSize: Math.round(30 * escala) }]} accessibilityRole="header">
+        <Text
+          style={[estilos.headerTitle, { fontSize: Math.round(30 * escala) }]}
+          accessibilityRole="header"
+        >
           Normas del juego
         </Text>
 
         <Pressable
-          onPress={() => router.replace('/')}
+          onPress={() => router.replace("/")}
           style={estilos.btnInicio}
           accessible
           accessibilityRole="button"
           accessibilityLabel="Ir a Inicio"
         >
-          <Ionicons name="home-outline" size={16} color={Colors.purple} accessibilityElementsHidden importantForAccessibility="no" />
+          <Ionicons
+            name="home-outline"
+            size={16}
+            color={Colors.purple}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+          />
           <Text style={estilos.btnInicioTxt}>Inicio</Text>
         </Pressable>
         {/* ── Programar tareas ── */}
         <SectionTitle>Programar tareas</SectionTitle>
         <Card>
-          <RuleRow
-            title="Tarea puntual"
-            badge="Home/Calendario"
-          />
+          <RuleRow title="Tarea puntual" badge="Home/Calendario" />
           <RuleRow
             title="Tarea repetitiva diaria o semanal"
             badge="Calendario"
@@ -154,11 +204,7 @@ export default function NormasJuego() {
             title="Tarea completada a tiempo o sin hora"
             badge="+5 estrellas"
           />
-          <RuleRow
-            title="Tarea completada tarde"
-            badge="+3 estrellas"
-            last
-          />
+          <RuleRow title="Tarea completada tarde" badge="+3 estrellas" last />
         </Card>
 
         {/* ── Penalizaciones ── */}
@@ -195,69 +241,113 @@ export default function NormasJuego() {
           accessible={false}
           accessibilityLabel="Cuadrícula de medallas"
         >
-          <MedalCard icon="🥉" name="Bronce" req={`${UMBRALES_MEDALLA.bronce} ⭐`} />
-          <MedalCard icon="🥈" name="Plata"  req={`${UMBRALES_MEDALLA.plata} ⭐`}  />
-          <MedalCard icon="🥇" name="Oro"    req={`${UMBRALES_MEDALLA.oro} ⭐`}    />
-                  </View>
-
+          <MedalCard
+            icon="🥉"
+            name="Bronce"
+            req={`${UMBRALES_MEDALLA.bronce} ⭐`}
+          />
+          <MedalCard
+            icon="🥈"
+            name="Plata"
+            req={`${UMBRALES_MEDALLA.plata} ⭐`}
+          />
+          <MedalCard icon="🥇" name="Oro" req={`${UMBRALES_MEDALLA.oro} ⭐`} />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-
-
 const estilos = StyleSheet.create({
-  safe:      { flex: 1, backgroundColor: C.bg },
-  scroll:    { flex: 1 },
+  safe: { flex: 1, backgroundColor: C.bg },
+  scroll: { flex: 1 },
   container: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     paddingTop: 20,
     paddingHorizontal: 20,
-
   },
 
   headerTitle: {
-    fontSize: 30, fontWeight: '800',
-    color: C.purple.text, textAlign: 'center', marginBottom: 24,
+    fontSize: 30,
+    fontWeight: "800",
+    color: C.purple.text,
+    textAlign: "center",
+    marginBottom: 24,
   },
 
   sectionTitle: {
-    fontSize: 11, fontWeight: '600', color: C.textMuted,
-    letterSpacing: 0.8, textTransform: 'uppercase',
-    marginBottom: 8, marginTop: 20, marginLeft: 4,
+    fontSize: 11,
+    fontWeight: "600",
+    color: C.textMuted,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    marginBottom: 8,
+    marginTop: 20,
+    marginLeft: 4,
   },
 
   card: {
-    backgroundColor: C.surface, borderRadius: 14,
-    borderWidth: 0.5, borderColor: C.border, overflow: 'hidden',
+    backgroundColor: C.surface,
+    borderRadius: 14,
+    borderWidth: 0.5,
+    borderColor: C.border,
+    overflow: "hidden",
   },
-   btnInicio:    { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: Colors.purple + '18', borderRadius: 20, alignSelf: 'flex-start', marginBottom: 20, minHeight: 44 },
-  btnInicioTxt: { color: Colors.purple, fontWeight: '600', fontSize: 13 },
-
+  btnInicio: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: Colors.purple + "18",
+    borderRadius: 20,
+    alignSelf: "flex-start",
+    marginBottom: 20,
+    minHeight: 44,
+  },
+  btnInicioTxt: { color: Colors.purple, fontWeight: "600", fontSize: 13 },
 
   row: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 12, paddingHorizontal: 14,
-    borderBottomWidth: 0.5, borderBottomColor: C.border,
-    gap: 12, minHeight: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderBottomWidth: 0.5,
+    borderBottomColor: C.border,
+    gap: 12,
+    minHeight: 52,
   },
-  rowLast:    { borderBottomWidth: 0 },
+  rowLast: { borderBottomWidth: 0 },
   rowContent: { flex: 1 },
-  rowTitle:   { fontSize: 14, fontWeight: '500', color: C.textPrimary, marginBottom: 1 },
-  rowSubtitle:{ fontSize: 12, color: C.textMuted, lineHeight: 16 },
+  rowTitle: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: C.textPrimary,
+    marginBottom: 1,
+  },
+  rowSubtitle: { fontSize: 12, color: C.textMuted, lineHeight: 16 },
 
-  badge:     { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  badgeText: { fontSize: 12, fontWeight: '600' },
+  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  badgeText: { fontSize: 12, fontWeight: "600" },
 
-  medalGrid: { flexDirection: 'row', gap: 8 },
+  medalGrid: { flexDirection: "row", gap: 8, width: "100%" },
   medalCard: {
-    flex: 1, backgroundColor: C.surface,
-    borderRadius: 14, borderWidth: 0.5, borderColor: C.border,
-    paddingVertical: 16, alignItems: 'center',
+    flex: 1,
+    minWidth: 80,
+    backgroundColor: C.surface,
+    borderRadius: 14,
+    borderWidth: 0.5,
+    borderColor: C.border,
+    paddingVertical: 16,
+    alignItems: "center",
     minHeight: 90,
   },
   medalIcon: { fontSize: 26, marginBottom: 6 },
-  medalName: { fontSize: 13, fontWeight: '600', color: C.textPrimary, marginBottom: 2 },
-  medalReq:  { fontSize: 12, color: C.textMuted },
+  medalName: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: C.textPrimary,
+    marginBottom: 2,
+  },
+  medalReq: { fontSize: 12, color: C.textMuted },
 });
