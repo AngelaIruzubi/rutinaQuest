@@ -24,7 +24,7 @@ import { AvatarProvider } from "../../context/AvatarContext";
 import { initDB } from "../../database/database";
 
 Sentry.init({
-  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+  dsn: "https://7d8296b71552a8579eb246c9fe060bd0@o4511767324393472.ingest.de.sentry.io/4511767331536976",
   tracesSampleRate: 1.0,
   environment: __DEV__ ? "development" : "production",
 });
