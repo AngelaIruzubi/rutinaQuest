@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Audio } from "expo-av";
 import * as Haptics from "expo-haptics";
 import * as Notifications from "expo-notifications";
@@ -253,7 +254,7 @@ export default function Home() {
 
         for (const t of pending) {
           const mins = minutosRestantes(t.hora);
-          if (mins !== null && mins > 0 && mins <= 6) {
+          if (mins !== null && mins > 0 && mins <= 5) {
             const key = `cincoMin_${t.id}`;
             if (!notifEnviadasHoy.current.has(key)) {
               notifEnviadasHoy.current.add(key);
@@ -268,7 +269,7 @@ export default function Home() {
 
         if (
           hora === 12 &&
-          minutos <= 1 &&
+          minutos === 0 &&
           gami.tareasCompletasHoy === 0 &&
           pending.length > 0 &&
           !notifEnviadasHoy.current.has("mitadDia")
@@ -282,7 +283,7 @@ export default function Home() {
 
         if (
           hora === 21 &&
-          minutos <= 1 &&
+          minutos === 0 &&
           pending.length > 0 &&
           !notifEnviadasHoy.current.has("finDia")
         ) {
@@ -411,9 +412,9 @@ export default function Home() {
     const newRacha = nuevoEstado.racha;
 
     const rachaKey = `rachaHoy_${hoy}`;
-    const debeMostrarRacha =
-      newRacha >= 1 && !notifEnviadasHoy.current.has(rachaKey);
-    if (debeMostrarRacha) notifEnviadasHoy.current.add(rachaKey);
+    const rachaYaMostrada = await AsyncStorage.getItem(rachaKey);
+    const debeMostrarRacha = newRacha >= 1 && !rachaYaMostrada;
+    if (debeMostrarRacha) await AsyncStorage.setItem(rachaKey, "1");
 
     const todasCompletadas = pendingAntes.length === 0 && totalDeHoy > 0;
     let delay = 0;
