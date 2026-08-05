@@ -15,7 +15,7 @@ interface AnimatedCounterProps {
 export function AnimatedCounter({ anim, max }: AnimatedCounterProps) {
   const [display, setDisplay] = useState(Math.max(0, max - 1));
   const { width } = useWindowDimensions();
-  const numSize = Math.min(72, width * 0.16); // máx 72, pero se adapta a pantallas pequeñas
+  const numSize = Math.min(52, width * 0.13); // máx 52 para caber dentro del círculo de 96px
 
   useEffect(() => {
     const id = anim.addListener(({ value }) => setDisplay(Math.round(value)));

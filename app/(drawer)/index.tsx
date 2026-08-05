@@ -239,6 +239,68 @@ export default function Home() {
           notifEnviadasHoy.current = new Set();
           penalizacionDisparadaRef.current = false;
 
+          // Programar notificaciones del día con trigger de hora para que lleguen aunque la app esté cerrada
+          if (Platform.OS !== "web") {
+            await Notifications.cancelAllScheduledNotificationsAsync();
+            const ahora = new Date();
+
+            // 12h — solo si no han pasado las 12 y no hay tareas completadas
+            const hoy12 = new Date();
+            hoy12.setHours(12, 0, 0, 0);
+            if (hoy12 > ahora) {
+              await Notifications.scheduleNotificationAsync({
+                content: {
+                  title: "☀️ Es mediodía",
+                  body: "¿Has empezado tus tareas de hoy?",
+                  sound: true,
+                },
+                trigger: {
+                  type: Notifications.SchedulableTriggerInputTypes.DATE,
+                  date: hoy12,
+                },
+              });
+            }
+
+            // 21h — solo si no han pasado las 21
+            const hoy21 = new Date();
+            hoy21.setHours(21, 0, 0, 0);
+            if (hoy21 > ahora) {
+              await Notifications.scheduleNotificationAsync({
+                content: {
+                  title: "🌙 Se acaba el día",
+                  body: "¡Aún tienes tiempo de completar tus tareas!",
+                  sound: true,
+                },
+                trigger: {
+                  type: Notifications.SchedulableTriggerInputTypes.DATE,
+                  date: hoy21,
+                },
+              });
+            }
+
+            // 5 min antes de cada tarea con hora
+            for (const t of tareasHoy as any[]) {
+              if (t.completed || !t.hora || t.hora === "Sin hora") continue;
+              const [hh, mm] = t.hora.split(":").map(Number);
+              if (isNaN(hh) || isNaN(mm)) continue;
+              const trigger5min = new Date();
+              trigger5min.setHours(hh, mm - 5, 0, 0);
+              if (trigger5min > ahora) {
+                await Notifications.scheduleNotificationAsync({
+                  content: {
+                    title: "⏰ ¡Quedan 5 minutos!",
+                    body: `La tarea "${t.title}" vence pronto`,
+                    sound: true,
+                  },
+                  trigger: {
+                    type: Notifications.SchedulableTriggerInputTypes.DATE,
+                    date: trigger5min,
+                  },
+                });
+              }
+            }
+          }
+
           if (vencidasAyer > 0 && !gami.penalizacionAplicada) {
             const prevEstrellas = gami.estrellas;
             const res = (await gami.penalizarFinDia(vencidasAyer)) as any;
