@@ -3,12 +3,77 @@ import { hoyAppStr } from "../utils/fecha";
 
 let db = null;
 
+let dbInitialized = false;
+
 function getDB() {
-  if (!db) {
-    const SQLite = require("expo-sqlite");
-    db = SQLite.openDatabaseSync("taskmanager.db");
+  if (!db || !dbInitialized) {
+    try {
+      const SQLite = require("expo-sqlite");
+      if (!db) {
+        db = SQLite.openDatabaseSync("taskmanager.db");
+      }
+      if (!dbInitialized) {
+        // Siempre re-ejecutar init para garantizar tablas
+        db.execSync(`
+          CREATE TABLE IF NOT EXISTS usuario (
+            id        INTEGER PRIMARY KEY,
+            tonoPiel  INTEGER DEFAULT 0,
+            colorPelo INTEGER DEFAULT 0,
+            cara      INTEGER DEFAULT 0,
+            ojos      INTEGER DEFAULT 0,
+            peloCorto INTEGER DEFAULT 0,
+            peloLargo INTEGER DEFAULT -1,
+            shirt     INTEGER DEFAULT 0,
+            nivel     INTEGER DEFAULT 1,
+            puntos    INTEGER DEFAULT 0
+          );
+          CREATE TABLE IF NOT EXISTS tareas (
+            id               TEXT PRIMARY KEY,
+            title            TEXT NOT NULL,
+            pictogramId      INTEGER,
+            hora             TEXT,
+            completed        INTEGER DEFAULT 0,
+            stars            INTEGER DEFAULT 0,
+            fechaCompletada  TEXT,
+            fechaDia         TEXT,
+            estado           TEXT DEFAULT 'pendiente'
+          );
+          INSERT OR IGNORE INTO usuario (id) VALUES (1);
+        `);
+        const migraciones = [
+          "ALTER TABLE usuario ADD COLUMN ojos INTEGER DEFAULT 0",
+          "ALTER TABLE tareas ADD COLUMN fechaCompletada TEXT",
+          "ALTER TABLE tareas ADD COLUMN stars INTEGER DEFAULT 0",
+          "ALTER TABLE tareas ADD COLUMN fechaDia TEXT",
+          "ALTER TABLE tareas ADD COLUMN estado TEXT DEFAULT 'pendiente'",
+          "ALTER TABLE tareas ADD COLUMN repeticion TEXT DEFAULT 'ninguna'",
+          "ALTER TABLE tareas ADD COLUMN tareaBaseId TEXT",
+          "ALTER TABLE usuario ADD COLUMN genero TEXT DEFAULT 'hombre'",
+        ];
+        for (const sql of migraciones) {
+          try {
+            db.execSync(sql);
+          } catch {}
+        }
+        dbInitialized = true;
+      }
+    } catch (e) {
+      console.error("[DB] Error inicializando BD:", e?.message ?? e);
+      return null;
+    }
   }
   return db;
+}
+
+function safeQuery(fn, fallback = null) {
+  try {
+    const database = getDB();
+    if (!database) return fallback;
+    return fn(database);
+  } catch (e) {
+    console.error("[DB] Error en query:", e?.message ?? e);
+    return fallback;
+  }
 }
 
 export function initDB() {
@@ -83,7 +148,10 @@ export function getUsuario() {
     const data = localStorage.getItem("usuario");
     return data ? JSON.parse(data) : USUARIO_DEFAULT;
   }
-  return getDB().getFirstSync("SELECT * FROM usuario WHERE id = 1");
+  return safeQuery(
+    (db) => db.getFirstSync("SELECT * FROM usuario WHERE id = 1"),
+    null,
+  );
 }
 
 //Escribe datos del avatar
@@ -98,7 +166,9 @@ export function updateUsuario(fields) {
     .map((k) => `${k}=?`)
     .join(", ");
   const values = Object.values(fields);
-  getDB().runSync(`UPDATE usuario SET ${keys} WHERE id=1`, values);
+  safeQuery((db) =>
+    db.runSync(`UPDATE usuario SET ${keys} WHERE id=1`, values),
+  );
 }
 
 // ── TAREAS ────
@@ -108,7 +178,7 @@ export function getTareas() {
     const data = localStorage.getItem("tareas");
     return data ? JSON.parse(data) : [];
   }
-  return getDB().getAllSync("SELECT * FROM tareas");
+  return safeQuery((db) => db.getAllSync("SELECT * FROM tareas"), []);
 }
 
 //Devuelve las tareas filtradas por completadas, canceladad o vencidad y ordenadas por fecha
@@ -161,23 +231,25 @@ export function insertTarea(tarea, fechaDiaParam) {
     );
     return;
   }
-  getDB().runSync(
-    `INSERT INTO tareas
+  safeQuery((db) =>
+    db.runSync(
+      `INSERT INTO tareas
        (id, title, pictogramId, hora, completed, stars, fechaCompletada, fechaDia, estado, repeticion, tareaBaseId)
      VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-    [
-      tarea.id,
-      tarea.title,
-      tarea.pictogramId ?? null,
-      tarea.hora ?? "Sin hora",
-      0,
-      0,
-      null,
-      fechaDia,
-      "pendiente",
-      repeticion,
-      tareaBaseId,
-    ],
+      [
+        tarea.id,
+        tarea.title,
+        tarea.pictogramId ?? null,
+        tarea.hora ?? "Sin hora",
+        0,
+        0,
+        null,
+        fechaDia,
+        "pendiente",
+        repeticion,
+        tareaBaseId,
+      ],
+    ),
   );
 }
 
@@ -426,7 +498,7 @@ export function deleteTarea(id) {
     localStorage.setItem("tareas", JSON.stringify(tareas));
     return;
   }
-  getDB().runSync("DELETE FROM tareas WHERE id=?", [id]);
+  safeQuery((db) => db.runSync("DELETE FROM tareas WHERE id=?", [id]));
 }
 
 //Elimina tarea repetitiva  futuras y actualiza a 'eliminadas' las pasadas
