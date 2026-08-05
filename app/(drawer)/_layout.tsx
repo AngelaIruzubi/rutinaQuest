@@ -136,7 +136,22 @@ export default function Layout() {
   const titleSize = Math.max(16, Math.min(30, (width * 0.072) / clampedScale));
 
   useEffect(() => {
-    // La BD ya está lista; solo ocultamos la splash
+    // Pedir permisos de notificación al abrir la app
+    if (Platform.OS !== "web") {
+      Notifications.requestPermissionsAsync().then(({ status }) => {
+        if (status !== "granted")
+          console.warn("Permisos de notificación denegados");
+      });
+      if (Platform.OS === "android") {
+        Notifications.setNotificationChannelAsync("default", {
+          name: "default",
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: "#A77BBE",
+        });
+      }
+    }
+    // Ocultar splash
     if (Platform.OS !== "web") SplashScreen.hideAsync().catch(() => {});
   }, []);
 

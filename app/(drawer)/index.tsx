@@ -58,7 +58,7 @@ import {
 import { detectarMedalla } from "../../utils/gamificacion";
 
 if (__DEV__) {
-  setFechaSimulada("2026-09-29");
+  setFechaSimulada("2027-09-29");
   setHoraSimulada(12, 0);
 }
 const SONIDOS: Record<string, any> = {
@@ -169,6 +169,14 @@ export default function Home() {
   const rachaNotifTimer = useRef<any>(null);
 
   const pendientesPenalRef = useRef<any>({ vencidasAyer: 0 });
+
+  // Calcular vencidasAyer al montar para que esté disponible antes del efecto de penalización
+  useEffect(() => {
+    if (Platform.OS !== "web") {
+      const result = limpiarTareasViejas() as any;
+      pendientesPenalRef.current = { vencidasAyer: result?.vencidasAyer ?? 0 };
+    }
+  }, []);
 
   const gami = useGamificacion();
   const { ajustes, escala } = useAjustesCtx();
