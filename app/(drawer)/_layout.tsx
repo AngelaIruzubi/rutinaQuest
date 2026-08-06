@@ -136,23 +136,40 @@ export default function Layout() {
   const titleSize = Math.max(16, Math.min(30, (width * 0.072) / clampedScale));
 
   useEffect(() => {
-    // Pedir permisos de notificación al abrir la app
-    if (Platform.OS !== "web") {
-      Notifications.requestPermissionsAsync().then(({ status }) => {
-        if (status !== "granted")
-          console.warn("Permisos de notificación denegados");
-      });
-      if (Platform.OS === "android") {
-        Notifications.setNotificationChannelAsync("default", {
-          name: "default",
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: "#A77BBE",
-        });
+    (async () => {
+      // Pedir permisos de notificación
+      if (Platform.OS !== "web") {
+        const { status } = await Notifications.requestPermissionsAsync();
+        console.log("[NOTIF] Permiso:", status);
+
+        if (Platform.OS === "android") {
+          await Notifications.setNotificationChannelAsync("default", {
+            name: "default",
+            importance: Notifications.AndroidImportance.MAX,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: "#A77BBE",
+            sound: "default",
+          });
+        }
+
+        // PRUEBA: notificación 10 segundos después de abrir
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: "✅ Notificaciones funcionan",
+            body: "Las notificaciones están configuradas correctamente",
+            sound: true,
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+            seconds: 10,
+          },
+        }).catch((e) => console.error("[NOTIF] Error test:", e));
+
+        SplashScreen.hideAsync().catch(() => {});
+      } else {
+        SplashScreen.hideAsync().catch(() => {});
       }
-    }
-    // Ocultar splash
-    if (Platform.OS !== "web") SplashScreen.hideAsync().catch(() => {});
+    })();
   }, []);
 
   return (
