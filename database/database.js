@@ -145,15 +145,18 @@ export function getTareasHistorial() {
         return fb.localeCompare(fa);
       });
   }
-  return safeQuery(
-    (db) =>
-      db.getAllSync(`
+  try {
+    return (
+      getDB()?.getAllSync(`
     SELECT * FROM tareas
     WHERE estado IN ('completada','cancelada','vencida') OR completed = 1
     ORDER BY COALESCE(fechaCompletada, fechaDia) DESC
-  `),
-    [],
-  );
+  `) ?? []
+    );
+  } catch (e) {
+    console.error("[DB] getTareasHistorial error:", e?.message);
+    return [];
+  }
 }
 
 export function insertTarea(tarea, fechaDiaParam) {
@@ -321,13 +324,18 @@ export function getFechasConTareas() {
     }
     return fechas;
   }
-  const rows = safeQuery(
-    (db) =>
-      db.getAllSync(
-        `SELECT fechaDia, COUNT(*) as count FROM tareas WHERE estado NOT IN ('cancelada','vencida') AND fechaDia IS NOT NULL GROUP BY fechaDia`,
-      ),
-    [],
-  );
+  const rows = (() => {
+    try {
+      return (
+        getDB()?.getAllSync(
+          `SELECT fechaDia, COUNT(*) as count FROM tareas WHERE estado NOT IN ('cancelada','vencida') AND fechaDia IS NOT NULL GROUP BY fechaDia`,
+        ) ?? []
+      );
+    } catch (e) {
+      console.error("[DB] getFechasConTareas error:", e?.message);
+      return [];
+    }
+  })();
   const fechas = {};
   for (const r of rows) fechas[r.fechaDia] = r.count;
   return fechas;
@@ -577,24 +585,33 @@ export function limpiarTareasViejas() {
 
   generarTareasRepetitivas();
 
-  const vencidasAyer =
-    safeQuery(
-      (db) =>
-        db.getFirstSync(
+  const vencidasAyer = (() => {
+    try {
+      return (
+        getDB()?.getFirstSync(
           `SELECT COUNT(*) as total FROM tareas WHERE fechaDia = ? AND estado = 'vencida'`,
           [ayer],
-        ),
-      { total: 0 },
-    )?.total ?? 0;
+        )?.total ?? 0
+      );
+    } catch (e) {
+      console.error("[DB] vencidasAyer error:", e?.message);
+      return 0;
+    }
+  })();
 
-  const tareasHoy = safeQuery(
-    (db) =>
-      db.getAllSync(
-        `SELECT * FROM tareas WHERE fechaDia = ? ORDER BY id DESC`,
-        [hoy],
-      ),
-    [],
-  );
+  const tareasHoy = (() => {
+    try {
+      return (
+        getDB()?.getAllSync(
+          `SELECT * FROM tareas WHERE fechaDia = ? ORDER BY id DESC`,
+          [hoy],
+        ) ?? []
+      );
+    } catch (e) {
+      console.error("[DB] tareasHoy error:", e?.message);
+      return [];
+    }
+  })();
 
   return { tareasHoy, vencidasAyer };
 }
