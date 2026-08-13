@@ -183,8 +183,8 @@ export function insertTarea(tarea, fechaDiaParam) {
     );
     return;
   }
-  safeQuery((db) =>
-    db.runSync(
+  try {
+    getDB()?.runSync(
       `INSERT INTO tareas (id, title, pictogramId, hora, completed, stars, fechaCompletada, fechaDia, estado, repeticion, tareaBaseId)
      VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
       [
@@ -200,8 +200,10 @@ export function insertTarea(tarea, fechaDiaParam) {
         repeticion,
         tareaBaseId,
       ],
-    ),
-  );
+    );
+  } catch (e) {
+    console.error("[DB] insertTarea error:", e?.message);
+  }
 }
 
 export function generarTareasRepetitivas() {
@@ -302,14 +304,17 @@ export function getTareasPorFecha(fecha) {
         t.estado !== "vencida",
     );
   }
-  return safeQuery(
-    (db) =>
-      db.getAllSync(
+  try {
+    return (
+      getDB()?.getAllSync(
         `SELECT * FROM tareas WHERE fechaDia = ? AND estado NOT IN ('cancelada','vencida') ORDER BY hora ASC`,
         [fecha],
-      ),
-    [],
-  );
+      ) ?? []
+    );
+  } catch (e) {
+    console.error("[DB] getTareasPorFecha error:", e?.message);
+    return [];
+  }
 }
 
 export function getFechasConTareas() {
@@ -359,12 +364,14 @@ export function updateTareaCompletada(id, completed, stars = 5) {
     localStorage.setItem("tareas", JSON.stringify(tareas));
     return;
   }
-  safeQuery((db) =>
-    db.runSync(
+  try {
+    getDB()?.runSync(
       `UPDATE tareas SET completed=?, fechaCompletada=?, stars=?, estado=? WHERE id=?`,
       [completed ? 1 : 0, fecha, stars, estado, id],
-    ),
-  );
+    );
+  } catch (e) {
+    console.error("[DB] updateTareaCompletada error:", e?.message);
+  }
 }
 
 export function cancelarTarea(id) {
@@ -459,7 +466,11 @@ export function deleteTarea(id) {
     localStorage.setItem("tareas", JSON.stringify(tareas));
     return;
   }
-  safeQuery((db) => db.runSync("DELETE FROM tareas WHERE id=?", [id]));
+  try {
+    getDB()?.runSync("DELETE FROM tareas WHERE id=?", [id]);
+  } catch (e) {
+    console.error("[DB] deleteTarea error:", e?.message);
+  }
 }
 
 export function eliminarTareaYRepetitivas(baseId) {
