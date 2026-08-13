@@ -64,14 +64,12 @@ function getDB() {
 }
 
 function safeQuery(fn, fallback = null) {
-  try {
-    const database = getDB();
-    if (!database) return fallback;
-    return fn(database);
-  } catch (e) {
-    console.error("[DB] Error en query:", e?.message ?? e);
+  const database = getDB();
+  if (!database) {
+    console.error("[DB] getDB() returned null");
     return fallback;
   }
+  return fn(database);
 }
 
 export function initDB() {
