@@ -36,11 +36,13 @@ try {
 // ─── INICIALIZACIÓN SÍNCRONA DE LA BD ────────────────────────────────────────
 // Se ejecuta cuando el módulo se importa, ANTES de cualquier render.
 // Así ninguna pantalla puede llamar a la BD antes de que esté lista.
-try {
-  initDB();
-} catch (e) {
-  console.warn("Error inicializando BD:", e);
-}
+setTimeout(() => {
+  try {
+    initDB();
+  } catch (e) {
+    console.warn("Error inicializando BD:", e);
+  }
+}, 500);
 // ─────────────────────────────────────────────────────────────────────────────
 
 Notifications.setNotificationHandler({
