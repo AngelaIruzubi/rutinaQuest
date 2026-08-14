@@ -96,10 +96,11 @@ export function getUsuario() {
     const data = localStorage.getItem("usuario");
     return data ? JSON.parse(data) : USUARIO_DEFAULT;
   }
-  return safeQuery(
-    (db) => db.getFirstSync("SELECT * FROM usuario WHERE id = 1"),
-    null,
-  );
+  try {
+    return getDB()?.getFirstSync("SELECT * FROM usuario WHERE id = 1") ?? null;
+  } catch (e) {
+    return null;
+  }
 }
 
 export function updateUsuario(fields) {
@@ -112,9 +113,11 @@ export function updateUsuario(fields) {
     .map((k) => `${k}=?`)
     .join(", ");
   const values = Object.values(fields);
-  safeQuery((db) =>
-    db.runSync(`UPDATE usuario SET ${keys} WHERE id=1`, values),
-  );
+  try {
+    getDB()?.runSync(`UPDATE usuario SET ${keys} WHERE id=1`, values);
+  } catch (e) {
+    console.error("[DB] error:", e?.message);
+  }
 }
 
 // ── TAREAS ────
@@ -124,7 +127,11 @@ export function getTareas() {
     const data = localStorage.getItem("tareas");
     return data ? JSON.parse(data) : [];
   }
-  return safeQuery((db) => db.getAllSync("SELECT * FROM tareas"), []);
+  try {
+    return getDB()?.getAllSync("SELECT * FROM tareas") ?? [];
+  } catch (e) {
+    return [];
+  }
 }
 
 export function getTareasHistorial() {
@@ -248,24 +255,27 @@ export function generarTareasRepetitivas() {
     return nuevas.length;
   }
 
-  const bases = safeQuery(
-    (db) =>
-      db.getAllSync(
+  let bases = [];
+  try {
+    bases =
+      getDB()?.getAllSync(
         `SELECT * FROM tareas WHERE repeticion != 'ninguna' AND (tareaBaseId IS NULL OR tareaBaseId = '')`,
-      ),
-    [],
-  );
+      ) ?? [];
+  } catch (e) {
+    return 0;
+  }
 
   let creadas = 0;
   for (const base of bases) {
-    const yaExiste = safeQuery(
-      (db) =>
-        db.getFirstSync(
-          `SELECT id FROM tareas WHERE (tareaBaseId = ? OR id = ?) AND fechaDia = ?`,
-          [base.id, base.id, hoy],
-        ),
-      null,
-    );
+    let yaExiste = null;
+    try {
+      yaExiste = getDB()?.getFirstSync(
+        `SELECT id FROM tareas WHERE (tareaBaseId = ? OR id = ?) AND fechaDia = ?`,
+        [base.id, base.id, hoy],
+      );
+    } catch (e) {
+      continue;
+    }
     if (yaExiste) continue;
 
     if (base.repeticion === "semanal") {
@@ -274,8 +284,8 @@ export function generarTareasRepetitivas() {
     }
 
     const newId = `${hoy}_rep_${base.id}_${Math.random().toString(36).slice(2, 6)}`;
-    safeQuery((db) =>
-      db.runSync(
+    try {
+      getDB()?.runSync(
         `INSERT INTO tareas (id, title, pictogramId, hora, completed, stars, fechaCompletada, fechaDia, estado, repeticion, tareaBaseId)
        VALUES (?,?,?,?,0,0,null,?,'pendiente','ninguna',?)`,
         [
@@ -286,8 +296,10 @@ export function generarTareasRepetitivas() {
           hoy,
           base.id,
         ],
-      ),
-    );
+      );
+    } catch (e) {
+      console.error("[DB] insert repetitiva error:", e?.message);
+    }
     creadas++;
   }
   return creadas;
@@ -383,12 +395,14 @@ export function cancelarTarea(id) {
     localStorage.setItem("tareas", JSON.stringify(tareas));
     return;
   }
-  safeQuery((db) =>
-    db.runSync(
+  try {
+    getDB()?.runSync(
       `UPDATE tareas SET estado='cancelada', completed=0, fechaCompletada=? WHERE id=?`,
       [hoy, id],
-    ),
-  );
+    );
+  } catch (e) {
+    console.error("[DB] error:", e?.message);
+  }
 }
 
 export function updateTareaHora(id, nuevaHora) {
@@ -399,9 +413,11 @@ export function updateTareaHora(id, nuevaHora) {
     localStorage.setItem("tareas", JSON.stringify(tareas));
     return;
   }
-  safeQuery((db) =>
-    db.runSync("UPDATE tareas SET hora=? WHERE id=?", [nuevaHora, id]),
-  );
+  try {
+    getDB()?.runSync("UPDATE tareas SET hora=? WHERE id=?", [nuevaHora, id]);
+  } catch (e) {
+    console.error("[DB] error:", e?.message);
+  }
 }
 
 export function updateTareaTituloPicto(id, titulo, pictogramId) {
@@ -414,13 +430,15 @@ export function updateTareaTituloPicto(id, titulo, pictogramId) {
     localStorage.setItem("tareas", JSON.stringify(tareas));
     return;
   }
-  safeQuery((db) =>
-    db.runSync("UPDATE tareas SET title=?, pictogramId=? WHERE id=?", [
+  try {
+    getDB()?.runSync("UPDATE tareas SET title=?, pictogramId=? WHERE id=?", [
       titulo,
       pictogramId ?? null,
       id,
-    ]),
-  );
+    ]);
+  } catch (e) {
+    console.error("[DB] error:", e?.message);
+  }
 }
 
 export function updateTareaBaseCompleta(baseId, titulo, pictogramId, hora) {
@@ -442,20 +460,22 @@ export function updateTareaBaseCompleta(baseId, titulo, pictogramId, hora) {
     localStorage.setItem("tareas", JSON.stringify(tareas));
     return;
   }
-  safeQuery((db) =>
-    db.runSync("UPDATE tareas SET title=?, pictogramId=?, hora=? WHERE id=?", [
-      titulo,
-      pictogramId ?? null,
-      hora ?? "Sin hora",
-      baseId,
-    ]),
-  );
-  safeQuery((db) =>
-    db.runSync(
+  try {
+    getDB()?.runSync(
+      "UPDATE tareas SET title=?, pictogramId=?, hora=? WHERE id=?",
+      [titulo, pictogramId ?? null, hora ?? "Sin hora", baseId],
+    );
+  } catch (e) {
+    console.error("[DB] error:", e?.message);
+  }
+  try {
+    getDB()?.runSync(
       `UPDATE tareas SET title=?, pictogramId=?, hora=? WHERE tareaBaseId=? AND estado='pendiente'`,
       [titulo, pictogramId ?? null, hora ?? "Sin hora", baseId],
-    ),
-  );
+    );
+  } catch (e) {
+    console.error("[DB] error:", e?.message);
+  }
 }
 
 export function deleteTarea(id) {
@@ -489,24 +509,30 @@ export function eliminarTareaYRepetitivas(baseId) {
     localStorage.setItem("tareas", JSON.stringify(tareas));
     return;
   }
-  safeQuery((db) =>
-    db.runSync(
+  try {
+    getDB()?.runSync(
       `UPDATE tareas SET repeticion='ninguna' WHERE (id=? OR tareaBaseId=?) AND (estado='completada' OR completed=1)`,
       [baseId, baseId],
-    ),
-  );
-  safeQuery((db) =>
-    db.runSync(
+    );
+  } catch (e) {
+    console.error("[DB] error:", e?.message);
+  }
+  try {
+    getDB()?.runSync(
       `UPDATE tareas SET estado='cancelada', completed=0, fechaCompletada=fechaDia, repeticion='ninguna' WHERE (id=? OR tareaBaseId=?) AND estado='pendiente' AND fechaDia <= ?`,
       [baseId, baseId, hoy],
-    ),
-  );
-  safeQuery((db) =>
-    db.runSync(
+    );
+  } catch (e) {
+    console.error("[DB] error:", e?.message);
+  }
+  try {
+    getDB()?.runSync(
       `DELETE FROM tareas WHERE (id=? OR tareaBaseId=?) AND estado='pendiente' AND fechaDia > ?`,
       [baseId, baseId, hoy],
-    ),
-  );
+    );
+  } catch (e) {
+    console.error("[DB] error:", e?.message);
+  }
 }
 
 // ── RESET DIARIO ─────
@@ -577,20 +603,26 @@ export function limpiarTareasViejas() {
     return { tareasHoy, vencidasAyer };
   }
 
-  safeQuery((db) =>
-    db.runSync(`UPDATE tareas SET fechaDia=? WHERE fechaDia IS NULL`, [hoy]),
-  );
-  safeQuery((db) =>
-    db.runSync(`
+  try {
+    getDB()?.runSync(`UPDATE tareas SET fechaDia=? WHERE fechaDia IS NULL`, [
+      hoy,
+    ]);
+  } catch (e) {}
+  try {
+    getDB()?.runSync(`
     UPDATE tareas SET estado = CASE WHEN completed = 1 THEN 'completada' ELSE 'pendiente' END WHERE estado IS NULL
-  `),
-  );
-  safeQuery((db) =>
-    db.runSync(
+  `);
+  } catch (e) {
+    console.error("[DB] error:", e?.message);
+  }
+  try {
+    getDB()?.runSync(
       `UPDATE tareas SET estado='vencida', completed=0, fechaCompletada=fechaDia WHERE fechaDia < ? AND estado='pendiente'`,
       [hoy],
-    ),
-  );
+    );
+  } catch (e) {
+    console.error("[DB] error:", e?.message);
+  }
 
   generarTareasRepetitivas();
 

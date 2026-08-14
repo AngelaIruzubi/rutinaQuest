@@ -36,13 +36,11 @@ try {
 // ─── INICIALIZACIÓN SÍNCRONA DE LA BD ────────────────────────────────────────
 // Se ejecuta cuando el módulo se importa, ANTES de cualquier render.
 // Así ninguna pantalla puede llamar a la BD antes de que esté lista.
-setTimeout(() => {
-  try {
-    initDB();
-  } catch (e) {
-    console.warn("Error inicializando BD:", e);
-  }
-}, 500);
+try {
+  initDB();
+} catch (e) {
+  console.warn("Error inicializando BD:", e);
+}
 // ─────────────────────────────────────────────────────────────────────────────
 
 Notifications.setNotificationHandler({
@@ -153,19 +151,6 @@ export default function Layout() {
             sound: "default",
           });
         }
-
-        // PRUEBA: notificación 10 segundos después de abrir
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: "✅ Notificaciones funcionan",
-            body: "Las notificaciones están configuradas correctamente",
-            sound: true,
-          },
-          trigger: {
-            type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-            seconds: 10,
-          },
-        }).catch((e) => console.error("[NOTIF] Error test:", e));
 
         SplashScreen.hideAsync().catch(() => {});
       } else {
