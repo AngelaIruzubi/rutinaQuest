@@ -1,3 +1,4 @@
+import { useDBReady } from "@/context/Dbreadycontext";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
@@ -324,6 +325,7 @@ export default function Historial() {
   const shotRef = useRef<any>(null);
 
   const [search, setSearch] = useState("");
+  const dbReady = useDBReady();
   const [historial, setHistorial] = useState<Tarea[]>([]);
   const lastHistorialRef = useRef<Tarea[]>([]);
   const [compartiendo, setCompartiendo] = useState(false);
@@ -345,7 +347,7 @@ export default function Historial() {
       const mapped = rows.map((r) => ({ ...r, completed: r.completed === 1 }));
       lastHistorialRef.current = mapped;
       setHistorial(mapped);
-    }, []),
+    }, [dbReady]),
   );
 
   const esMismaSemana = (lunes: Date) =>

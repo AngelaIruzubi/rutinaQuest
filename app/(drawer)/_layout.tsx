@@ -8,7 +8,7 @@ import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import { Drawer } from "expo-router/drawer";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   PixelRatio,
   Platform,
@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../../constants/theme";
 import { AjustesProvider } from "../../context/AjustesContext";
 import { AvatarProvider } from "../../context/AvatarContext";
+import { DBReadyContext } from "../../context/Dbreadycontext";
 import { initDB } from "../../database/database";
 
 Sentry.init({
@@ -130,6 +131,7 @@ function HeaderPerfilBtn() {
 const HeaderRight = () => <HeaderPerfilBtn />;
 
 export default function Layout() {
+  const [dbReady, setDbReady] = useState(false);
   const { width } = useWindowDimensions();
   const fontScale = PixelRatio.getFontScale();
   const clampedScale = Math.min(fontScale, 1.4);
@@ -137,13 +139,6 @@ export default function Layout() {
 
   useEffect(() => {
     (async () => {
-      // Inicializar BD dentro del componente, no a nivel de módulo
-      try {
-        initDB();
-      } catch (e) {
-        console.warn("Error initDB:", e);
-      }
-      await new Promise((resolve) => setTimeout(resolve, 300));
       // Pedir permisos de notificación
       if (Platform.OS !== "web") {
         const { status } = await Notifications.requestPermissionsAsync();
@@ -167,68 +162,73 @@ export default function Layout() {
   }, []);
 
   return (
-    <AjustesProvider>
-      <AvatarProvider>
-        <Drawer
-          drawerContent={CustomDrawerContent}
-          screenOptions={{
-            headerStyle: {
-              backgroundColor: Colors.light.primary,
-              shadowColor: "transparent",
-            },
-            headerTintColor: WHITE,
-            headerTitleAlign: "center",
-            headerTitleStyle: { fontSize: titleSize, fontWeight: "bold" },
-            headerTitleAllowFontScaling: false,
-            headerRight: HeaderRight,
-            drawerStyle: { backgroundColor: "#fff" },
-            drawerActiveTintColor: PURPLE,
-            drawerInactiveTintColor: "#555",
-            drawerActiveBackgroundColor: PURPLE + "15",
-          }}
-        >
-          <Drawer.Screen
-            name="index"
-            options={{ drawerLabel: LabelInicio, headerTitle: "RutinaQuest" }}
-          />
-          <Drawer.Screen
-            name="calendario"
-            options={{
-              drawerLabel: LabelCalendario,
-              headerTitle: "RutinaQuest",
+    <DBReadyContext.Provider value={dbReady}>
+      <AjustesProvider>
+        <AvatarProvider>
+          <Drawer
+            drawerContent={CustomDrawerContent}
+            screenOptions={{
+              headerStyle: {
+                backgroundColor: Colors.light.primary,
+                shadowColor: "transparent",
+              },
+              headerTintColor: WHITE,
+              headerTitleAlign: "center",
+              headerTitleStyle: { fontSize: titleSize, fontWeight: "bold" },
+              headerTitleAllowFontScaling: false,
+              headerRight: HeaderRight,
+              drawerStyle: { backgroundColor: "#fff" },
+              drawerActiveTintColor: PURPLE,
+              drawerInactiveTintColor: "#555",
+              drawerActiveBackgroundColor: PURPLE + "15",
             }}
-          />
-          <Drawer.Screen
-            name="temporizador"
-            options={{
-              drawerLabel: LabelTemporizador,
-              headerTitle: "RutinaQuest",
-            }}
-          />
-          <Drawer.Screen
-            name="progreso"
-            options={{ drawerLabel: LabelProgreso, headerTitle: "RutinaQuest" }}
-          />
-          <Drawer.Screen
-            name="historial"
-            options={{
-              drawerLabel: LabelHistorial,
-              headerTitle: "RutinaQuest",
-            }}
-          />
-          <Drawer.Screen
-            name="perfil"
-            options={{
-              drawerItemStyle: { display: "none" },
-              headerTitle: "RutinaQuest",
-            }}
-          />
-          <Drawer.Screen
-            name="normas"
-            options={{ drawerLabel: LabelNormas, headerTitle: "RutinaQuest" }}
-          />
-        </Drawer>
-      </AvatarProvider>
-    </AjustesProvider>
+          >
+            <Drawer.Screen
+              name="index"
+              options={{ drawerLabel: LabelInicio, headerTitle: "RutinaQuest" }}
+            />
+            <Drawer.Screen
+              name="calendario"
+              options={{
+                drawerLabel: LabelCalendario,
+                headerTitle: "RutinaQuest",
+              }}
+            />
+            <Drawer.Screen
+              name="temporizador"
+              options={{
+                drawerLabel: LabelTemporizador,
+                headerTitle: "RutinaQuest",
+              }}
+            />
+            <Drawer.Screen
+              name="progreso"
+              options={{
+                drawerLabel: LabelProgreso,
+                headerTitle: "RutinaQuest",
+              }}
+            />
+            <Drawer.Screen
+              name="historial"
+              options={{
+                drawerLabel: LabelHistorial,
+                headerTitle: "RutinaQuest",
+              }}
+            />
+            <Drawer.Screen
+              name="perfil"
+              options={{
+                drawerItemStyle: { display: "none" },
+                headerTitle: "RutinaQuest",
+              }}
+            />
+            <Drawer.Screen
+              name="normas"
+              options={{ drawerLabel: LabelNormas, headerTitle: "RutinaQuest" }}
+            />
+          </Drawer>
+        </AvatarProvider>
+      </AjustesProvider>
+    </DBReadyContext.Provider>
   );
 }

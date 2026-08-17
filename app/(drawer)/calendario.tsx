@@ -1,1169 +1,1293 @@
+import { useDBReady } from "@/context/Dbreadycontext";
 import { Ionicons } from "@expo/vector-icons";
-import DateTimePicker from "@react-native-community/datetimepicker";
-import * as Haptics from "expo-haptics";
-import { router, useFocusEffect } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import * as Sharing from "expo-sharing";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   AccessibilityInfo,
+  Alert,
   Image,
-  KeyboardAvoidingView,
+  Linking,
   Modal,
+  PixelRatio,
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { DIAS_SEMANA, MESES } from "../../constants/diasSemana";
+import ViewShot from "react-native-view-shot";
+import { StarRow } from "../../components/ui/StarRow";
+import { DIAS_CORTOS, DIAS_LARGOS } from "../../constants/diasSemana";
 import { Colors } from "../../constants/theme";
 import { useAjustesCtx } from "../../context/AjustesContext";
+import { useAvatar } from "../../context/AvatarContext";
+import { getTareasHistorial } from "../../database/database";
+import { useGamificacion } from "../../hooks/useGamificacion";
+import { Tarea } from "../../types/tarea";
+import { fechaAppDate, hoyAppStr } from "../../utils/fecha";
 import {
-  deleteTarea,
-  getFechasConTareas,
-  getTareasPorFecha,
-  insertTarea,
-} from "../../database/database";
-import { buscarPictogramas } from "../../services/arasaac";
-import { ahoraApp, ahoraAppMs, hoyAppStr } from "../../utils/fecha";
-import { fechaLegible } from "../../utils/fechaFormato";
+  diasDeSemana,
+  etiquetaSemana,
+  lunesDe,
+  toLocalDateStr,
+} from "../../utils/fechaFormato";
 
 const PURPLE = Colors.purple;
+const ORANGE = Colors.orange;
 const PURPLE_LT = Colors.purpleLt;
 const PURPLE_BG = Colors.purpleBg;
 const GREEN = Colors.green;
 const RED = Colors.red;
-function primerDiaMes(anyo: number, mes: number): Date {
-  return new Date(anyo, mes, 1);
-} //en que columna empieza
-function diasEnMes(anyo: number, mes: number): number {
-  return new Date(anyo, mes + 1, 0).getDate();
+const GOLD = Colors.gold;
+
+const COLORES_PELO = [
+  "#1a1a1a",
+  "#3B1F0E",
+  "#8B4513",
+  "#DAA520",
+  "#E8C47A",
+  "#E8E8E8",
+];
+
+function fechaReferencia(t: Tarea): string {
+  if (t.estado === "completada" || (t.completed && !t.estado)) {
+    return t.fechaCompletada ?? t.fechaDia ?? "";
+  }
+  return t.fechaDia ?? t.fechaCompletada ?? "";
 }
 
-// ─── Calendario mensual ───
-function CalendarioMes({
-  anyo,
-  mes,
-  fechasConTareas,
-  fechaSeleccionada,
-  onSelectFecha,
-}: {
-  anyo: number;
-  mes: number;
-  fechasConTareas: Record<string, number>;
-  fechaSeleccionada: string | null;
-  onSelectFecha: (f: string) => void;
-}) {
-  const { escala } = useAjustesCtx();
-  const hoy = hoyAppStr();
-  const totalDias = diasEnMes(anyo, mes);
-  const primerDia = primerDiaMes(anyo, mes);
-  const offsetLunes = (primerDia.getDay() + 6) % 7;
-  const celdas = offsetLunes + totalDias;
-  const filas = Math.ceil(celdas / 7);
+//Renderiza el avata
+function AvatarMini({ avatar, size = 120 }: { avatar: any; size?: number }) {
+  const { tonoPiel, cara, colorPelo, peloCorto, peloLargo, shirt } = avatar;
+  const si: 0 | 1 = tonoPiel === 1 ? 1 : 0;
+  const colorPeloStr = COLORES_PELO[colorPelo] ?? COLORES_PELO[0];
+  const caras = [
+    [
+      require("../../assets/images/avatar/cara1_claro.png"),
+      require("../../assets/images/avatar/cara2_claro.png"),
+      require("../../assets/images/avatar/cara3_claro.png"),
+    ],
+    [
+      require("../../assets/images/avatar/cara1_oscuro.png"),
+      require("../../assets/images/avatar/cara2_oscuro.png"),
+      require("../../assets/images/avatar/cara3_oscuro.png"),
+    ],
+  ];
+  const camisetas = [
+    [
+      require("../../assets/images/avatar/camiseta1_claro.png"),
+      require("../../assets/images/avatar/camiseta2_claro.png"),
+    ],
+    [
+      require("../../assets/images/avatar/camiseta1_oscuro.png"),
+      require("../../assets/images/avatar/camiseta2_oscuro.png"),
+    ],
+  ];
+  const peloCortoOpts = [
+    require("../../assets/images/avatar/pelo1.png"),
+    require("../../assets/images/avatar/pelo3.png"),
+  ];
+  const peloLargoOpts = [
+    require("../../assets/images/avatar/pelo5.png"),
+    require("../../assets/images/avatar/pelo6.png"),
+  ];
 
   return (
     <View
-      accessibilityRole="list"
-      accessibilityLabel={`Calendario de ${MESES[mes]} ${anyo}`}
+      style={{ width: size, height: size * 1.2, position: "relative" }}
+      accessibilityElementsHidden
+      importantForAccessibility="no"
     >
-      <View
-        style={s.semanaCab}
-        accessibilityElementsHidden
-        importantForAccessibility="no"
-      >
-        {DIAS_SEMANA.map((d) => (
-          <Text
-            key={d}
-            style={[s.semanaCabTxt, { fontSize: Math.round(11 * escala) }]}
-          >
-            {d}
-          </Text>
-        ))}
-      </View>
-
-      {Array.from({ length: filas }).map((_, fila) => (
-        <View
-          key={fila}
-          style={s.semanaFila}
-          accessible={false}
-          importantForAccessibility="no"
-        >
-          {Array.from({ length: 7 }).map((_, col) => {
-            const idx = fila * 7 + col;
-            const dia = idx - offsetLunes + 1;
-            if (dia < 1 || dia > totalDias) {
-              return (
-                <View
-                  key={col}
-                  style={s.celda}
-                  accessibilityElementsHidden
-                  importantForAccessibility="no"
-                />
-              );
-            }
-            const fecha = `${anyo}-${String(mes + 1).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
-            const esHoy = fecha === hoy;
-            const esPasado = fecha < hoy;
-            const selec = fecha === fechaSeleccionada;
-            const tieneTareas = !!fechasConTareas[fecha];
-            const diaSemana = DIAS_SEMANA[idx % 7];
-
-            let a11yLabel = `${dia} de ${MESES[mes]}, ${diaSemana}`;
-            if (esHoy) a11yLabel += ", hoy";
-            if (selec) a11yLabel += ", seleccionado";
-            if (tieneTareas) a11yLabel += ", con tareas";
-            if (esPasado && !esHoy) a11yLabel += ", pasado";
-
-            return (
-              <Pressable
-                key={col}
-                style={[
-                  s.celda,
-                  esHoy && s.celdaHoy,
-                  selec && s.celdaSelec,
-                  esPasado && !esHoy && s.celdaPasado,
-                ]}
-                onPress={() => onSelectFecha(fecha)}
-                accessible
-                accessibilityRole="button"
-                accessibilityLabel={a11yLabel}
-                accessibilityState={{ selected: selec }}
-              >
-                <Text
-                  style={[
-                    s.celdaTxt,
-                    esHoy && s.celdaHoyTxt,
-                    selec && s.celdaSelecTxt,
-                    esPasado && !esHoy && { color: "#CCC" },
-                  ]}
-                >
-                  {dia}
-                </Text>
-                {tieneTareas && (
-                  <View
-                    style={[s.punto, selec && { backgroundColor: "#fff" }]}
-                    accessibilityElementsHidden
-                    importantForAccessibility="no"
-                  />
-                )}
-              </Pressable>
-            );
-          })}
-        </View>
-      ))}
+      <Image
+        source={camisetas[si][shirt] ?? camisetas[0][0]}
+        style={{
+          position: "absolute",
+          top: size * 0.7,
+          left: -size * 0.12,
+          width: size * 1.3,
+          height: size * 1.3,
+          zIndex: 3,
+        }}
+        resizeMode="contain"
+        accessibilityIgnoresInvertColors
+      />
+      <Image
+        source={caras[si][cara] ?? caras[0][0]}
+        style={{
+          position: "absolute",
+          top: -size * 0.02,
+          left: 0,
+          width: size,
+          height: size,
+          zIndex: 1,
+        }}
+        resizeMode="contain"
+        accessibilityIgnoresInvertColors
+      />
+      {peloCorto >= 0 && peloCortoOpts[peloCorto] && (
+        <Image
+          source={peloCortoOpts[peloCorto]}
+          style={{
+            position: "absolute",
+            top: -size * 0.28,
+            left: size * -0.02,
+            width: size * 1.05,
+            height: size * 0.8,
+            zIndex: 4,
+            tintColor: colorPeloStr,
+          }}
+          resizeMode="contain"
+          accessibilityIgnoresInvertColors
+        />
+      )}
+      {peloCorto < 0 && peloLargo >= 0 && peloLargoOpts[peloLargo] && (
+        <Image
+          source={peloLargoOpts[peloLargo]}
+          style={{
+            position: "absolute",
+            top: -size * 0.27,
+            left: size * -0.1,
+            width: size * 1.2,
+            height: size * 1.2,
+            zIndex: 4,
+            tintColor: colorPeloStr,
+          }}
+          resizeMode="contain"
+          accessibilityIgnoresInvertColors
+        />
+      )}
     </View>
   );
 }
 
-// ─── Modal para añadir tarea ─────
-function ModalNuevaTarea({
-  visible,
-  fecha,
-  onClose,
-  onGuardar,
+function TarjetaCompartir({
+  avatar,
+  gami,
+  tareasUltimaSemana,
 }: {
-  visible: boolean;
-  fecha: string;
-  onClose: () => void;
-  onGuardar: (tarea: any) => void;
+  avatar: any;
+  gami: any;
+  tareasUltimaSemana: any[];
 }) {
-  const { escala } = useAjustesCtx();
-  const fs = (n: number) => Math.round(n * escala);
-  const [titulo, setTitulo] = useState("");
-  const [hora, setHora] = useState<string | null>(null);
-  const [pictogramas, setPictogramas] = useState<number[]>([]);
-  const [pictogramId, setPictogramId] = useState<number | null>(null);
-  const [showPicker, setShowPicker] = useState(false);
-  const [tempTime, setTempTime] = useState(new Date());
-  const [repeticion, setRepeticion] = useState<
-    "ninguna" | "diaria" | "semanal"
-  >("ninguna");
-
-  const PURPLE = "#A77BBE";
-  const PURPLE_LT = "#E5D9EE";
-  const PURPLE_BG = "#F4F0F6";
-
-  const buscar = async (texto: string) => {
-    setTitulo(texto);
-    if (texto.trim().length < 2) {
-      setPictogramas([]);
-      setPictogramId(null);
-      return;
-    }
-    const ids = await buscarPictogramas(texto, 6);
-    if (ids.length > 0) {
-      setPictogramas(ids);
-      setPictogramId(ids[0]);
-    } else {
-      setPictogramas([]);
-      setPictogramId(null);
-    }
-  };
-
-  const handleTimeChange = (event: any, date?: Date) => {
-    if (Platform.OS === "android") setShowPicker(false);
-    if (date) {
-      setTempTime(date);
-      setHora(
-        date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      );
-    }
-  };
-
-  const cerrar = () => {
-    setTitulo("");
-    setHora(null);
-    setPictogramId(null);
-    setPictogramas([]);
-    setShowPicker(false);
-    setRepeticion("ninguna");
-    onClose();
-  };
-
-  const guardar = () => {
-    if (!titulo.trim()) return;
-    onGuardar({
-      id: `${fecha}_${ahoraAppMs()}_${Math.random().toString(36).slice(2, 8)}`,
-      title: titulo.trim(),
-      hora: hora ?? "Sin hora",
-      pictogramId: pictogramId ?? null,
-      repeticion,
-    });
-    setTitulo("");
-    setHora(null);
-    setPictogramId(null);
-    setPictogramas([]);
-    setShowPicker(false);
-    setRepeticion("ninguna");
-    onClose();
-    AccessibilityInfo.announceForAccessibility(
-      `Tarea ${titulo} añadida para el ${fecha}`,
-    );
-  };
+  const medallaEmoji = gami.medalla
+    ? ({ bronce: "🥉", plata: "🥈", oro: "🥇" } as any)[gami.medalla]
+    : null;
+  const completadas = tareasUltimaSemana.filter(
+    (t) => t.estado === "completada" || (t.completada === 1 && !t.estado),
+  );
+  const canceladas = tareasUltimaSemana.filter(
+    (t) => t.estado === "cancelada" || t.estado === "vencida",
+  );
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={cerrar}
-      accessibilityViewIsModal
+    <View
+      style={tc.card}
+      collapsable={false}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1, justifyContent: "flex-end" }}
-      >
-        <Pressable
-          style={s.overlay}
-          onPress={cerrar}
-          accessible={false}
-          importantForAccessibility="no"
-        >
-          <Pressable
-            style={s.modalBox}
-            onPress={(e) => e.stopPropagation()}
-            accessible={false}
-            importantForAccessibility="yes"
-          >
-            <ScrollView
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-              bounces={false}
-              accessible={false}
-              importantForAccessibility="yes"
-            >
-              <View style={s.modalHeader} accessible={false}>
-                <View style={s.modalHeaderTexts} accessible={false}>
-                  <Text
-                    style={[
-                      s.modalTitle,
-                      { fontSize: Math.round(18 * escala) },
-                    ]}
-                    accessibilityRole="header"
-                  >
-                    Nueva tarea
-                  </Text>
-                  <View
-                    style={s.modalFechaChip}
-                    accessible
-                    accessibilityLabel={`Para el ${fechaLegible(fecha)}`}
-                  >
-                    <Ionicons
-                      name="calendar-outline"
-                      size={13}
-                      color={PURPLE}
-                      accessibilityElementsHidden
-                      importantForAccessibility="no"
-                    />
-                    <Text
-                      style={s.modalFechaChipTxt}
-                      accessibilityElementsHidden
-                      importantForAccessibility="no"
-                    >
-                      {fechaLegible(fecha)}
-                    </Text>
-                  </View>
-                </View>
-                <Pressable
-                  onPress={cerrar}
-                  style={s.modalCloseBtn}
-                  accessible
-                  accessibilityRole="button"
-                  accessibilityLabel="Cerrar formulario de nueva tarea"
-                >
-                  <Ionicons
-                    name="close"
-                    size={22}
-                    color={PURPLE}
-                    accessibilityElementsHidden
-                    importantForAccessibility="no"
-                  />
-                </Pressable>
-              </View>
-
-              <View style={s.modalDivider} accessible={false} />
-
-              {/* ── Título ── */}
-              <Text
-                style={s.modalInputLabel}
-                accessibilityElementsHidden
-                importantForAccessibility="no"
-              >
-                Título
-              </Text>
-              <View style={s.inputRow} accessible={false}>
-                <TextInput
-                  placeholder="¿Qué quieres hacer?"
-                  value={titulo}
-                  onChangeText={buscar}
-                  style={s.input}
-                  accessibilityLabel="Título de la tarea"
-                  autoCapitalize="sentences"
-                  accessibilityHint="Escribe el nombre. Se buscarán pictogramas automáticamente"
-                  returnKeyType="done"
-                  clearButtonMode="while-editing"
-                  autoFocus
-                />
-              </View>
-
-              {/* ── Selector múltiple de pictogramas ── */}
-              {pictogramas.length > 0 && (
-                <View style={{ marginBottom: 16 }} accessible={false}>
-                  <Text style={s.modalInputLabel} accessibilityRole="header">
-                    Elige un pictograma
-                  </Text>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={{ gap: 10, paddingVertical: 4 }}
-                    accessible={false}
-                  >
-                    {pictogramas.map((id, i) => (
-                      <Pressable
-                        key={id}
-                        onPress={() => setPictogramId(id)}
-                        style={[
-                          s.pictoOpcion,
-                          pictogramId === id && s.pictoOpcionSelec,
-                        ]}
-                        accessible
-                        accessibilityRole="button"
-                        accessibilityLabel={`Pictograma opción ${i + 1}${pictogramId === id ? ", seleccionado" : ""}`}
-                        accessibilityState={{ selected: pictogramId === id }}
-                      >
-                        <Image
-                          source={{
-                            uri: `https://static.arasaac.org/pictograms/${id}/${id}_300.png`,
-                          }}
-                          style={s.pictoImg}
-                          accessibilityIgnoresInvertColors
-                        />
-                      </Pressable>
-                    ))}
-                    <Pressable
-                      onPress={() => setPictogramId(null)}
-                      style={[
-                        s.pictoOpcion,
-                        s.pictoNinguno,
-                        pictogramId === null && s.pictoOpcionSelec,
-                      ]}
-                      accessible
-                      accessibilityRole="button"
-                      accessibilityLabel={`Sin pictograma${pictogramId === null ? ", seleccionado" : ""}`}
-                      accessibilityState={{ selected: pictogramId === null }}
-                    >
-                      <Ionicons
-                        name="close"
-                        size={22}
-                        color={pictogramId === null ? PURPLE : "#CCC"}
-                        accessibilityElementsHidden
-                        importantForAccessibility="no"
-                      />
-                      <Text
-                        style={[
-                          s.pictoNingunoTxt,
-                          pictogramId === null && { color: PURPLE },
-                        ]}
-                        accessibilityElementsHidden
-                        importantForAccessibility="no"
-                      >
-                        Ninguno
-                      </Text>
-                    </Pressable>
-                  </ScrollView>
-                </View>
-              )}
-
-              {/* ── Hora ── */}
-              <Text
-                style={s.modalInputLabel}
-                accessibilityElementsHidden
-                importantForAccessibility="no"
-              >
-                Hora (opcional)
-              </Text>
-
-              {Platform.OS === "web" ? (
-                <input
-                  type="time"
-                  onChange={(e) => setHora(e.target.value || null)}
-                  style={{
-                    padding: 10,
-                    fontSize: fs(15),
-                    borderRadius: 10,
-                    borderColor: PURPLE_LT,
-                    border: `1px solid ${PURPLE_LT}`,
-                    backgroundColor: PURPLE_BG,
-                    marginBottom: 16,
-                  }}
-                />
-              ) : (
-                <>
-                  <Pressable
-                    onPress={() => setShowPicker(true)}
-                    style={[s.inputRow, { marginBottom: showPicker ? 8 : 16 }]}
-                    accessible
-                    accessibilityRole="button"
-                    accessibilityLabel={
-                      hora
-                        ? `Hora seleccionada: ${hora}. Pulsa para cambiar`
-                        : "Seleccionar hora, opcional"
-                    }
-                  >
-                    <Ionicons
-                      name="time-outline"
-                      size={18}
-                      color={PURPLE}
-                      accessibilityElementsHidden
-                      importantForAccessibility="no"
-                    />
-                    <Text
-                      style={[
-                        s.input,
-                        { color: hora ? "#333" : "#AAA", paddingVertical: 12 },
-                      ]}
-                      accessibilityElementsHidden
-                      importantForAccessibility="no"
-                    >
-                      {hora ?? "Sin hora seleccionada"}
-                    </Text>
-                    {hora && (
-                      <Pressable
-                        onPress={() => {
-                          setHora(null);
-                          setShowPicker(false);
-                        }}
-                        accessible
-                        accessibilityRole="button"
-                        accessibilityLabel="Quitar hora"
-                        style={{ padding: 4 }}
-                      >
-                        <Ionicons
-                          name="close-circle"
-                          size={18}
-                          color="#CCC"
-                          accessibilityElementsHidden
-                          importantForAccessibility="no"
-                        />
-                      </Pressable>
-                    )}
-                  </Pressable>
-
-                  {showPicker && (
-                    <View style={{ marginBottom: 16 }} accessible={false}>
-                      <DateTimePicker
-                        value={tempTime}
-                        mode="time"
-                        is24Hour
-                        display={Platform.OS === "ios" ? "spinner" : "default"}
-                        onChange={handleTimeChange}
-                      />
-                      {Platform.OS === "ios" && (
-                        <Pressable
-                          onPress={() => setShowPicker(false)}
-                          style={{
-                            alignSelf: "flex-end",
-                            paddingHorizontal: 16,
-                            paddingVertical: 6,
-                          }}
-                          accessible
-                          accessibilityRole="button"
-                          accessibilityLabel="Confirmar hora seleccionada"
-                        >
-                          <Text
-                            style={{
-                              color: PURPLE,
-                              fontWeight: "700",
-                              fontSize: 15,
-                            }}
-                          >
-                            Listo
-                          </Text>
-                        </Pressable>
-                      )}
-                    </View>
-                  )}
-                </>
-              )}
-
-              {/* ── Repetición ── */}
-              <Text style={[s.modalInputLabel, { marginTop: 8 }]}>
-                ¿Se repite?
-              </Text>
-              <View
-                style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}
-                accessible={false}
-              >
-                {(["ninguna", "diaria", "semanal"] as const).map((opcion) => (
-                  <Pressable
-                    key={opcion}
-                    onPress={() => setRepeticion(opcion)}
-                    style={{
-                      flex: 1,
-                      paddingVertical: 10,
-                      borderRadius: 12,
-                      alignItems: "center",
-                      borderWidth: 2,
-                      borderColor: repeticion === opcion ? PURPLE : "#E5E5E5",
-                      backgroundColor:
-                        repeticion === opcion ? PURPLE_BG : "#fff",
-                    }}
-                    accessible
-                    accessibilityRole="button"
-                    accessibilityLabel={
-                      opcion === "ninguna"
-                        ? "Una vez"
-                        : opcion === "diaria"
-                          ? "Cada día"
-                          : "Cada semana"
-                    }
-                    accessibilityState={{ selected: repeticion === opcion }}
-                  >
-                    <Text style={{ fontSize: 18 }}>
-                      {opcion === "ninguna"
-                        ? "1"
-                        : opcion === "diaria"
-                          ? "📅"
-                          : "📆"}
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: fs(11),
-                        fontWeight: "600",
-                        color: repeticion === opcion ? PURPLE : "#999",
-                        marginTop: 2,
-                      }}
-                    >
-                      {opcion === "ninguna"
-                        ? "Una vez"
-                        : opcion === "diaria"
-                          ? "Cada día"
-                          : "Semanal"}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              {/* ── Botón guardar ── */}
-              <Pressable
-                onPress={guardar}
-                style={[s.btnGuardar, !titulo.trim() && s.btnGuardarDisabled]}
-                accessible
-                accessibilityRole="button"
-                accessibilityLabel={
-                  titulo.trim()
-                    ? `Añadir tarea ${titulo}`
-                    : "Añadir tarea. Escribe un título primero"
-                }
-                accessibilityHint={
-                  titulo.trim() ? "Guarda la tarea y cierra el formulario" : ""
-                }
-              >
-                <Ionicons
-                  name="checkmark"
-                  size={20}
-                  color="#fff"
-                  accessibilityElementsHidden
-                  importantForAccessibility="no"
-                />
+      <View style={tc.header}>
+        <Text style={tc.headerTxt}>🌟 RutinaQuest</Text>
+      </View>
+      <View style={tc.avatarRow}>
+        <View style={tc.avatarWrap}>
+          <AvatarMini avatar={avatar} size={110} />
+        </View>
+        <View style={tc.statsCol}>
+          <Text style={tc.statLine}>⭐ {gami.estrellas} estrellas</Text>
+          <Text style={tc.statLine}>🔥 {gami.racha} días de racha</Text>
+          {medallaEmoji && (
+            <Text style={tc.statLine}>
+              {medallaEmoji} Medalla de {gami.medalla}
+            </Text>
+          )}
+          <View style={tc.statsDivider} />
+          <Text style={tc.statLine}>✅ {completadas.length} esta semana</Text>
+          <Text style={tc.statLine}>❌ {canceladas.length} canceladas</Text>
+        </View>
+      </View>
+      {tareasUltimaSemana.length > 0 && (
+        <View style={tc.tareasSection}>
+          <Text style={tc.tareasSectionTitle}>Esta semana</Text>
+          {tareasUltimaSemana.slice(0, 10).map((t, i) => {
+            const ok =
+              t.estado === "completada" || (t.completada === 1 && !t.estado);
+            return (
+              <View key={i} style={tc.tareaFila}>
+                <Text style={tc.tareaEmoji}>{ok ? "✅" : "❌"}</Text>
                 <Text
-                  style={s.btnGuardarTxt}
-                  accessibilityElementsHidden
-                  importantForAccessibility="no"
+                  style={[
+                    tc.tareaTxt,
+                    !ok && {
+                      color: "#AAA",
+                      textDecorationLine: "line-through",
+                    },
+                  ]}
+                  numberOfLines={1}
                 >
-                  Añadir tarea
+                  {t.title}
                 </Text>
-              </Pressable>
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </KeyboardAvoidingView>
-    </Modal>
+                <Text style={tc.tareaStars}>
+                  {"★".repeat(t.stars ?? (ok ? 5 : 0))}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
+      <Text style={tc.footer}>
+        {new Date().toLocaleDateString("es-ES", { dateStyle: "long" })}
+      </Text>
+    </View>
   );
 }
 
-export default function Calendario() {
-  const { escala, colores } = useAjustesCtx();
-  const ahora = ahoraApp();
-  const [anyo, setAnyo] = useState(ahora.getFullYear());
-  const [mes, setMes] = useState(ahora.getMonth());
+const tc = StyleSheet.create({
+  card: {
+    width: 320,
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    overflow: "hidden",
+    borderWidth: 2,
+    borderColor: PURPLE_LT,
+  },
+  header: {
+    backgroundColor: PURPLE,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  headerTxt: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+  },
+  avatarRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+    gap: 12,
+    backgroundColor: PURPLE_BG,
+  },
+  avatarWrap: { width: 110, height: 132, overflow: "hidden" },
+  statsCol: { flex: 1, gap: 4 },
+  statLine: { fontSize: 13, color: "#444", fontWeight: "600" },
+  statsDivider: { height: 1, backgroundColor: PURPLE_LT, marginVertical: 4 },
+  tareasSection: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 4 },
+  tareasSectionTitle: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#BBB",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 6,
+  },
+  tareaFila: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 5,
+  },
+  tareaEmoji: { fontSize: 14 },
+  tareaTxt: { flex: 1, fontSize: 13, color: "#333", fontWeight: "500" },
+  tareaStars: { fontSize: 11, color: GOLD },
+  footer: {
+    textAlign: "center",
+    fontSize: 10,
+    color: "#BBB",
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: PURPLE_LT,
+  },
+});
 
-  const [fechaSelec, setFechaSelec] = useState<string | null>(null);
-  const [tareasDia, setTareasDia] = useState<any[]>([]);
-  const lastTareasDiaRef = useRef<any[]>([]);
-  const [fechasConTareas, setFechasConTareas] = useState<
-    Record<string, number>
-  >({});
-  const [modalVisible, setModalVisible] = useState(false);
+export default function Historial() {
+  const { escala, colores } = useAjustesCtx();
+  const ts = useMemo(
+    () => ({
+      titulo: { fontSize: Math.round(30 * escala) },
+      seccionTitulo: { fontSize: Math.round(11 * escala) },
+      tareaTitle: { fontSize: Math.round(14 * escala) },
+      tareaHora: { fontSize: Math.round(12 * escala) },
+      tareaStars: { fontSize: Math.round(13 * escala) },
+    }),
+    [escala],
+  );
+  const router = useRouter();
+  const gami = useGamificacion();
+  const { avatar } = useAvatar();
+  const shotRef = useRef<any>(null);
+
+  const [search, setSearch] = useState("");
+  const dbReady = useDBReady();
+  const [historial, setHistorial] = useState<Tarea[]>([]);
+  const lastHistorialRef = useRef<Tarea[]>([]);
+  const [compartiendo, setCompartiendo] = useState(false);
+  const [modalCaptura, setModalCaptura] = useState(false);
+  const [destinoPend, setDestinoPend] = useState<
+    "whatsapp" | "gmail" | "nativo" | null
+  >(null);
+  const [semanaActual, setSemanaActual] = useState(() =>
+    lunesDe(fechaAppDate()),
+  );
 
   const hoy = hoyAppStr();
+  const [diaSeleccionado, setDiaSeleccionado] = useState(hoy);
 
-  const cargar = useCallback(() => {
-    setTimeout(() => {
-      setFechasConTareas(getFechasConTareas() as any);
-      if (fechaSelec) {
-        const rows = getTareasPorFecha(fechaSelec) as any[];
-        if (rows.length === 0 && lastTareasDiaRef.current.length > 0) return;
-        lastTareasDiaRef.current = rows;
-        setTareasDia(rows);
+  useFocusEffect(
+    useCallback(() => {
+      const rows = getTareasHistorial() as any[];
+      if (rows.length === 0 && lastHistorialRef.current.length > 0) return;
+      const mapped = rows.map((r) => ({ ...r, completed: r.completed === 1 }));
+      lastHistorialRef.current = mapped;
+      setHistorial(mapped);
+    }, [dbReady]),
+  );
+
+  const esMismaSemana = (lunes: Date) =>
+    toLocalDateStr(lunes) === toLocalDateStr(lunesDe(fechaAppDate()));
+
+  const irAnterior = () =>
+    setSemanaActual((prev) => {
+      const d = new Date(prev);
+      d.setDate(d.getDate() - 7);
+      setDiaSeleccionado(toLocalDateStr(d));
+      return d;
+    });
+  const irSiguiente = () =>
+    setSemanaActual((prev) => {
+      if (esMismaSemana(prev)) return prev;
+      const d = new Date(prev);
+      d.setDate(d.getDate() + 7);
+      setDiaSeleccionado(esMismaSemana(d) ? hoy : toLocalDateStr(d));
+      return d;
+    });
+
+  const esEstaSemana = esMismaSemana(semanaActual);
+  const dias = diasDeSemana(semanaActual);
+
+  const tareasUltimaSemana = historial.filter((t) =>
+    dias.includes(fechaReferencia(t)),
+  );
+
+  const tareasDelDia = historial.filter(
+    (t) =>
+      fechaReferencia(t) === diaSeleccionado &&
+      t.title.toLowerCase().includes(search.toLowerCase()),
+  );
+  const completadasDia = tareasDelDia.filter(
+    (t) => t.estado === "completada" || (t.completed && !t.estado),
+  );
+  const canceladasDia = tareasDelDia.filter((t) => t.estado === "cancelada");
+  const vencidasDia = tareasDelDia.filter((t) => t.estado === "vencida");
+
+  const nombreDia = new Date(diaSeleccionado + "T12:00:00").toLocaleDateString(
+    "es-ES",
+    { weekday: "long", day: "numeric", month: "long" },
+  );
+
+  const buildTextoCompartir = () => {
+    const completadas = tareasUltimaSemana.filter(
+      (t) => t.estado === "completada" || (t.completed && !t.estado),
+    );
+    const canceladas = tareasUltimaSemana.filter(
+      (t) => t.estado === "cancelada" || t.estado === "vencida",
+    );
+    const medallaEmoji = gami.medalla
+      ? ({ bronce: "🥉", plata: "🥈", oro: "🥇" } as any)[gami.medalla]
+      : "";
+    return [
+      "🌟 RutinaQuest · Mi historial",
+      "",
+      `⭐ ${gami.estrellas} estrellas`,
+      `🔥 ${gami.racha} días de racha`,
+      medallaEmoji ? `${medallaEmoji} Medalla de ${gami.medalla}` : "",
+      "",
+      `✅ ${completadas.length} completadas esta semana`,
+      `❌ ${canceladas.length} canceladas`,
+      "",
+      "📋 Tareas de la semana:",
+      ...tareasUltimaSemana.slice(0, 10).map((t) => {
+        const ok = t.estado === "completada" || (t.completed && !t.estado);
+        return `${ok ? "✅" : "❌"} ${t.title}`;
+      }),
+      "",
+      new Date().toLocaleDateString("es-ES", { dateStyle: "long" }),
+    ]
+      .filter(Boolean)
+      .join("\n");
+  };
+
+  const iniciarCompartir = (destino: "whatsapp" | "gmail" | "nativo") => {
+    if (historial.length === 0) {
+      Alert.alert(
+        "Sin historial",
+        "Aún no tienes tareas completadas para exportar.",
+      );
+      return;
+    }
+
+    const texto = buildTextoCompartir();
+
+    if (Platform.OS === "web") {
+      if (destino === "whatsapp") {
+        window.open(
+          `https://wa.me/?text=${encodeURIComponent(texto)}`,
+          "_blank",
+        );
+      } else if (destino === "gmail") {
+        window.open(
+          `mailto:?subject=${encodeURIComponent("Mi historial de RutinaQuest")}&body=${encodeURIComponent(texto)}`,
+          "_self",
+        );
+      } else {
+        if (navigator.share) {
+          navigator
+            .share({ title: "Mi historial de RutinaQuest", text: texto })
+            .catch(() => {});
+        } else {
+          navigator.clipboard.writeText(texto).then(() => {
+            Alert.alert(
+              "Copiado",
+              "El historial se ha copiado al portapapeles.",
+            );
+          });
+        }
       }
-    }, 800);
-  }, [fechaSelec]);
+      return;
+    }
 
-  useFocusEffect(cargar);
+    if (destino === "gmail") {
+      Linking.openURL(
+        `mailto:?subject=${encodeURIComponent("Mi historial de RutinaQuest")}&body=${encodeURIComponent(texto)}`,
+      );
+      return;
+    }
 
-  const seleccionarFecha = (fecha: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setFechaSelec(fecha);
-    const todas = getTareasPorFecha(fecha) as any[];
-    setTareasDia(
-      todas.filter(
-        (t: any) =>
-          t.estado === "pendiente" || (!t.estado && t.completed !== 1),
-      ),
-    );
-    const n = todas.filter(
-      (t: any) => t.estado === "pendiente" || (!t.estado && t.completed !== 1),
-    ).length;
-    AccessibilityInfo.announceForAccessibility(
-      n > 0
-        ? `${fecha}, ${n} tarea${n > 1 ? "s" : ""} pendiente${n > 1 ? "s" : ""}`
-        : `${fecha}, sin tareas pendientes`,
-    );
+    setDestinoPend(destino);
+    setModalCaptura(true);
   };
 
-  const mesAnterior = () => {
-    if (mes === 0) {
-      setMes(11);
-      setAnyo((a) => a - 1);
-    } else setMes((m) => m - 1);
-  };
+  const onModalListo = async () => {
+    if (!destinoPend) return;
+    setCompartiendo(true);
+    try {
+      await new Promise((r) => setTimeout(r, 800));
+      const uri: string = await shotRef.current.capture();
 
-  const mesSiguiente = () => {
-    if (mes === 11) {
-      setMes(0);
-      setAnyo((a) => a + 1);
-    } else setMes((m) => m + 1);
+      if (Platform.OS === "ios") {
+        setCompartiendo(false);
+        setModalCaptura(false);
+        setDestinoPend(null);
+        await new Promise((r) => setTimeout(r, 350));
+        const disponible = await Sharing.isAvailableAsync();
+        if (disponible) {
+          await Sharing.shareAsync(uri, {
+            mimeType: "image/png",
+            dialogTitle: "Compartir perfil RutinaQuest",
+            UTI: "public.png",
+          });
+        }
+      } else {
+        setCompartiendo(false);
+        setModalCaptura(false);
+        setDestinoPend(null);
+        await new Promise((r) => setTimeout(r, 100));
+        await Share.share({
+          message: buildTextoCompartir(),
+          title: "Mi historial de RutinaQuest",
+        });
+      }
+    } catch (e: any) {
+      console.warn("Error compartir:", e?.message ?? e);
+      Alert.alert("Error", e?.message ?? String(e));
+    } finally {
+      setCompartiendo(false);
+      setModalCaptura(false);
+      setDestinoPend(null);
+    }
   };
-
-  const onGuardar = (tarea: any) => {
-    insertTarea(tarea, fechaSelec!);
-    const todas = getTareasPorFecha(fechaSelec!) as any[];
-    setTareasDia(
-      todas.filter(
-        (t: any) =>
-          t.estado === "pendiente" || (!t.estado && t.completed !== 1),
-      ),
-    );
-    setFechasConTareas(getFechasConTareas() as any);
-  };
-
-  const eliminar = (id: string, titulo: string) => {
-    deleteTarea(id);
-    setTareasDia((prev) => prev.filter((t) => t.id !== id));
-    setFechasConTareas(getFechasConTareas() as any);
-    AccessibilityInfo.announceForAccessibility(`Tarea ${titulo} eliminada`);
-  };
-
-  const esFuturo = fechaSelec !== null && fechaSelec > hoy;
-  const esHoy = fechaSelec === hoy;
 
   return (
-    <View style={s.root}>
+    <View style={styles.root}>
+      <Modal
+        visible={modalCaptura}
+        transparent
+        animationType="none"
+        onShow={onModalListo}
+        accessibilityViewIsModal={false}
+      >
+        <View
+          style={styles.modalCapturaOverlay}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          <ViewShot
+            ref={shotRef}
+            options={{ format: "png", quality: 1, result: "tmpfile" }}
+          >
+            <TarjetaCompartir
+              avatar={avatar}
+              gami={gami}
+              tareasUltimaSemana={tareasUltimaSemana}
+            />
+          </ViewShot>
+          {compartiendo && (
+            <View style={styles.capturaLoading}>
+              <Text style={styles.capturaLoadingTxt}>Preparando imagen...</Text>
+            </View>
+          )}
+        </View>
+      </Modal>
+
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ flexGrow: 1 }}
+        contentContainerStyle={{ paddingBottom: 40 }}
         keyboardShouldPersistTaps="handled"
+        accessible={false}
       >
-        <Text style={s.headerTitle} accessibilityRole="header">
-          Calendario
+        <Text
+          style={[styles.titulo, ts.titulo, ts.titulo]}
+          accessibilityRole="header"
+        >
+          Historial
         </Text>
 
-        <Pressable
-          onPress={() => router.replace("/")}
-          style={s.btnInicio}
+        {/* Botones compartir */}
+        <View style={styles.shareRow} accessible={false}>
+          <Pressable
+            onPress={() => router.replace("/")}
+            style={styles.btnInicio}
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel="Ir a Inicio"
+          >
+            <Ionicons
+              name="home-outline"
+              size={16}
+              color={PURPLE}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            />
+            <Text style={styles.btnInicioTxt}>Inicio</Text>
+          </Pressable>
+
+          <View style={styles.shareBtnsRow} accessible={false}>
+            <Pressable
+              onPress={() => iniciarCompartir("whatsapp")}
+              disabled={compartiendo}
+              style={[
+                styles.shareBtn,
+                { backgroundColor: "#25D366" },
+                compartiendo && { opacity: 0.5 },
+              ]}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel="Compartir por WhatsApp"
+              accessibilityState={{ disabled: compartiendo }}
+            >
+              <Ionicons
+                name="logo-whatsapp"
+                size={16}
+                color="#fff"
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+              />
+              <Text style={styles.shareBtnTxt} numberOfLines={1}>
+                WhatsApp
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => iniciarCompartir("gmail")}
+              disabled={compartiendo}
+              style={[
+                styles.shareBtn,
+                { backgroundColor: "#EA4335" },
+                compartiendo && { opacity: 0.5 },
+              ]}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel="Compartir por Gmail"
+              accessibilityState={{ disabled: compartiendo }}
+            >
+              <Ionicons
+                name="mail-outline"
+                size={16}
+                color="#fff"
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+              />
+              <Text style={styles.shareBtnTxt} numberOfLines={1}>
+                Gmail
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => iniciarCompartir("nativo")}
+              disabled={compartiendo}
+              style={[
+                styles.shareBtn,
+                { backgroundColor: PURPLE },
+                compartiendo && { opacity: 0.5 },
+              ]}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel={
+                compartiendo
+                  ? "Preparando imagen"
+                  : "Más opciones para compartir"
+              }
+              accessibilityState={{ disabled: compartiendo }}
+            >
+              <Ionicons
+                name="share-social-outline"
+                size={16}
+                color="#fff"
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+              />
+              <Text style={styles.shareBtnTxt} numberOfLines={1}>
+                {compartiendo ? "..." : "Más"}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Buscador */}
+        <View
+          style={styles.searchBar}
           accessible
-          accessibilityRole="button"
-          accessibilityLabel="Ir a Inicio"
+          accessibilityRole="search"
+          accessibilityLabel="Buscar tarea en historial"
         >
+          <TextInput
+            placeholder="Buscar tarea..."
+            value={search}
+            onChangeText={setSearch}
+            style={{ flex: 1, fontSize: 15 }}
+            accessibilityLabel="Campo de búsqueda"
+            accessibilityHint="Filtra las tareas del historial por nombre"
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+          />
           <Ionicons
-            name="home-outline"
-            size={16}
-            color={PURPLE}
+            name="search"
+            size={18}
+            color="#999"
             accessibilityElementsHidden
             importantForAccessibility="no"
           />
-          <Text style={s.btnInicioTxt}>Inicio</Text>
-        </Pressable>
+        </View>
 
-        {/* ── Cabecera mes ── */}
-        <View style={s.mesHeader}>
+        {/* Selector semana */}
+        <View style={styles.weekSelector} accessible={false}>
           <Pressable
-            onPress={mesAnterior}
-            style={s.mesBtn}
+            onPress={irAnterior}
+            style={[
+              styles.weekArrow,
+              {
+                minWidth: 44,
+                minHeight: 44,
+                justifyContent: "center",
+                alignItems: "center",
+              },
+            ]}
             accessible
             accessibilityRole="button"
-            accessibilityLabel="Mes anterior"
+            accessibilityLabel="Semana anterior"
           >
             <Ionicons name="chevron-back" size={22} color={PURPLE} />
           </Pressable>
-          <Text
-            style={s.mesTitulo}
-            allowFontScaling={false}
-            accessibilityRole="header"
-            accessibilityLabel={`${MESES[mes]} de ${anyo}`}
-          >
-            {MESES[mes]} {anyo}
-          </Text>
+
+          <View style={{ flex: 1, alignItems: "center" }}>
+            <Text
+              style={styles.weekLabel}
+              accessibilityLabel={`Semana del ${etiquetaSemana(semanaActual)}`}
+            >
+              {etiquetaSemana(semanaActual)}
+            </Text>
+          </View>
+
           <Pressable
-            onPress={mesSiguiente}
-            style={s.mesBtn}
+            onPress={irSiguiente}
+            disabled={esEstaSemana}
+            style={[
+              styles.weekArrow,
+              esEstaSemana && { opacity: 0.3 },
+              {
+                minWidth: 44,
+                minHeight: 44,
+                justifyContent: "center",
+                alignItems: "center",
+              },
+            ]}
             accessible
             accessibilityRole="button"
-            accessibilityLabel="Mes siguiente"
+            accessibilityLabel="Semana siguiente"
+            accessibilityState={{ disabled: esEstaSemana }}
           >
             <Ionicons name="chevron-forward" size={22} color={PURPLE} />
           </Pressable>
         </View>
 
-        {/* ── Calendario ── */}
-        <CalendarioMes
-          anyo={anyo}
-          mes={mes}
-          fechasConTareas={fechasConTareas}
-          fechaSeleccionada={fechaSelec}
-          onSelectFecha={seleccionarFecha}
-        />
+        {/* Tira de días */}
+        <View style={styles.daysStrip} accessible={false}>
+          {dias.map((fecha, idx) => {
+            const sel = fecha === diaSeleccionado;
+            const esHoy = fecha === hoy;
 
-        {/* ── Panel del día seleccionado ── */}
-        {fechaSelec && (
-          <View style={s.diaPanel} accessible={false}>
-            <View style={s.diaPanelHeader}>
-              <View>
+            const nC = historial.filter(
+              (t) =>
+                fechaReferencia(t) === fecha &&
+                (t.estado === "completada" || (t.completed && !t.estado)),
+            ).length;
+            const nX = historial.filter(
+              (t) =>
+                fechaReferencia(t) === fecha &&
+                (t.estado === "cancelada" || t.estado === "vencida"),
+            ).length;
+
+            const partes = [DIAS_LARGOS[idx]];
+            if (esHoy) partes.push("hoy");
+            if (sel) partes.push("seleccionado");
+            if (nC > 0) partes.push(`${nC} completada${nC > 1 ? "s" : ""}`);
+            if (nX > 0) partes.push(`${nX} no realizada${nX > 1 ? "s" : ""}`);
+
+            return (
+              <Pressable
+                key={fecha}
+                onPress={() => {
+                  setDiaSeleccionado(fecha);
+                  AccessibilityInfo.announceForAccessibility(partes.join(", "));
+                }}
+                style={[
+                  styles.dayBtn,
+                  sel && styles.dayBtnSel,
+                  esHoy && !sel && styles.dayBtnHoy,
+                ]}
+                accessible
+                accessibilityRole="button"
+                accessibilityLabel={partes.join(", ")}
+                accessibilityState={{ selected: sel }}
+              >
                 <Text
-                  style={s.diaPanelFecha}
-                  allowFontScaling={false}
-                  accessibilityLabel={`Día seleccionado: ${fechaLegible(fechaSelec)}${esHoy ? ", hoy" : ""}`}
+                  style={[
+                    styles.dayBtnLbl,
+                    sel && { color: "#fff", fontWeight: "700" },
+                    esHoy && !sel && { color: PURPLE, fontWeight: "700" },
+                  ]}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no"
                 >
-                  {fechaLegible(fechaSelec)}
+                  {DIAS_CORTOS[idx]}
                 </Text>
-                {esHoy && (
-                  <View style={s.hoyBadge}>
-                    <Text style={s.hoyBadgeTxt} allowFontScaling={false}>
-                      Hoy
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              {(esHoy || esFuturo) && (
-                <Pressable
-                  onPress={() => setModalVisible(true)}
-                  style={s.btnAdd}
-                  accessible
-                  accessibilityRole="button"
-                  accessibilityLabel="Añadir tarea"
-                  accessibilityHint={`Añade una nueva tarea para el ${fechaLegible(fechaSelec)}`}
+                <View
+                  style={{ flexDirection: "row", gap: 2, marginTop: 3 }}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no"
                 >
-                  <Ionicons
-                    name="add"
-                    size={22}
-                    color="#fff"
-                    accessibilityElementsHidden
-                    importantForAccessibility="no"
-                  />
-                </Pressable>
+                  {nC > 0 && (
+                    <View
+                      style={[
+                        styles.dot,
+                        { backgroundColor: sel ? "#fff" : GREEN },
+                      ]}
+                    />
+                  )}
+                  {nX > 0 && (
+                    <View
+                      style={[
+                        styles.dot,
+                        { backgroundColor: sel ? "#fcc" : RED },
+                      ]}
+                    />
+                  )}
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <View style={styles.diaHeader}>
+          <Text
+            style={styles.diaNombre}
+            accessibilityLabel={
+              diaSeleccionado === hoy ? `Hoy, ${nombreDia}` : nombreDia
+            }
+          >
+            {diaSeleccionado === hoy
+              ? `Hoy · ${nombreDia}`
+              : nombreDia.charAt(0).toUpperCase() + nombreDia.slice(1)}
+          </Text>
+          {tareasDelDia.length > 0 && (
+            <View
+              style={styles.diaBadgesRow}
+              accessible
+              accessibilityLabel={`${completadasDia.length} realizadas, ${canceladasDia.length + vencidasDia.length} no realizadas`}
+            >
+              <View
+                style={[
+                  styles.diaBadge,
+                  {
+                    backgroundColor: PURPLE_BG,
+                    borderColor: PURPLE,
+                    borderWidth: 1,
+                  },
+                ]}
+              >
+                <Text
+                  style={[styles.diaBadgeText, { color: PURPLE }]}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no"
+                >
+                  ✓ {completadasDia.length}
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.diaBadge,
+                  {
+                    backgroundColor: PURPLE_BG,
+                    borderColor: PURPLE,
+                    borderWidth: 1,
+                  },
+                ]}
+              >
+                <Text
+                  style={[styles.diaBadgeText, { color: PURPLE }]}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no"
+                >
+                  ✕ {canceladasDia.length + vencidasDia.length}
+                </Text>
+              </View>
+            </View>
+          )}
+        </View>
+
+        {tareasDelDia.length === 0 ? (
+          <View
+            style={styles.emptyBox}
+            accessible
+            accessibilityLiveRegion="polite"
+            accessibilityLabel="Sin tareas este día. Pulsa otro día para ver su historial"
+          >
+            <Text style={styles.emptyText}>Sin tareas este día</Text>
+            <Text style={styles.emptySubText}>
+              Pulsa otro día para ver su historial
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.columnasRow} accessible={false}>
+            {/* Columna realizadas */}
+            <View style={styles.columna}>
+              <View
+                style={[
+                  styles.columnaHeader,
+                  { backgroundColor: PURPLE_BG, borderColor: PURPLE },
+                ]}
+              >
+                <Text
+                  style={[styles.columnaHeaderText, { color: PURPLE }]}
+                  accessibilityRole="header"
+                  accessibilityLabel={`Realizadas: ${completadasDia.length}`}
+                >
+                  ✓ Realizadas
+                </Text>
+              </View>
+              {completadasDia.length === 0 ? (
+                <Text
+                  style={styles.colEmpty}
+                  accessibilityLabel="Ninguna tarea realizada"
+                >
+                  Ninguna
+                </Text>
+              ) : (
+                completadasDia.map((item) => (
+                  <View
+                    key={item.id}
+                    style={[styles.tareaCard, { borderLeftColor: GREEN }]}
+                    accessible
+                    accessibilityLabel={`${item.title}, ${item.stars ?? 5} de 5 estrellas${item.hora && item.hora !== "Sin hora" ? `, hora ${item.hora}` : ""}`}
+                  >
+                    {item.pictogramId && (
+                      <Image
+                        source={{
+                          uri: `https://static.arasaac.org/pictograms/${item.pictogramId}/${item.pictogramId}_300.png`,
+                        }}
+                        style={styles.pictogram}
+                        accessibilityElementsHidden
+                        importantForAccessibility="no"
+                        accessibilityIgnoresInvertColors
+                      />
+                    )}
+                    <Text
+                      style={[styles.tareaTitle, ts.tareaTitle, ts.tareaTitle]}
+                      numberOfLines={2}
+                      accessibilityElementsHidden
+                      importantForAccessibility="no"
+                    >
+                      {item.title}
+                    </Text>
+                    <StarRow count={item.stars ?? 5} size={12} />
+                    {item.hora && item.hora !== "Sin hora" && (
+                      <Text
+                        style={[styles.tareaHora, ts.tareaHora, ts.tareaHora]}
+                        accessibilityElementsHidden
+                        importantForAccessibility="no"
+                      >
+                        {item.hora}
+                      </Text>
+                    )}
+                  </View>
+                ))
               )}
             </View>
 
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              accessible={false}
-              style={{ maxHeight: 300 }}
-            >
-              {tareasDia.length === 0 ? (
-                <View
-                  style={s.emptyDia}
-                  accessible
-                  accessibilityLiveRegion="polite"
-                  accessibilityLabel={
-                    esFuturo || esHoy
-                      ? "Sin tareas pendientes. Pulsa el botón más para añadir"
-                      : "Sin tareas pendientes este día"
-                  }
+            <View style={styles.columna}>
+              <View
+                style={[
+                  styles.columnaHeader,
+                  { backgroundColor: PURPLE_BG, borderColor: PURPLE },
+                ]}
+              >
+                <Text
+                  style={[styles.columnaHeaderText, { color: PURPLE }]}
+                  accessibilityRole="header"
+                  accessibilityLabel={`No realizadas: ${canceladasDia.length + vencidasDia.length}`}
                 >
-                  <Ionicons
-                    name={
-                      esFuturo || esHoy
-                        ? "add-circle-outline"
-                        : "checkmark-circle-outline"
-                    }
-                    size={32}
-                    color="#DDD"
-                  />
-                  <Text style={s.emptyDiaTxt} allowFontScaling={false}>
-                    {esFuturo || esHoy
-                      ? "Sin tareas · pulsa + para añadir"
-                      : "Sin tareas este día"}
-                  </Text>
-                </View>
+                  ✕ No realizadas
+                </Text>
+              </View>
+
+              {canceladasDia.length === 0 && vencidasDia.length === 0 ? (
+                <Text
+                  style={styles.colEmpty}
+                  accessibilityLabel="Ninguna tarea sin realizar"
+                >
+                  Ninguna
+                </Text>
               ) : (
-                tareasDia.map((t: any) => {
-                  const horaLabel =
-                    t.hora && t.hora !== "Sin hora" ? `, hora ${t.hora}` : "";
-                  return (
+                <>
+                  {/* Eliminadas  */}
+                  {canceladasDia.map((item) => (
                     <View
-                      key={t.id}
-                      style={s.tareaFila}
+                      key={item.id}
+                      style={[
+                        styles.tareaCard,
+                        { borderLeftColor: RED, opacity: 0.75 },
+                      ]}
                       accessible
-                      accessibilityLabel={`${t.title}${horaLabel}`}
+                      accessibilityLabel={`${item.title}, eliminada${item.hora && item.hora !== "Sin hora" ? `, hora ${item.hora}` : ""}`}
                     >
-                      <View style={s.tareaIconWrap}>
-                        <Ionicons name="ellipse" size={8} color={PURPLE} />
-                      </View>
-                      <View style={{ flex: 1 }}>
+                      {item.pictogramId && (
+                        <Image
+                          source={{
+                            uri: `https://static.arasaac.org/pictograms/${item.pictogramId}/${item.pictogramId}_300.png`,
+                          }}
+                          style={styles.pictogram}
+                          accessibilityElementsHidden
+                          importantForAccessibility="no"
+                          accessibilityIgnoresInvertColors
+                        />
+                      )}
+                      <Text
+                        style={[
+                          styles.tareaTitle,
+                          ts.tareaTitle,
+                          { textDecorationLine: "line-through", color: "#888" },
+                        ]}
+                        numberOfLines={2}
+                        accessibilityElementsHidden
+                        importantForAccessibility="no"
+                      >
+                        {item.title}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: fs(10),
+                          color: RED,
+                          fontWeight: "600",
+                          marginTop: 2,
+                        }}
+                        accessibilityElementsHidden
+                        importantForAccessibility="no"
+                      >
+                        Eliminada
+                      </Text>
+                      {item.hora && item.hora !== "Sin hora" && (
                         <Text
-                          style={s.tareaTitulo}
-                          allowFontScaling={false}
-                          numberOfLines={1}
+                          style={[styles.tareaHora, ts.tareaHora, ts.tareaHora]}
+                          accessibilityElementsHidden
+                          importantForAccessibility="no"
                         >
-                          {t.title}
+                          {item.hora}
                         </Text>
-                        {t.hora && t.hora !== "Sin hora" && (
-                          <Text
-                            style={s.tareaHora}
-                            allowFontScaling={false}
-                            accessibilityElementsHidden
-                            importantForAccessibility="no"
-                          >
-                            🕐 {t.hora}
-                          </Text>
-                        )}
-                      </View>
-                      {esFuturo && (
-                        <Pressable
-                          onPress={() => eliminar(t.id, t.title)}
-                          style={s.btnEliminar}
-                          accessible
-                          accessibilityRole="button"
-                          accessibilityLabel={`Eliminar tarea ${t.title}`}
-                        >
-                          <Ionicons
-                            name="trash-outline"
-                            size={16}
-                            color={RED}
-                            accessibilityElementsHidden
-                            importantForAccessibility="no"
-                          />
-                        </Pressable>
                       )}
                     </View>
-                  );
-                })
+                  ))}
+
+                  {/* Sin hacer — se quedaron pendientes */}
+                  {vencidasDia.map((item) => (
+                    <View
+                      key={item.id}
+                      style={[
+                        styles.tareaCard,
+                        { borderLeftColor: ORANGE, opacity: 0.85 },
+                      ]}
+                      accessible
+                      accessibilityLabel={`${item.title}, saltada${item.hora && item.hora !== "Sin hora" ? `, hora ${item.hora}` : ""}`}
+                    >
+                      {item.pictogramId && (
+                        <Image
+                          source={{
+                            uri: `https://static.arasaac.org/pictograms/${item.pictogramId}/${item.pictogramId}_300.png`,
+                          }}
+                          style={styles.pictogram}
+                          accessibilityElementsHidden
+                          importantForAccessibility="no"
+                          accessibilityIgnoresInvertColors
+                        />
+                      )}
+                      <Text
+                        style={[
+                          styles.tareaTitle,
+                          ts.tareaTitle,
+                          { textDecorationLine: "line-through", color: "#888" },
+                        ]}
+                        numberOfLines={2}
+                        accessibilityElementsHidden
+                        importantForAccessibility="no"
+                      >
+                        {item.title}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: fs(10),
+                          color: ORANGE,
+                          fontWeight: "600",
+                          marginTop: 2,
+                        }}
+                        accessibilityElementsHidden
+                        importantForAccessibility="no"
+                      >
+                        Saltada
+                      </Text>
+                      {item.hora && item.hora !== "Sin hora" && (
+                        <Text
+                          style={[styles.tareaHora, ts.tareaHora, ts.tareaHora]}
+                          accessibilityElementsHidden
+                          importantForAccessibility="no"
+                        >
+                          {item.hora}
+                        </Text>
+                      )}
+                    </View>
+                  ))}
+                </>
               )}
-            </ScrollView>
+            </View>
           </View>
         )}
       </ScrollView>
-
-      <ModalNuevaTarea
-        visible={modalVisible}
-        fecha={fechaSelec || ""}
-        onClose={() => setModalVisible(false)}
-        onGuardar={onGuardar}
-      />
     </View>
   );
 }
 
-const s = StyleSheet.create({
+const fs = (size: number) =>
+  Math.round(size * Math.min(PixelRatio.getFontScale(), 1.4));
+
+const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: "#fff",
-    paddingTop: Platform.OS === "ios" ? 20 : 16,
-    paddingHorizontal: 14,
+    paddingTop: 20,
+    paddingHorizontal: 20,
   },
+
+  modalCapturaOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  capturaLoading: {
+    position: "absolute",
+    bottom: 40,
+    backgroundColor: PURPLE,
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  capturaLoadingTxt: { color: "#fff", fontWeight: "700", fontSize: 14 },
+
   btnInicio: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    paddingHorizontal: 18,
+    paddingHorizontal: 12,
     paddingVertical: 7,
-    backgroundColor: Colors.purple + "18",
+    backgroundColor: PURPLE + "18",
     borderRadius: 20,
     alignSelf: "flex-start",
+    minHeight: 40,
+  },
+  btnInicioTxt: { color: PURPLE, fontWeight: "600", fontSize: 13 },
+  titulo: {
+    fontSize: 30,
+    fontWeight: "800",
+    color: PURPLE,
+    marginBottom: 24,
+    textAlign: "center",
+  },
+
+  shareRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+    gap: 8,
+  },
+  shareBtnsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flexShrink: 1,
+  },
+  shareBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 22,
+    minHeight: 40,
+    flexShrink: 1,
+  },
+  shareBtnTxt: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 12,
+    flexShrink: 1,
+  },
+
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f3f2f2",
+    borderRadius: 25,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
     marginBottom: 20,
     minHeight: 44,
   },
-  btnInicioTxt: { color: Colors.purple, fontWeight: "600", fontSize: 15 },
-  headerTitle: {
-    fontSize: 30,
-    fontWeight: "800",
-    color: Colors.purple,
-    textAlign: "center",
-    marginBottom: 24,
-  },
 
-  // Cabecera mes
-  mesHeader: {
+  weekSelector: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 20,
-    marginTop: 16,
-    marginBottom: 16,
-  },
-  mesBtn: {
-    minWidth: 49,
-    height: 49,
-    minHeight: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  mesTitulo: { fontSize: 29, fontWeight: "700", color: Colors.purple },
-
-  // Calendario
-  semanaCab: { flexDirection: "row", marginBottom: 6 },
-  semanaCabTxt: {
-    flex: 1,
-    textAlign: "center",
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#BBB",
-  },
-  semanaFila: { flexDirection: "row", marginBottom: 2 },
-  celda: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 4,
-    borderRadius: 10,
-    minHeight: 36,
-    justifyContent: "center",
-  },
-  celdaTxt: { fontSize: 14, color: "#333", fontWeight: "500" },
-  celdaHoy: { backgroundColor: Colors.purple },
-  celdaHoyTxt: { color: "#fff", fontWeight: "700" },
-  celdaSelec: {
-    backgroundColor: Colors.purpleLt,
-    borderWidth: 1.5,
-    borderColor: Colors.purple,
-  },
-  celdaSelecTxt: { color: Colors.purple, fontWeight: "700" },
-  celdaPasado: {},
-  punto: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: Colors.purple,
-    marginTop: 2,
-  },
-
-  // Panel día
-  diaPanel: {
-    minHeight: 200,
-    marginTop: 16,
-    backgroundColor: Colors.purpleBg,
-    borderRadius: 20,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: Colors.purpleLt,
-  },
-  diaPanelHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  diaPanelFecha: { fontSize: 15, fontWeight: "700", color: PURPLE },
-  hoyBadge: {
-    backgroundColor: GREEN + "22",
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    alignSelf: "flex-start",
-    marginTop: 3,
-  },
-  hoyBadgeTxt: { fontSize: 11, fontWeight: "700", color: GREEN },
-  btnAdd: {
-    backgroundColor: PURPLE,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  emptyDia: { alignItems: "center", paddingVertical: 28, gap: 8 },
-  emptyDiaTxt: { fontSize: 13, color: "#BBB", textAlign: "center" },
-
-  tareaFila: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: PURPLE_LT,
-    minHeight: 52,
-    gap: 10,
-  },
-  tareaIconWrap: { width: 20, alignItems: "center" },
-  tareaTitulo: { fontSize: 14, color: "#333", fontWeight: "600" },
-  tareaHora: { fontSize: 12, color: "#888", marginTop: 2 },
-  btnEliminar: { padding: 10 },
-
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.35)",
-    justifyContent: "flex-end",
-  },
-  modalBox: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingTop: 20,
-    paddingHorizontal: 24,
-    paddingBottom: 44,
-  },
-
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  modalHeaderTexts: { flex: 1, gap: 6 },
-  modalTitle: { fontSize: 22, fontWeight: "800", color: PURPLE },
-
-  modalFechaChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
     backgroundColor: PURPLE_BG,
-    borderRadius: 20,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    alignSelf: "flex-start",
-    borderWidth: 1,
-    borderColor: PURPLE_LT,
-  },
-  modalFechaChipTxt: { fontSize: 13, color: PURPLE, fontWeight: "600" },
-
-  modalCloseBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: PURPLE_BG,
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: 10,
-  },
-
-  modalDivider: { height: 1, backgroundColor: PURPLE_LT, marginBottom: 16 },
-
-  modalInputLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#999",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-    marginBottom: 8,
-  },
-  modalInputLabelOpc: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#BBB",
-    textTransform: "none",
-  },
-
-  inputRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: PURPLE_LT,
-    borderRadius: 14,
-    paddingHorizontal: 20,
-    backgroundColor: PURPLE_BG,
-    minHeight: 48,
-    marginBottom: 16,
-  },
-  input: { flex: 1, fontSize: 15, color: "#333" },
-
-  btnGuardar: {
-    backgroundColor: PURPLE,
     borderRadius: 16,
-    padding: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    gap: 8,
-    minHeight: 52,
-    marginTop: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    marginBottom: 12,
+    borderWidth: 1.5,
+    borderColor: PURPLE_LT,
   },
-  btnGuardarDisabled: { opacity: 0.45 },
-  btnGuardarTxt: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  weekArrow: { padding: 6 },
+  weekLabel: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: PURPLE,
+    textAlign: "center",
+    flexShrink: 1,
+  },
 
-  pictoOpcion: {
-    width: 76,
-    height: 76,
+  daysStrip: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#FAFAFA",
     borderRadius: 14,
-    borderWidth: 2,
-    borderColor: "#E5E5E5",
-    backgroundColor: "#fff",
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#EEE",
+  },
+  dayBtn: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    padding: 4,
+    paddingVertical: 8,
+    borderRadius: 12,
+    marginHorizontal: 2,
+    minHeight: 50,
   },
-  pictoOpcionSelec: {
-    borderColor: PURPLE,
-    borderWidth: 3,
-    backgroundColor: PURPLE_BG,
+  dayBtnSel: { backgroundColor: PURPLE },
+  dayBtnHoy: { backgroundColor: PURPLE_LT },
+  dayBtnLbl: { fontSize: 11, color: "#AAA", fontWeight: "600" },
+  dot: { width: 5, height: 5, borderRadius: 3 },
+
+  diaHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 14,
   },
-  pictoImg: { width: 64, height: 64, borderRadius: 10 },
-  pictoNinguno: { gap: 2 },
-  pictoNingunoTxt: { fontSize: 10, color: "#CCC", fontWeight: "600" },
+  diaNombre: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#555",
+    flex: 1,
+    textTransform: "capitalize",
+    flexShrink: 1,
+  },
+  diaBadgesRow: { flexDirection: "row", gap: 6 },
+  diaBadge: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
+  diaBadgeText: { fontSize: 12, fontWeight: "700" },
+
+  columnasRow: { flexDirection: "row", gap: 12 },
+  columna: { flex: 1 },
+  columnaHeader: {
+    borderRadius: 10,
+    borderWidth: 1.5,
+    paddingVertical: 7,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  columnaHeaderText: { fontSize: 12, fontWeight: "700" },
+  colEmpty: { fontSize: 12, color: "#CCC", textAlign: "center", marginTop: 12 },
+
+  tareaCard: {
+    backgroundColor: "#FAFAFA",
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 8,
+    borderLeftWidth: 3,
+  },
+  pictogram: { width: 36, height: 36, borderRadius: 6, marginBottom: 6 },
+  tareaTitle: {
+    fontSize: 12,
+    color: "#333",
+    fontWeight: "600",
+    marginBottom: 4,
+    flexShrink: 1,
+  },
+  tareaHora: { fontSize: 11, color: "#AAA", marginTop: 2 },
+
+  emptyBox: { alignItems: "center", paddingVertical: 30 },
+  emptyText: {
+    fontSize: 16,
+    color: "#AAA",
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  emptySubText: { fontSize: 13, color: "#CCC", marginTop: 6 },
 });

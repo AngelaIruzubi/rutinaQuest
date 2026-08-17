@@ -429,7 +429,7 @@ export default function Home() {
           );
         }
       },
-      __DEV__ ? 2000 : 60000,
+      __DEV__ ? 2000 : 300000, // 5 minutos en producción
     );
     return () => clearInterval(checkTimer.current);
   }, [
