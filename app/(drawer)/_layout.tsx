@@ -36,13 +36,11 @@ try {
 // ─── INICIALIZACIÓN SÍNCRONA DE LA BD ────────────────────────────────────────
 // Se ejecuta cuando el módulo se importa, ANTES de cualquier render.
 // Así ninguna pantalla puede llamar a la BD antes de que esté lista.
-setTimeout(() => {
-  try {
-    initDB();
-  } catch (e) {
-    console.warn("Error inicializando BD:", e);
-  }
-}, 500);
+try {
+  initDB();
+} catch (e) {
+  console.warn("Error inicializando BD:", e);
+}
 // ─────────────────────────────────────────────────────────────────────────────
 
 Notifications.setNotificationHandler({
@@ -139,6 +137,13 @@ export default function Layout() {
 
   useEffect(() => {
     (async () => {
+      // Inicializar BD dentro del componente, no a nivel de módulo
+      try {
+        initDB();
+      } catch (e) {
+        console.warn("Error initDB:", e);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 300));
       // Pedir permisos de notificación
       if (Platform.OS !== "web") {
         const { status } = await Notifications.requestPermissionsAsync();

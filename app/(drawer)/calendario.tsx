@@ -641,13 +641,15 @@ export default function Calendario() {
   const hoy = hoyAppStr();
 
   const cargar = useCallback(() => {
-    setFechasConTareas(getFechasConTareas() as any);
-    if (fechaSelec) {
-      const rows = getTareasPorFecha(fechaSelec) as any[];
-      if (rows.length === 0 && lastTareasDiaRef.current.length > 0) return;
-      lastTareasDiaRef.current = rows;
-      setTareasDia(rows);
-    }
+    setTimeout(() => {
+      setFechasConTareas(getFechasConTareas() as any);
+      if (fechaSelec) {
+        const rows = getTareasPorFecha(fechaSelec) as any[];
+        if (rows.length === 0 && lastTareasDiaRef.current.length > 0) return;
+        lastTareasDiaRef.current = rows;
+        setTareasDia(rows);
+      }
+    }, 800);
   }, [fechaSelec]);
 
   useFocusEffect(cargar);
