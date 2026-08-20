@@ -1,12 +1,24 @@
 const { getSentryExpoConfig } = require("@sentry/react-native/metro");
+const path = require("path");
 
 const config = getSentryExpoConfig(__dirname);
 
-// Excluir archivos .wasm para web (expo-sqlite los necesita solo en nativo)
-config.resolver = config.resolver || {};
-config.resolver.assetExts = config.resolver.assetExts || [];
-if (!config.resolver.assetExts.includes("wasm")) {
-  config.resolver.assetExts.push("wasm");
-}
+const WEB_MOCKS = {
+  "expo-notifications": path.resolve(__dirname, "mocks/expo-notifications.js"),
+};
+
+const resolveRequest = config.resolver.resolveRequest;
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (platform === "web" && WEB_MOCKS[moduleName]) {
+    return {
+      filePath: WEB_MOCKS[moduleName],
+      type: "sourceFile",
+    };
+  }
+  if (resolveRequest) {
+    return resolveRequest(context, moduleName, platform);
+  }
+  return context.resolveRequest(context, moduleName, platform);
+};
 
 module.exports = config;

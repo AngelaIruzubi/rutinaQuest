@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback, useEffect, useState } from "react";
 import { Platform } from "react-native";
 import { NombreMedalla, UMBRALES_MEDALLA } from "../constants/medallas";
@@ -33,41 +34,23 @@ interface ResultadoPenalizacion {
   nuevoEstado: EstadoPersistido;
 }
 
-// ─── SQLite (solo nativo) ─────────────────────────────────────────────────────
-
-let SQLite: any = null;
-if (Platform.OS !== "web") {
-  SQLite = require("expo-sqlite");
-}
-
 // ─── Persistencia ─────────────────────────────────────────────────────────────
+// Antes se guardaba en su propia BD SQLite (juego.db), independiente de la
+// BD principal de tareas y sin coordinación con ella — dos conexiones nativas
+// distintas escribiendo por su cuenta. Se sustituye por AsyncStorage, más
+// simple y sin el módulo nativo de SQLite que daba problemas en algunos
+// dispositivos.
 
-const DB_NAME = "juego.db";
 const STATE_KEY = "juego_state";
-const TABLE_SQL = `CREATE TABLE IF NOT EXISTS juego (key TEXT PRIMARY KEY, value TEXT NOT NULL)`;
 
 const storage = {
-  _db: null as any,
-
-  async _getDB(): Promise<any> {
-    if (this._db) return this._db;
-    this._db = await SQLite.openDatabaseAsync(DB_NAME);
-    await this._db.execAsync(TABLE_SQL);
-    return this._db;
-  },
-
   async get(key: string): Promise<EstadoPersistido | null> {
     try {
-      if (Platform.OS === "web") {
-        const raw = localStorage.getItem(key);
-        return raw ? JSON.parse(raw) : null;
-      }
-      const db = await this._getDB();
-      const row = await db.getFirstAsync(
-        "SELECT value FROM juego WHERE key = ?",
-        [key],
-      );
-      return row ? JSON.parse(row.value) : null;
+      const raw =
+        Platform.OS === "web"
+          ? localStorage.getItem(key)
+          : await AsyncStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
     } catch (e) {
       console.warn("[Juego] storage.get error:", e);
       return null;
@@ -78,13 +61,9 @@ const storage = {
     try {
       if (Platform.OS === "web") {
         localStorage.setItem(key, JSON.stringify(value));
-        return;
+      } else {
+        await AsyncStorage.setItem(key, JSON.stringify(value));
       }
-      const db = await this._getDB();
-      await db.runAsync(
-        "INSERT OR REPLACE INTO juego (key, value) VALUES (?, ?)",
-        [key, JSON.stringify(value)],
-      );
     } catch (e) {
       console.warn("[Juego] storage.set error:", e);
     }

@@ -127,9 +127,9 @@ export default function Layout() {
   const clampedScale = Math.min(fontScale, 1.4);
   const titleSize = Math.max(16, Math.min(30, (width * 0.072) / clampedScale));
 
-  // Se abre la BD aquí (al montar), no al cargar el módulo: en un arranque en
-  // frío el puente nativo puede no estar listo todavía si se abre antes de
-  // que React haya montado nada, y expo-sqlite falla con un error nativo.
+  // initDB() ya no hace nada real (los datos se guardan con AsyncStorage,
+  // sin migraciones que ejecutar), pero se mantiene la señal dbReady porque
+  // varias pantallas todavía la usan para saber cuándo pueden cargar datos.
   useEffect(() => {
     (async () => {
       try {

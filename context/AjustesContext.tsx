@@ -1,4 +1,5 @@
 // context/AjustesContext.tsx
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { PixelRatio, Platform, useColorScheme } from 'react-native';
 
@@ -123,34 +124,23 @@ function guardarSync(a: Ajustes) {
   } catch {}
 }
 
+// Antes se guardaba con su propia conexión SQLite directa al mismo archivo
+// "taskmanager.db" que usa el resto de la app (database.js), sin ninguna
+// coordinación entre ambas — dos conexiones nativas independientes al mismo
+// fichero, una fuente extra de problemas del módulo nativo de SQLite. Se
+// sustituye por AsyncStorage.
 async function guardarNativo(a: Ajustes) {
   if (Platform.OS === 'web') return;
   try {
-    // Usamos expo-sqlite igual que el resto del proyecto
-    const SQLite = require('expo-sqlite');
-    const db = SQLite.openDatabaseSync('taskmanager.db');
-    db.runSync(
-      `CREATE TABLE IF NOT EXISTS ajustes (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
-    );
-    db.runSync(
-      `INSERT OR REPLACE INTO ajustes (key, value) VALUES (?, ?)`,
-      [KEY, JSON.stringify(a)]
-    );
+    await AsyncStorage.setItem(KEY, JSON.stringify(a));
   } catch {}
 }
 
 async function leerNativo(): Promise<Ajustes> {
   if (Platform.OS === 'web') return leerSync();
   try {
-    const SQLite = require('expo-sqlite');
-    const db = SQLite.openDatabaseSync('taskmanager.db');
-    db.runSync(
-      `CREATE TABLE IF NOT EXISTS ajustes (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
-    );
-    const row = db.getFirstSync(
-      `SELECT value FROM ajustes WHERE key = ?`, [KEY]
-    );
-    return row ? { ...AJUSTES_DEFAULT, ...JSON.parse((row as any).value) } : { ...AJUSTES_DEFAULT };
+    const raw = await AsyncStorage.getItem(KEY);
+    return raw ? { ...AJUSTES_DEFAULT, ...JSON.parse(raw) } : { ...AJUSTES_DEFAULT };
   } catch {
     return { ...AJUSTES_DEFAULT };
   }
@@ -170,7 +160,7 @@ export function AjustesProvider({ children }: { children: React.ReactNode }) {
   const sistemaOscuro              = useColorScheme() === 'dark';
   const [ajustes, setAjustes]      = useState<Ajustes>(leerSync());
 
-  // Cargar desde nativo al montar (SQLite es sync en expo-sqlite v2)
+  // Cargar desde AsyncStorage al montar (empieza con los defaults/valor web)
   useEffect(() => {
     leerNativo().then(a => setAjustes(a));
   }, []);
