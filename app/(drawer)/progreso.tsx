@@ -477,13 +477,20 @@ export default function Progreso() {
 
   useFocusEffect(
     useCallback(() => {
-      const rows = getTareas() as any[];
-      const hechas: Tarea[] = rows
-        .filter((r) => r.completed === 1)
-        .map((r) => ({ ...r, completed: true }))
-        .reverse();
-      setCompletadas(hechas);
+      let cancelado = false;
+      (async () => {
+        const rows = (await getTareas()) as any[];
+        if (cancelado) return;
+        const hechas: Tarea[] = rows
+          .filter((r) => r.completed === 1)
+          .map((r) => ({ ...r, completed: true }))
+          .reverse();
+        setCompletadas(hechas);
+      })();
       gami.recargar();
+      return () => {
+        cancelado = true;
+      };
     }, [gami.recargar]),
   );
 

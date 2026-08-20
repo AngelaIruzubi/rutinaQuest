@@ -59,7 +59,7 @@ import {
 import { detectarMedalla } from "../../utils/gamificacion";
 
 if (__DEV__) {
-  setFechaSimulada("2027-09-29");
+  setFechaSimulada("2027-08-18");
   setHoraSimulada(12, 0);
 }
 const SONIDOS: Record<string, any> = {
@@ -199,7 +199,7 @@ export default function Home() {
         }).catch(() => {});
       }
 
-      const tareasDia = getTareasPorFecha(hoy) as any[];
+      const tareasDia = (await getTareasPorFecha(hoy)) as any[];
       for (const t of tareasDia) {
         if (t.completed || !t.hora || t.hora === "Sin hora") continue;
         const [hh, mm] = t.hora.split(":").map(Number);
@@ -238,8 +238,12 @@ export default function Home() {
   // Calcular vencidasAyer al montar para que esté disponible antes del efecto de penalización
   useEffect(() => {
     if (Platform.OS !== "web") {
-      const result = limpiarTareasViejas() as any;
-      pendientesPenalRef.current = { vencidasAyer: result?.vencidasAyer ?? 0 };
+      (async () => {
+        const result = (await limpiarTareasViejas()) as any;
+        pendientesPenalRef.current = {
+          vencidasAyer: result?.vencidasAyer ?? 0,
+        };
+      })();
     }
   }, []);
 
@@ -295,8 +299,9 @@ export default function Home() {
         if (hoy !== ultimoDiaInterval.current) {
           ultimoDiaInterval.current = hoy;
 
-          generarTareasRepetitivas();
-          const { tareasHoy, vencidasAyer } = limpiarTareasViejas() as any;
+          await generarTareasRepetitivas();
+          const { tareasHoy, vencidasAyer } =
+            (await limpiarTareasViejas()) as any;
           setTasks(
             tareasHoy.map((r: any) => ({ ...r, completed: r.completed === 1 })),
           );
@@ -513,7 +518,7 @@ export default function Home() {
       : true;
     const pts = tieneHora ? (enTiempo ? 5 : 3) : 5;
 
-    updateTareaCompletada(task.id, true, pts);
+    await updateTareaCompletada(task.id, true, pts);
     if (ajustes.vibracion && Platform.OS !== "web")
       Vibration.vibrate(enTiempo ? [0, 80, 60, 120] : [0, 60]);
     if (Platform.OS !== "web") {
@@ -604,12 +609,12 @@ export default function Home() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       if (opcion === "esta") {
         if (!task.completed) {
-          cancelarTarea(task.id);
+          await cancelarTarea(task.id);
           saltadasRef.current += 1;
           if (saltadasRef.current >= 3) disparaNotif("saltadas");
           else disparaNotif("eliminada");
         } else {
-          deleteTarea(task.id);
+          await deleteTarea(task.id);
         }
         setTasks((prev) => prev.filter((t) => t.id !== task.id));
       } else {
@@ -624,11 +629,11 @@ export default function Home() {
         );
         for (const inst of instanciasEnPantalla) {
           if (!inst.completed && inst.fechaDia <= hoyStr) {
-            cancelarTarea(inst.id);
+            await cancelarTarea(inst.id);
           }
         }
 
-        eliminarTareaYRepetitivas(baseId);
+        await eliminarTareaYRepetitivas(baseId);
         setTasks((prev) =>
           prev.filter((t) => t.id !== baseId && t.tareaBaseId !== baseId),
         );
@@ -651,12 +656,12 @@ export default function Home() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
 
       if (!task.completed) {
-        cancelarTarea(task.id);
+        await cancelarTarea(task.id);
         saltadasRef.current += 1;
         if (saltadasRef.current >= 3) disparaNotif("saltadas");
         else disparaNotif("eliminada");
       } else {
-        deleteTarea(task.id);
+        await deleteTarea(task.id);
       }
       setTasks((prev) => prev.filter((t) => t.id !== task.id));
     }
@@ -971,8 +976,8 @@ export default function Home() {
       <ModalNuevaTarea
         visible={modalVisible}
         onCerrar={() => setModalVisible(false)}
-        onGuardar={(tarea) => {
-          insertTarea(tarea);
+        onGuardar={async (tarea) => {
+          await insertTarea(tarea);
           setTasks((prev) => [
             ...prev,
             { ...tarea, fechaDia: hoyAppStr() } as Tarea,
@@ -994,7 +999,7 @@ export default function Home() {
         visible={editModalVisible}
         tarea={selectedTask}
         onCerrar={() => setEditModalVisible(false)}
-        onGuardar={(titulo, pictogramId, hora) => {
+        onGuardar={async (titulo, pictogramId, hora) => {
           if (!selectedTask) return;
           const horaFinal = hora ?? "Sin hora";
           const esInstanciaRepetitiva =
@@ -1022,8 +1027,12 @@ export default function Home() {
                   Haptics.NotificationFeedbackType.Warning,
                 );
               if (opcion === "esta") {
-                updateTareaTituloPicto(selectedTask.id, titulo, pictogramId);
-                updateTareaHora(selectedTask.id, horaFinal);
+                await updateTareaTituloPicto(
+                  selectedTask.id,
+                  titulo,
+                  pictogramId,
+                );
+                await updateTareaHora(selectedTask.id, horaFinal);
                 setTasks((prev) =>
                   prev.map((t) =>
                     t.id === selectedTask.id
@@ -1035,7 +1044,12 @@ export default function Home() {
                 const baseId = esInstanciaRepetitiva
                   ? selectedTask.tareaBaseId
                   : selectedTask.id;
-                updateTareaBaseCompleta(baseId, titulo, pictogramId, horaFinal);
+                await updateTareaBaseCompleta(
+                  baseId,
+                  titulo,
+                  pictogramId,
+                  horaFinal,
+                );
                 setTasks((prev) =>
                   prev.map((t) =>
                     t.id === baseId || t.tareaBaseId === baseId
@@ -1051,8 +1065,8 @@ export default function Home() {
               );
             }, 300);
           } else {
-            updateTareaTituloPicto(selectedTask.id, titulo, pictogramId);
-            updateTareaHora(selectedTask.id, horaFinal);
+            await updateTareaTituloPicto(selectedTask.id, titulo, pictogramId);
+            await updateTareaHora(selectedTask.id, horaFinal);
             setTasks((prev) =>
               prev.map((t) =>
                 t.id === selectedTask.id

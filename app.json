@@ -7,7 +7,7 @@
     "icon": "./assets/images/icono.png",
     "scheme": "rutinaquest",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.rutinaquest.app"
@@ -22,7 +22,8 @@
       "edgeToEdgeEnabled": false,
       "predictiveBackGestureEnabled": false,
       "package": "com.rutinaquest.app",
-      "permissions": ["POST_NOTIFICATIONS", "RECEIVE_BOOT_COMPLETED", "VIBRATE"]
+      "permissions": ["POST_NOTIFICATIONS", "RECEIVE_BOOT_COMPLETED", "VIBRATE"],
+      "allowBackup": false
     },
     "splash": {
       "image": "./assets/images/icono.png",

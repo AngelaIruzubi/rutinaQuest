@@ -34,16 +34,6 @@ try {
   if (Platform.OS !== "web") SplashScreen.preventAutoHideAsync();
 } catch {}
 
-// ─── INICIALIZACIÓN SÍNCRONA DE LA BD ────────────────────────────────────────
-// Se ejecuta cuando el módulo se importa, ANTES de cualquier render.
-// Así ninguna pantalla puede llamar a la BD antes de que esté lista.
-try {
-  initDB();
-} catch (e) {
-  console.warn("Error inicializando BD:", e);
-}
-// ─────────────────────────────────────────────────────────────────────────────
-
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
@@ -136,6 +126,20 @@ export default function Layout() {
   const fontScale = PixelRatio.getFontScale();
   const clampedScale = Math.min(fontScale, 1.4);
   const titleSize = Math.max(16, Math.min(30, (width * 0.072) / clampedScale));
+
+  // Se abre la BD aquí (al montar), no al cargar el módulo: en un arranque en
+  // frío el puente nativo puede no estar listo todavía si se abre antes de
+  // que React haya montado nada, y expo-sqlite falla con un error nativo.
+  useEffect(() => {
+    (async () => {
+      try {
+        await initDB();
+      } catch (e) {
+        console.warn("Error inicializando BD:", e);
+      }
+      setDbReady(true);
+    })();
+  }, []);
 
   useEffect(() => {
     (async () => {

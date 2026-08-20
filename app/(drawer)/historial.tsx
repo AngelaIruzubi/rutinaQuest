@@ -327,7 +327,6 @@ export default function Historial() {
   const [search, setSearch] = useState("");
   const dbReady = useDBReady();
   const [historial, setHistorial] = useState<Tarea[]>([]);
-  const lastHistorialRef = useRef<Tarea[]>([]);
   const [compartiendo, setCompartiendo] = useState(false);
   const [modalCaptura, setModalCaptura] = useState(false);
   const [destinoPend, setDestinoPend] = useState<
@@ -342,11 +341,19 @@ export default function Historial() {
 
   useFocusEffect(
     useCallback(() => {
-      const rows = getTareasHistorial() as any[];
-      if (rows.length === 0 && lastHistorialRef.current.length > 0) return;
-      const mapped = rows.map((r) => ({ ...r, completed: r.completed === 1 }));
-      lastHistorialRef.current = mapped;
-      setHistorial(mapped);
+      let cancelado = false;
+      (async () => {
+        const rows = (await getTareasHistorial()) as any[];
+        if (cancelado) return;
+        const mapped = rows.map((r) => ({
+          ...r,
+          completed: r.completed === 1,
+        }));
+        setHistorial(mapped);
+      })();
+      return () => {
+        cancelado = true;
+      };
     }, [dbReady]),
   );
 

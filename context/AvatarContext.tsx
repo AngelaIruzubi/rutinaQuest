@@ -33,20 +33,22 @@ export const AvatarProvider = ({ children }: any) => {
   });
 
   useEffect(() => {
-    initDB();
-    const row = getUsuario() as any;
-    if (row) {
-      setAvatar({
-        tonoPiel: row.tonoPiel ?? 0,
-        cara: row.cara ?? 0,
-        ojos: row.ojos ?? 0,
-        colorPelo: row.colorPelo ?? 0,
-        peloCorto: row.peloCorto ?? 0,
-        peloLargo: row.peloLargo ?? -1,
-        shirt: row.shirt ?? 0,
-        genero: row.genero ?? "hombre",
-      });
-    }
+    (async () => {
+      await initDB();
+      const row = (await getUsuario()) as any;
+      if (row) {
+        setAvatar({
+          tonoPiel: row.tonoPiel ?? 0,
+          cara: row.cara ?? 0,
+          ojos: row.ojos ?? 0,
+          colorPelo: row.colorPelo ?? 0,
+          peloCorto: row.peloCorto ?? 0,
+          peloLargo: row.peloLargo ?? -1,
+          shirt: row.shirt ?? 0,
+          genero: row.genero ?? "hombre",
+        });
+      }
+    })();
   }, []);
 
   const updateAvatar = (field: keyof AvatarType, value: number) => {
