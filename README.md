@@ -29,7 +29,7 @@ npm install
 ### 3. Inicia el servidor de desarrollo
 
 ```bash
-npx expo start
+npx expo start --dev-client
 ```
 
 Aparecerá un **código QR** en la terminal.
@@ -40,11 +40,17 @@ Aparecerá un **código QR** en la terminal.
 
 Esta es la forma recomendada para disfrutar de **todas las funcionalidades**, incluyendo las notificaciones.
 
-1. Instala **Expo Go** en tu móvil:
-   - [Android — Google Play](https://play.google.com/store/apps/details?id=host.exp.exponent)
-   - [iOS — App Store](https://apps.apple.com/app/expo-go/id982107779)
+Este proyecto usa módulos nativos personalizados (notificaciones, Sentry), así que **la app de Expo Go de las tiendas no sirve** — hace falta un _development build_ propio:
 
-2. Abre Expo Go y escanea el QR que aparece en la terminal.
+1. Genera tu build de desarrollo instalable (solo hace falta una vez, o cuando cambien las dependencias nativas):
+
+   ```bash
+   eas build --profile development --platform android
+   ```
+
+   Instala el `.apk` que te da el enlace de EAS en tu móvil.
+
+2. Con el servidor arrancado (`npx expo start --dev-client`), abre esa app en el móvil y escanea el QR.
 
 3. La app se cargará directamente en tu dispositivo.
 
@@ -60,33 +66,32 @@ Si prefieres no usar el móvil, puedes abrirla en el navegador con:
 npx expo start --web
 ```
 
-**Nota:** En la versión web las **notificaciones push no están disponibles**. Para probar esa funcionalidad es necesario usar Expo Go en un dispositivo móvil.
+**Nota:** En la versión web las **notificaciones push no están disponibles**. Para probar esa funcionalidad hace falta el _development build_ en un dispositivo móvil (ver sección anterior).
 
 ---
 
 ## Funcionalidades principales
 
-| Pantalla | Descripción |
-|---|---|
-| Tareas | Gestión de tareas diarias con prioridades y temporizador |
-| Calendario | Vista semanal del historial de actividad |
-| Progreso | Estrellas, racha diaria y medallas (Bronce / Plata / Oro) |
-| Historial | Registro de tareas completadas con búsqueda |
-| Temporizador | Contador por tarea con configuración personalizada |
-| Ajustes | Personalización visual, notificaciones y exportación |
-| Perfil | Avatar y estadísticas del usuario |
-| Normas | Reglas del sistema de gamificación |
+| Pantalla     | Descripción                                               |
+| ------------ | --------------------------------------------------------- |
+| Tareas       | Gestión de tareas diarias con prioridades y temporizador  |
+| Calendario   | Vista semanal del historial de actividad                  |
+| Progreso     | Estrellas, racha diaria y medallas (Bronce / Plata / Oro) |
+| Historial    | Registro de tareas completadas con búsqueda               |
+| Temporizador | Contador por tarea con configuración personalizada        |
+| Ajustes      | Personalización visual, notificaciones y exportación      |
+| Perfil       | Avatar y estadísticas del usuario                         |
+| Normas       | Reglas del sistema de gamificación                        |
 
 ---
 
 ## Stack tecnológico
 
-- **React Native** con **Expo** (SDK 51+)
+- **React Native** con **Expo** (SDK 54)
 - **Expo Router** — navegación basada en archivos
-- **SQLite** — base de datos local en el dispositivo
+- **AsyncStorage** — almacenamiento local en el dispositivo
+- **Sentry** — reporte de errores en producción
 - **TypeScript**
-
----
 
 ## Versión
 
