@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AppState,
   Modal,
   Platform,
   Pressable,
@@ -217,55 +219,117 @@ export default function Temporizador() {
   const [modalVisible, setModalVisible]= useState<boolean>(false);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Marca de tiempo absoluta (reloj del sistema), no un contador de "ticks":
+  // así, si el intervalo se congela en segundo plano, al volver se recalcula
+  // el tiempo real transcurrido en vez de quedarse parado.
+  const finAbsolutoRef = useRef<number | null>(null); // countdown: cuándo debe llegar a 0
+  const inicioAbsolutoRef = useRef<number | null>(null); // cronómetro: desde cuándo cuenta
+  const notifIdRef = useRef<string | null>(null);
 
   const totalSeg = configToSeg(config);
   const progreso = modo === 'countdown' && totalSeg > 0
     ? tiempoActual / totalSeg
     : 0;
 
-  // ── Tick ──────────────────────────────────────────────────────────────────
-  const tick = useCallback(() => {
-    setTiempoActual(prev => {
-      if (modo === 'countdown') {
-        if (prev <= 1) {
-          clearInterval(intervalRef.current!);
-          setEstado('finished');
-          if (Platform.OS !== 'web') Vibration.vibrate([0, 400, 200, 400]);
-          return 0;
-        }
-        return prev - 1;
-      } else {
-        return prev + 1;
+  const cancelarNotifPendiente = useCallback(async () => {
+    if (notifIdRef.current && Platform.OS !== 'web') {
+      try {
+        await Notifications.cancelScheduledNotificationAsync(notifIdRef.current);
+      } catch {}
+      notifIdRef.current = null;
+    }
+  }, []);
+
+  // ── Recalcular tiempo a partir del reloj real ──────────────────────────────
+  const recomputar = useCallback(() => {
+    if (modo === 'countdown') {
+      if (finAbsolutoRef.current == null) return;
+      const restanteSeg = Math.max(
+        0,
+        Math.ceil((finAbsolutoRef.current - Date.now()) / 1000),
+      );
+      setTiempoActual(restanteSeg);
+      if (restanteSeg <= 0) {
+        setEstado('finished');
+        if (Platform.OS !== 'web') Vibration.vibrate([0, 400, 200, 400]);
+        cancelarNotifPendiente();
       }
-    });
-  }, [modo]);
+    } else {
+      if (inicioAbsolutoRef.current == null) return;
+      setTiempoActual(
+        Math.floor((Date.now() - inicioAbsolutoRef.current) / 1000),
+      );
+    }
+  }, [modo, cancelarNotifPendiente]);
 
   useEffect(() => {
     if (estado === 'running') {
-      intervalRef.current = setInterval(tick, 1000);
+      intervalRef.current = setInterval(recomputar, 1000);
     } else {
       if (intervalRef.current) clearInterval(intervalRef.current);
     }
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [estado, tick]);
+  }, [estado, recomputar]);
+
+  // Al volver a primer plano, recalcular al instante (no esperar al próximo tick)
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active' && estado === 'running') recomputar();
+    });
+    return () => sub.remove();
+  }, [estado, recomputar]);
 
   // ── Acciones ──────────────────────────────────────────────────────────────
-  const handlePlay  = () => { if (estado !== 'finished') setEstado('running'); };
-  const handlePause = () => setEstado('paused');
+  const handlePlay = async () => {
+    if (estado === 'finished') return;
+    if (modo === 'countdown') {
+      finAbsolutoRef.current = Date.now() + tiempoActual * 1000;
+      if (Platform.OS !== 'web') {
+        try {
+          notifIdRef.current = await Notifications.scheduleNotificationAsync({
+            content: {
+              title: '⏰ ¡Tiempo cumplido!',
+              body: 'Tu temporizador ha terminado',
+              sound: true,
+            },
+            trigger: {
+              type: Notifications.SchedulableTriggerInputTypes.DATE,
+              date: new Date(finAbsolutoRef.current),
+            },
+          });
+        } catch {}
+      }
+    } else {
+      inicioAbsolutoRef.current = Date.now() - tiempoActual * 1000;
+    }
+    setEstado('running');
+  };
+  const handlePause = () => {
+    setEstado('paused');
+    cancelarNotifPendiente();
+  };
   const handleReset = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setEstado('idle');
     setTiempoActual(modo === 'countdown' ? configToSeg(config) : 0);
+    finAbsolutoRef.current = null;
+    inicioAbsolutoRef.current = null;
+    cancelarNotifPendiente();
   };
   const handleModo = (nuevo: Modo) => {
     setModo(nuevo);
     setEstado('idle');
     setTiempoActual(nuevo === 'countdown' ? configToSeg(config) : 0);
+    finAbsolutoRef.current = null;
+    inicioAbsolutoRef.current = null;
+    cancelarNotifPendiente();
   };
   const handleConfig = (nueva: ConfigTiempo) => {
     setConfig(nueva);
     setEstado('idle');
     setTiempoActual(configToSeg(nueva));
+    finAbsolutoRef.current = null;
+    cancelarNotifPendiente();
     setModalVisible(false);
   };
 

@@ -25,9 +25,14 @@ import {
   getFechasConTareas,
   getTareasPorFecha,
   insertTarea,
+  updateTareaNotifId,
 } from "../../database/database";
 import { buscarPictogramas } from "../../services/arasaac";
 import { ahoraApp, ahoraAppMs, hoyAppStr } from "../../utils/fecha";
+import {
+  cancelarNotifTarea,
+  programarNotif5MinAntes,
+} from "../../utils/notificacionesTarea";
 import { fechaLegible } from "../../utils/fechaFormato";
 
 const PURPLE = Colors.purple;
@@ -694,6 +699,12 @@ export default function Calendario() {
 
   const onGuardar = async (tarea: any) => {
     await insertTarea(tarea, fechaSelec!);
+    const notifId = await programarNotif5MinAntes(
+      fechaSelec!,
+      tarea.hora,
+      tarea.title ?? "",
+    );
+    if (notifId && tarea.id) await updateTareaNotifId(tarea.id, notifId);
     const pendientes = ((await getTareasPorFecha(fechaSelec!)) as any[]).filter(
       esPendiente,
     );
@@ -702,6 +713,8 @@ export default function Calendario() {
   };
 
   const eliminar = async (id: string, titulo: string) => {
+    const tarea = tareasDia.find((t) => t.id === id);
+    await cancelarNotifTarea(tarea?.notifId);
     await deleteTarea(id);
     setTareasDia((prev) => prev.filter((t) => t.id !== id));
     setFechasConTareas((await getFechasConTareas()) as any);
@@ -854,19 +867,24 @@ export default function Calendario() {
                 tareasDia.map((t: any) => {
                   const horaLabel =
                     t.hora && t.hora !== "Sin hora" ? `, hora ${t.hora}` : "";
+                  const previewLabel = t.virtual ? ", aún no creada" : "";
                   return (
                     <View
                       key={t.id}
-                      style={s.tareaFila}
+                      style={[s.tareaFila, t.virtual && s.tareaFilaVirtual]}
                       accessible
-                      accessibilityLabel={`${t.title}${horaLabel}`}
+                      accessibilityLabel={`${t.title}${horaLabel}${previewLabel}`}
                     >
                       <View style={s.tareaIconWrap}>
-                        <Ionicons name="ellipse" size={8} color={PURPLE} />
+                        <Ionicons
+                          name={t.virtual ? "repeat-outline" : "ellipse"}
+                          size={t.virtual ? 14 : 8}
+                          color={t.virtual ? "#BBB" : PURPLE}
+                        />
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text
-                          style={s.tareaTitulo}
+                          style={[s.tareaTitulo, t.virtual && { color: "#999" }]}
                           allowFontScaling={false}
                           numberOfLines={1}
                         >
@@ -882,8 +900,18 @@ export default function Calendario() {
                             🕐 {t.hora}
                           </Text>
                         )}
+                        {t.virtual && (
+                          <Text
+                            style={s.tareaVirtualTxt}
+                            allowFontScaling={false}
+                            accessibilityElementsHidden
+                            importantForAccessibility="no"
+                          >
+                            Se repite · aún no creada
+                          </Text>
+                        )}
                       </View>
-                      {esFuturo && (
+                      {esFuturo && !t.virtual && (
                         <Pressable
                           onPress={() => eliminar(t.id, t.title)}
                           style={s.btnEliminar}
@@ -1052,9 +1080,20 @@ const s = StyleSheet.create({
     minHeight: 52,
     gap: 10,
   },
+  tareaFilaVirtual: {
+    backgroundColor: "#FAFAFA",
+    borderStyle: "dashed",
+    borderColor: "#DDD",
+  },
   tareaIconWrap: { width: 20, alignItems: "center" },
   tareaTitulo: { fontSize: 14, color: "#333", fontWeight: "600" },
   tareaHora: { fontSize: 12, color: "#888", marginTop: 2 },
+  tareaVirtualTxt: {
+    fontSize: 10,
+    color: "#AAA",
+    fontWeight: "600",
+    marginTop: 2,
+  },
   btnEliminar: { padding: 10 },
 
   overlay: {

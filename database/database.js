@@ -151,6 +151,7 @@ async function insertTareaImpl(tarea, fechaDiaParam) {
     estado: "pendiente",
     repeticion: tarea.repeticion ?? "ninguna",
     tareaBaseId: tarea.tareaBaseId ?? null,
+    notifId: null,
   };
   const tareas = await getTareasImpl();
   await guardarTareas([...tareas, nueva]);
@@ -176,6 +177,7 @@ function generarInstanciasRepetitivas(todas, hoy) {
         (t.tareaBaseId === base.id || t.id === base.id) && t.fechaDia === hoy,
     );
     if (yaExiste) continue;
+    if (base.fechaDia && base.fechaDia > hoy) continue;
     if (base.repeticion === "semanal") {
       const [by, bm, bd] = (base.fechaDia ?? hoy).split("-").map(Number);
       if (diaSemana !== new Date(by, bm - 1, bd).getDay()) continue;
@@ -209,19 +211,130 @@ export function generarTareasRepetitivas() {
 }
 
 async function getTareasPorFechaImpl(fecha) {
-  return (await getTareasImpl()).filter(
+  const todas = await getTareasImpl();
+  const reales = todas.filter(
     (t) =>
       t.fechaDia === fecha &&
       t.estado !== "cancelada" &&
       t.estado !== "vencida",
   );
+  const hoy = hoyAppStr();
+  if (fecha <= hoy) return reales;
+  // Fecha futura: además de lo real, se añade la vista previa de tareas
+  // repetitivas que aún no se han generado (ver nota en
+  // proyectarOcurrenciasFuturas). Se marcan con virtual:true para que la
+  // pantalla sepa que todavía no existen de verdad.
+  return [...reales, ...calcularVirtualesParaFecha(todas, fecha, hoy)];
 }
 export function getTareasPorFecha(fecha) {
   return encolar(() => getTareasPorFechaImpl(fecha));
 }
 
+// Las instancias de una tarea repetitiva se crean de una en una, el día que
+// realmente llega (ver generarInstanciasRepetitivas). Para que el calendario
+// pueda pintar el puntito en los próximos días aunque esa instancia todavía
+// no exista de verdad, se calculan aquí "en el aire" (sin guardar nada), con
+// un horizonte máximo para no proyectar una tarea diaria hasta el infinito.
+const HORIZONTE_PROYECCION_DIAS = 365;
+
+function sumarDias(fecha, dias) {
+  const f = new Date(fecha + "T12:00:00");
+  f.setDate(f.getDate() + dias);
+  const y = f.getFullYear();
+  const m = String(f.getMonth() + 1).padStart(2, "0");
+  const d = String(f.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+// Vista previa (sin guardar nada) de las tareas repetitivas que le tocarían
+// a una fecha futura concreta, para cuando el usuario toca ese día en el
+// calendario antes de que la instancia real se haya generado.
+function calcularVirtualesParaFecha(todas, fecha, hoy) {
+  const bases = todas.filter(
+    (t) =>
+      t.repeticion &&
+      t.repeticion !== "ninguna" &&
+      !t.tareaBaseId &&
+      t.estado !== "cancelada",
+  );
+  const virtuales = [];
+  for (const base of bases) {
+    const inicio = base.fechaDia && base.fechaDia > hoy ? base.fechaDia : hoy;
+    if (fecha < inicio || fecha === base.fechaDia) continue;
+    const yaExiste = todas.some(
+      (t) => t.tareaBaseId === base.id && t.fechaDia === fecha,
+    );
+    if (yaExiste) continue;
+
+    let coincide = base.repeticion === "diaria";
+    if (base.repeticion === "semanal") {
+      const [by, bm, bd] = (base.fechaDia ?? hoy).split("-").map(Number);
+      const diaSemanaBase = new Date(by, bm - 1, bd).getDay();
+      const [fy, fm, fd] = fecha.split("-").map(Number);
+      coincide = new Date(fy, fm - 1, fd).getDay() === diaSemanaBase;
+    }
+    if (!coincide) continue;
+
+    virtuales.push({
+      id: `virtual_${base.id}_${fecha}`,
+      title: base.title,
+      pictogramId: base.pictogramId ?? null,
+      hora: base.hora ?? "Sin hora",
+      completed: 0,
+      stars: 0,
+      fechaCompletada: null,
+      fechaDia: fecha,
+      estado: "pendiente",
+      repeticion: "ninguna",
+      tareaBaseId: base.id,
+      virtual: true,
+    });
+  }
+  return virtuales;
+}
+
+function proyectarOcurrenciasFuturas(todas, hoy) {
+  const bases = todas.filter(
+    (t) =>
+      t.repeticion &&
+      t.repeticion !== "ninguna" &&
+      !t.tareaBaseId &&
+      t.estado !== "cancelada",
+  );
+  const yaExisten = new Set(
+    todas
+      .filter((t) => t.tareaBaseId)
+      .map((t) => `${t.tareaBaseId}|${t.fechaDia}`),
+  );
+
+  const proyectadas = [];
+  for (const base of bases) {
+    const inicio = base.fechaDia && base.fechaDia > hoy ? base.fechaDia : hoy;
+    const [by, bm, bd] = (base.fechaDia ?? hoy).split("-").map(Number);
+    const diaSemanaBase = new Date(by, bm - 1, bd).getDay();
+
+    for (let i = 0; i <= HORIZONTE_PROYECCION_DIAS; i++) {
+      const fecha = sumarDias(inicio, i);
+      if (fecha === base.fechaDia) continue; // ya cuenta como la propia base
+      if (yaExisten.has(`${base.id}|${fecha}`)) continue; // ya generada de verdad
+
+      if (base.repeticion === "diaria") {
+        proyectadas.push(fecha);
+      } else if (base.repeticion === "semanal") {
+        const [fy, fm, fd] = fecha.split("-").map(Number);
+        if (new Date(fy, fm - 1, fd).getDay() === diaSemanaBase) {
+          proyectadas.push(fecha);
+        }
+      }
+    }
+  }
+  return proyectadas;
+}
+
 async function getFechasConTareasImpl() {
-  const tareas = (await getTareasImpl()).filter(
+  const hoy = hoyAppStr();
+  const todas = await getTareasImpl();
+  const tareas = todas.filter(
     (t) =>
       (t.estado === "pendiente" || (!t.estado && t.completed !== 1)) &&
       t.fechaDia,
@@ -230,6 +343,10 @@ async function getFechasConTareasImpl() {
   for (const t of tareas) {
     if (!fechas[t.fechaDia]) fechas[t.fechaDia] = 0;
     fechas[t.fechaDia]++;
+  }
+  for (const fecha of proyectarOcurrenciasFuturas(todas, hoy)) {
+    if (!fechas[fecha]) fechas[fecha] = 0;
+    fechas[fecha]++;
   }
   return fechas;
 }
@@ -278,6 +395,16 @@ async function updateTareaHoraImpl(id, nuevaHora) {
 }
 export function updateTareaHora(id, nuevaHora) {
   return encolar(() => updateTareaHoraImpl(id, nuevaHora));
+}
+
+async function updateTareaNotifIdImpl(id, notifId) {
+  const tareas = (await getTareasImpl()).map((t) =>
+    t.id === id ? { ...t, notifId: notifId ?? null } : t,
+  );
+  await guardarTareas(tareas);
+}
+export function updateTareaNotifId(id, notifId) {
+  return encolar(() => updateTareaNotifIdImpl(id, notifId));
 }
 
 async function updateTareaTituloPictoImpl(id, titulo, pictogramId) {

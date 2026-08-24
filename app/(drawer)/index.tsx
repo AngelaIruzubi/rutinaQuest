@@ -10,6 +10,10 @@ import { Colors } from "../../constants/theme";
 import { useTareasHoy } from "../../hooks/useTareasHoy";
 import { Tarea } from "../../types/tarea";
 import { capitalize } from "../../utils/fechaFormato";
+import {
+  cancelarNotifTarea,
+  programarNotif5MinAntes,
+} from "../../utils/notificacionesTarea";
 import { minutosRestantes, parseTiempoLim } from "../../utils/tiempo";
 
 import {
@@ -37,6 +41,7 @@ import {
   updateTareaBaseCompleta,
   updateTareaCompletada,
   updateTareaHora,
+  updateTareaNotifId,
   updateTareaTituloPicto,
 } from "../../database/database";
 
@@ -391,21 +396,10 @@ export default function Home() {
         }
 
         const pending = tasks.filter((t) => !t.completed && t.fechaDia === hoy);
-
-        for (const t of pending) {
-          const mins = minutosRestantes(t.hora);
-          if (mins !== null && mins > 0 && mins <= 5) {
-            const key = `cincoMin_${t.id}`;
-            if (!notifEnviadasHoy.current.has(key)) {
-              notifEnviadasHoy.current.add(key);
-              enviarNotifSistema(
-                "⏰ ¡Quedan 5 minutos!",
-                `La tarea "${t.title}" vence pronto`,
-              );
-            }
-            break;
-          }
-        }
+        // El aviso de "quedan 5 minutos" ya no se comprueba aquí: se
+        // programa como notificación precisa del sistema al crear/editar
+        // cada tarea (ver programarNotif5MinAntes), en vez de este chequeo
+        // periódico que podía llegar tarde (solo se repetía cada 5 min).
 
         if (
           hora === 12 &&
@@ -608,6 +602,7 @@ export default function Home() {
       if (Platform.OS !== "web")
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       if (opcion === "esta") {
+        await cancelarNotifTarea(task.notifId);
         if (!task.completed) {
           await cancelarTarea(task.id);
           saltadasRef.current += 1;
@@ -629,6 +624,7 @@ export default function Home() {
         );
         for (const inst of instanciasEnPantalla) {
           if (!inst.completed && inst.fechaDia <= hoyStr) {
+            await cancelarNotifTarea(inst.notifId);
             await cancelarTarea(inst.id);
           }
         }
@@ -655,6 +651,7 @@ export default function Home() {
       if (Platform.OS !== "web")
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
 
+      await cancelarNotifTarea(task.notifId);
       if (!task.completed) {
         await cancelarTarea(task.id);
         saltadasRef.current += 1;
@@ -978,9 +975,15 @@ export default function Home() {
         onCerrar={() => setModalVisible(false)}
         onGuardar={async (tarea) => {
           await insertTarea(tarea);
+          const notifId = await programarNotif5MinAntes(
+            hoyAppStr(),
+            tarea.hora,
+            tarea.title ?? "",
+          );
+          if (notifId && tarea.id) await updateTareaNotifId(tarea.id, notifId);
           setTasks((prev) => [
             ...prev,
-            { ...tarea, fechaDia: hoyAppStr() } as Tarea,
+            { ...tarea, fechaDia: hoyAppStr(), notifId } as Tarea,
           ]);
         }}
       />
@@ -1033,10 +1036,23 @@ export default function Home() {
                   pictogramId,
                 );
                 await updateTareaHora(selectedTask.id, horaFinal);
+                const notifIdEsta = await programarNotif5MinAntes(
+                  selectedTask.fechaDia,
+                  horaFinal,
+                  titulo,
+                  selectedTask.notifId,
+                );
+                await updateTareaNotifId(selectedTask.id, notifIdEsta);
                 setTasks((prev) =>
                   prev.map((t) =>
                     t.id === selectedTask.id
-                      ? { ...t, title: titulo, pictogramId, hora: horaFinal }
+                      ? {
+                          ...t,
+                          title: titulo,
+                          pictogramId,
+                          hora: horaFinal,
+                          notifId: notifIdEsta,
+                        }
                       : t,
                   ),
                 );
@@ -1050,10 +1066,24 @@ export default function Home() {
                   pictogramId,
                   horaFinal,
                 );
+                const notifIdTodas = await programarNotif5MinAntes(
+                  selectedTask.fechaDia,
+                  horaFinal,
+                  titulo,
+                  selectedTask.notifId,
+                );
+                await updateTareaNotifId(selectedTask.id, notifIdTodas);
                 setTasks((prev) =>
                   prev.map((t) =>
                     t.id === baseId || t.tareaBaseId === baseId
-                      ? { ...t, title: titulo, pictogramId, hora: horaFinal }
+                      ? {
+                          ...t,
+                          title: titulo,
+                          pictogramId,
+                          hora: horaFinal,
+                          notifId:
+                            t.id === selectedTask.id ? notifIdTodas : t.notifId,
+                        }
                       : t,
                   ),
                 );
@@ -1067,10 +1097,23 @@ export default function Home() {
           } else {
             await updateTareaTituloPicto(selectedTask.id, titulo, pictogramId);
             await updateTareaHora(selectedTask.id, horaFinal);
+            const notifIdSimple = await programarNotif5MinAntes(
+              selectedTask.fechaDia,
+              horaFinal,
+              titulo,
+              selectedTask.notifId,
+            );
+            await updateTareaNotifId(selectedTask.id, notifIdSimple);
             setTasks((prev) =>
               prev.map((t) =>
                 t.id === selectedTask.id
-                  ? { ...t, title: titulo, pictogramId, hora: horaFinal }
+                  ? {
+                      ...t,
+                      title: titulo,
+                      pictogramId,
+                      hora: horaFinal,
+                      notifId: notifIdSimple,
+                    }
                   : t,
               ),
             );

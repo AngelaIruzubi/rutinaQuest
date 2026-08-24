@@ -12,4 +12,6 @@ export interface Tarea {
   repeticion?: 'ninguna' | 'diaria' | 'semanal';  // ← añadir
   tareaBaseId?: string | null;                      // ← añadir
   estado?: 'completada' | 'cancelada' | 'pendiente' | 'vencida';
+  /** Id de la notificación de "5 min antes" programada, si hay alguna */
+  notifId?: string | null;
 }
