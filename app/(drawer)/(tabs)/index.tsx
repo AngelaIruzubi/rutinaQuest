@@ -2,23 +2,24 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Audio } from "expo-av";
 import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Notifications from "expo-notifications";
+import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { ModalDetalleTarea } from "../../components/modals/ModalDetalleTarea";
-import { ModalNuevaTarea } from "../../components/modals/ModalNuevaTarea";
-import { Colors } from "../../constants/theme";
-import { useTareasHoy } from "../../hooks/useTareasHoy";
-import { Tarea } from "../../types/tarea";
-import { capitalize } from "../../utils/fechaFormato";
+import { ModalDetalleTarea } from "../../../components/modals/ModalDetalleTarea";
+import { ModalNuevaTarea } from "../../../components/modals/ModalNuevaTarea";
+import { AppFonts, Colors } from "../../../constants/theme";
+import { useTareasHoy } from "../../../hooks/useTareasHoy";
+import { Tarea } from "../../../types/tarea";
+import { capitalize } from "../../../utils/fechaFormato";
 import {
   cancelarNotifTarea,
   programarNotif5MinAntes,
-} from "../../utils/notificacionesTarea";
-import { minutosRestantes, parseTiempoLim } from "../../utils/tiempo";
+} from "../../../utils/notificacionesTarea";
+import { minutosRestantes, parseTiempoLim } from "../../../utils/tiempo";
 
 import {
   AccessibilityInfo,
-  Alert,
   Image,
   Platform,
   Pressable,
@@ -43,40 +44,49 @@ import {
   updateTareaHora,
   updateTareaNotifId,
   updateTareaTituloPicto,
-} from "../../database/database";
+} from "../../../database/database";
 
-import { PEREZOSO_IMAGENES } from "../../constants/notiConfig";
-import { useAjustesCtx } from "../../context/AjustesContext";
-import { useGamificacion } from "../../hooks/useGamificacion";
+import { PEREZOSO_IMAGENES } from "../../../constants/notiConfig";
+import { useAjustesCtx } from "../../../context/AjustesContext";
+import { useGamificacion } from "../../../hooks/useGamificacion";
 
-import { ModalConfirm } from "../../components/modals/ModalConfirm";
-import { ModalEditarTarea } from "../../components/modals/ModalEditarTarea";
-import { PerezosoNotif } from "../../components/notifs/PerezosoNotif";
-import { RachaNotif } from "../../components/notifs/RachaNotif";
-import { useReduceMotion } from "../../hooks/useReduceMotion";
+import { ModalEditarTarea } from "../../../components/modals/ModalEditarTarea";
+import { PerezosoNotif } from "../../../components/notifs/PerezosoNotif";
+import { RachaNotif } from "../../../components/notifs/RachaNotif";
+import { useConfirm } from "../../../hooks/useConfirm";
+import { useReduceMotion } from "../../../hooks/useReduceMotion";
 import {
   ahoraApp,
   ahoraAppMs,
   hoyAppStr,
   setFechaSimulada,
   setHoraSimulada,
-} from "../../utils/fecha";
-import { detectarMedalla } from "../../utils/gamificacion";
+} from "../../../utils/fecha";
+import { detectarMedalla } from "../../../utils/gamificacion";
 
 if (__DEV__) {
-  setFechaSimulada("2027-08-18");
+  setFechaSimulada("2027-08-20");
   setHoraSimulada(12, 0);
 }
 const SONIDOS: Record<string, any> = {
-  "success.mp3": require("../../assets/sounds/success.mp3"),
-  "error.mp3": require("../../assets/sounds/error.mp3"),
-  "goalmet.mp3": require("../../assets/sounds/goalmet.mp3"),
-  "racha.mp3": require("../../assets/sounds/racha.mp3"),
+  "success.mp3": require("../../../assets/sounds/success.mp3"),
+  "error.mp3": require("../../../assets/sounds/error.mp3"),
+  "goalmet.mp3": require("../../../assets/sounds/goalmet.mp3"),
+  "racha.mp3": require("../../../assets/sounds/racha.mp3"),
 };
 
 const PURPLE = Colors.purple;
 const ORANGE = Colors.orange;
 const RED = Colors.red;
+
+// Cuánto dura cada tipo de notificación en pantalla — se usa tanto para
+// ocultarla como para encadenar la siguiente (tarea → todo completo →
+// racha) sin que se pisen entre sí ni en el sonido ni en la vista.
+function duracionNotif(type: string): number {
+  const esTareaCompletada =
+    type === "ontime" || type === "late" || type === "sinHora";
+  return esTareaCompletada ? 2200 : 4500;
+}
 
 async function pedirPermisosNotificaciones() {
   if (Platform.OS === "web") return;
@@ -120,49 +130,27 @@ async function enviarNotifSistema(titulo: string, cuerpo: string) {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [modalVisible, setModalVisible] = useState(false);
   const [taskModalVisible, setTaskModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false); // ← añadir aquí
   const [search, setSearch] = useState("");
   const [selectedTask, setSelectedTask] = useState<Tarea | null>(null);
-  const [confirmVisible, setConfirmVisible] = useState(false);
-  const [confirmConfig, setConfirmConfig] = useState<{
-    titulo: string;
-    mensaje: string;
-    opciones: { texto: string; valor: any; destructivo?: boolean }[];
-  } | null>(null);
-  const confirmResolveRef = useRef<((val: any) => void) | null>(null);
-
-  const mostrarConfirm = (
-    titulo: string,
-    mensaje: string,
-    opciones: { texto: string; valor: any; destructivo?: boolean }[],
-  ) =>
-    new Promise<any>((resolve) => {
-      if (Platform.OS !== "web") {
-        Alert.alert(
-          titulo,
-          mensaje,
-          [
-            ...opciones.map((op) => ({
-              text: op.texto,
-              style: (op.destructivo
-                ? "destructive"
-                : op.valor === null
-                  ? "cancel"
-                  : "default") as any,
-              onPress: () => resolve(op.valor),
-            })),
-          ],
-          { cancelable: true, onDismiss: () => resolve(null) },
-        );
-      } else {
-        confirmResolveRef.current = resolve;
-        setConfirmConfig({ titulo, mensaje, opciones });
-        setConfirmVisible(true);
-      }
-    });
+  const { mostrarConfirm, confirmModal } = useConfirm();
   const { tasks, setTasks, cargarTareas } = useTareasHoy();
+
+  // Sin esto, expo-av usa el modo de audio por defecto: en iOS no suena
+  // nada si el móvil está en silencio, y en general el volumen de "media"
+  // puede no comportarse bien — por eso los sonidos de logros no sonaban
+  // aunque el código los disparara correctamente.
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    Audio.setAudioModeAsync({
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: false,
+      shouldDuckAndroid: true,
+    }).catch(() => {});
+  }, []);
 
   // Programar notificaciones del día al montar
   useEffect(() => {
@@ -485,7 +473,10 @@ export default function Home() {
     }
     setNotifType(type);
     setShowNotif(true);
-    notifTimer.current = setTimeout(() => setShowNotif(false), 4500);
+    notifTimer.current = setTimeout(
+      () => setShowNotif(false),
+      duracionNotif(type),
+    );
   };
 
   const disparaRachaNotif = (racha: number) => {
@@ -551,19 +542,28 @@ export default function Home() {
     if (debeMostrarRacha) await AsyncStorage.setItem(rachaKey, "1");
 
     const todasCompletadas = pendingAntes.length === 0 && totalDeHoy > 0;
-    let delay = 0;
     const medalla = detectarMedalla(prevTotal, newTotal);
+    const primerTipo = medalla
+      ? medalla
+      : !tieneHora
+        ? "sinHora"
+        : enTiempo
+          ? "ontime"
+          : "late";
 
-    if (medalla) disparaNotif(medalla);
-    else if (!tieneHora) disparaNotif("sinHora");
-    else if (enTiempo) disparaNotif("ontime");
-    else disparaNotif("late");
+    disparaNotif(primerTipo);
 
-    delay += 4000; // deja que la notificación de estrellas termine
+    // Cada siguiente notificación espera lo que realmente dura la anterior
+    // (+ un pequeño respiro) en vez de un número fijo — si no, con tareas
+    // que duran menos (2.2s) la siguiente notif se disparaba de más tarde
+    // de la cuenta y con las que duran más (4.5s) se disparaba mientras la
+    // anterior aún estaba en pantalla (el sonido de la racha sonaba a la
+    // vez que se veía la notificación de "todo completado").
+    let delay = duracionNotif(primerTipo) + 300;
 
     if (todasCompletadas) {
       setTimeout(() => disparaNotif("goalmet"), delay);
-      delay += 4000;
+      delay += duracionNotif("goalmet") + 300;
     }
 
     if (debeMostrarRacha) {
@@ -685,7 +685,7 @@ export default function Home() {
 
   return (
     <View
-      style={{ flex: 1, backgroundColor: "#ffffff", paddingHorizontal: 20 }}
+      style={{ flex: 1, backgroundColor: "#FBF6F0", paddingHorizontal: 20 }}
     >
       <PerezosoNotif
         type={notifType}
@@ -705,34 +705,91 @@ export default function Home() {
         accessible={false}
       >
         {/* ── Cabecera ── */}
-        <View style={{ paddingTop: 20, paddingBottom: 20 }} accessible={false}>
-          <View
-            style={{
-              flexDirection: "column",
-              padding: 40,
-              justifyContent: "center",
-              alignItems: "center",
-              gap: 20,
-            }}
-            accessible
-            accessibilityRole="header"
-            accessibilityLabel={`Mis Tareas. ${formattedToday}`}
-          >
-            <View accessible={false}>
+        <View
+          style={{ paddingTop: 24, paddingBottom: 18, gap: 16 }}
+          accessible={false}
+        >
+          <View style={styles.headerRow} accessible={false}>
+            <View
+              accessible
+              accessibilityRole="header"
+              accessibilityLabel={`Mis Tareas. ${formattedToday}`}
+            >
               <Text
-                style={[styles.title, { fontSize: fs(30) }]}
+                style={[styles.title, { fontSize: fs(26) }]}
                 accessibilityElementsHidden
                 importantForAccessibility="no"
               >
                 Mis Tareas
               </Text>
               <Text
-                style={[styles.dateText, { fontSize: fs(17) }]}
+                style={[styles.dateText, { fontSize: fs(15) }]}
                 accessibilityElementsHidden
                 importantForAccessibility="no"
               >
                 {formattedToday}
               </Text>
+            </View>
+
+            <Pressable
+              onPress={() => router.push("/perfil")}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel="Mi perfil"
+              accessibilityHint="Abre la pantalla de personalización del avatar"
+            >
+              <LinearGradient
+                colors={["#C9A9DB", Colors.purple]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0.4, y: 1 }}
+                style={styles.profileBtn}
+              >
+                <Ionicons
+                  name="person-circle-outline"
+                  size={24}
+                  color="#fff"
+                  accessibilityElementsHidden
+                  importantForAccessibility="no"
+                />
+              </LinearGradient>
+            </Pressable>
+          </View>
+
+          {/* ── Estadísticas rápidas ── */}
+          <View
+            style={{ flexDirection: "row", gap: 10 }}
+            accessible
+            accessibilityLabel={`${gami.estrellas} estrellas. Racha de ${gami.racha} ${gami.racha === 1 ? "día" : "días"}`}
+          >
+            <View style={styles.statPill}>
+              <View
+                style={[styles.statIconWrap, { backgroundColor: "#FFF6DB" }]}
+              >
+                <Ionicons name="star" size={16} color="#E8B500" />
+              </View>
+              <View>
+                <Text style={[styles.statValue, { fontSize: fs(16) }]}>
+                  {gami.estrellas}
+                </Text>
+                <Text style={[styles.statLabel, { fontSize: fs(11) }]}>
+                  estrellas
+                </Text>
+              </View>
+            </View>
+            <View style={styles.statPill}>
+              <View
+                style={[styles.statIconWrap, { backgroundColor: "#FFF2EC" }]}
+              >
+                <Text style={{ fontSize: 14 }}>🔥</Text>
+              </View>
+              <View>
+                <Text style={[styles.statValue, { fontSize: fs(16) }]}>
+                  {gami.racha} {gami.racha === 1 ? "día" : "días"}
+                </Text>
+                <Text style={[styles.statLabel, { fontSize: fs(11) }]}>
+                  de racha
+                </Text>
+              </View>
             </View>
           </View>
 
@@ -742,24 +799,28 @@ export default function Home() {
             accessibilityHint="Escribe para filtrar las tareas de hoy"
             accessibilityRole="search"
           >
+            <Ionicons
+              name="search"
+              size={18}
+              color="#C7C0CE"
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            />
             <TextInput
-              placeholder="Buscar tarea.."
+              placeholder="Buscar tarea..."
               value={search}
               onChangeText={setSearch}
-              style={{ flex: 1, fontSize: fs(16) }}
+              style={{
+                flex: 1,
+                fontSize: fs(15),
+                fontFamily: AppFonts.body,
+                color: "#3A3342",
+              }}
               returnKeyType="search"
               accessibilityLabel="Buscar tarea"
               accessibilityHint="Escribe para filtrar las tareas de hoy"
               accessibilityRole="search"
               clearButtonMode="while-editing"
-            />
-
-            <Ionicons
-              name="search"
-              size={20}
-              color="#999"
-              accessibilityElementsHidden
-              importantForAccessibility="no"
             />
           </View>
         </View>
@@ -852,7 +913,7 @@ export default function Home() {
                       flex: 1,
                     }}
                   >
-                    {item.pictogramId && (
+                    {item.pictogramId ? (
                       <Image
                         source={{
                           uri: `https://static.arasaac.org/pictograms/${item.pictogramId}/${item.pictogramId}_300.png`,
@@ -861,10 +922,32 @@ export default function Home() {
                         accessibilityLabel={`Pictograma de ${item.title}`}
                         accessibilityIgnoresInvertColors
                       />
+                    ) : (
+                      <View
+                        style={[
+                          styles.pictogramPlaceholder,
+                          vencida && { backgroundColor: "#FCEBEB" },
+                          urgente && !vencida && { backgroundColor: "#FFF2EC" },
+                        ]}
+                        accessibilityElementsHidden
+                        importantForAccessibility="no"
+                      >
+                        <Ionicons
+                          name={
+                            vencida
+                              ? "alert-circle-outline"
+                              : urgente
+                                ? "time-outline"
+                                : "checkmark-circle-outline"
+                          }
+                          size={22}
+                          color={vencida ? RED : urgente ? ORANGE : PURPLE}
+                        />
+                      </View>
                     )}
                     <View style={{ flex: 1 }}>
                       <Text
-                        style={[styles.taskTitle, { fontSize: fs(17) }]}
+                        style={[styles.taskTitle, { fontSize: fs(16) }]}
                         numberOfLines={1}
                       >
                         {item.title}
@@ -872,9 +955,9 @@ export default function Home() {
                       {item.repeticion && item.repeticion !== "ninguna" && (
                         <Text
                           style={{
-                            fontSize: 10,
+                            fontSize: fs(11),
+                            fontFamily: AppFonts.bodyBold,
                             color: PURPLE,
-                            fontWeight: "600",
                           }}
                         >
                           {item.repeticion === "diaria"
@@ -885,9 +968,9 @@ export default function Home() {
                       {urgente && !vencida && (
                         <Text
                           style={{
-                            fontSize: 11,
+                            fontSize: fs(11.5),
+                            fontFamily: AppFonts.bodyBold,
                             color: ORANGE,
-                            fontWeight: "600",
                           }}
                         >
                           ¡Quedan {mins} min!
@@ -896,9 +979,9 @@ export default function Home() {
                       {vencida && (
                         <Text
                           style={{
-                            fontSize: 11,
+                            fontSize: fs(11.5),
+                            fontFamily: AppFonts.bodyBold,
                             color: RED,
-                            fontWeight: "600",
                           }}
                         >
                           ⚠ Fuera de hora
@@ -917,8 +1000,9 @@ export default function Home() {
                       <Text
                         style={[
                           styles.taskTime,
-                          { fontSize: fs(13) },
+                          { fontSize: fs(13.5) },
                           vencida && { color: RED },
+                          urgente && !vencida && { color: ORANGE },
                         ]}
                         accessibilityElementsHidden
                         importantForAccessibility="no"
@@ -926,13 +1010,6 @@ export default function Home() {
                         {item.hora}
                       </Text>
                     )}
-                    <Ionicons
-                      name="chevron-forward"
-                      size={16}
-                      color="#CCC"
-                      accessibilityElementsHidden
-                      importantForAccessibility="no"
-                    />
                   </View>
                 </View>
               </Pressable>
@@ -944,29 +1021,29 @@ export default function Home() {
       {/* ── FAB ── */}
       <Pressable
         onPress={() => setModalVisible(true)}
-        style={{
-          position: "absolute",
-          bottom: 30,
-          right: 25,
-          backgroundColor: PURPLE,
-          width: 70,
-          height: 70,
-          borderRadius: 35,
-          justifyContent: "center",
-          alignItems: "center",
-        }}
+        style={({ pressed }) => [
+          styles.fab,
+          { opacity: pressed && !reduceMotion ? 0.85 : 1 },
+        ]}
         accessible
         accessibilityRole="button"
         accessibilityLabel="Añadir nueva tarea"
         accessibilityHint="Abre el formulario para crear una nueva tarea de hoy"
       >
-        <Ionicons
-          name="add"
-          size={36}
-          color="#FFF"
-          accessibilityElementsHidden
-          importantForAccessibility="no"
-        />
+        <LinearGradient
+          colors={["#C9A9DB", PURPLE]}
+          start={{ x: 0.1, y: 0 }}
+          end={{ x: 0.9, y: 1 }}
+          style={styles.fabGradient}
+        >
+          <Ionicons
+            name="add"
+            size={30}
+            color="#FFF"
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+          />
+        </LinearGradient>
       </Pressable>
 
       {/* ── MODAL: AÑADIR TAREA ── */}
@@ -1127,78 +1204,157 @@ export default function Home() {
         }}
       />
 
-      {confirmVisible && confirmConfig && (
-        <ModalConfirm
-          visible={confirmVisible}
-          titulo={confirmConfig.titulo}
-          mensaje={confirmConfig.mensaje}
-          opciones={confirmConfig.opciones}
-          onOpcion={(valor) => {
-            setConfirmVisible(false);
-            confirmResolveRef.current?.(valor);
-          }}
-        />
-      )}
+      {confirmModal}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   title: {
-    fontSize: 30,
-    fontWeight: "800",
-    color: PURPLE,
-    textAlign: "center",
-    marginBottom: 6,
+    fontSize: 26,
+    fontFamily: AppFonts.displayBold,
+    color: "#3A3342",
+    marginBottom: 2,
   },
   dateText: {
-    textAlign: "center",
-    color: "#888",
-    marginBottom: 20,
-    fontSize: 17,
+    fontFamily: AppFonts.body,
+    color: "#8A8194",
+    fontSize: 15,
   },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+  profileBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: Colors.purple,
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+
+  statPill: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#ECE4F0",
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    minHeight: 44,
+  },
+  statIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statValue: {
+    fontFamily: AppFonts.displayBold,
+    color: "#3A3342",
+    lineHeight: 18,
+  },
+  statLabel: { fontFamily: AppFonts.body, color: "#8A8194" },
 
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f3f2f2",
-    borderRadius: 25,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    marginBottom: 20,
+    gap: 10,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#ECE4F0",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     minHeight: 44,
   },
   emptyBox: { alignItems: "center", paddingVertical: 24, width: "100%" },
   emptyText: {
     fontSize: 26,
     color: PURPLE,
-    fontWeight: "600",
+    fontFamily: AppFonts.displayBold,
     marginTop: 14,
     textAlign: "center",
   },
-  emptySubText: { fontSize: 20, color: "#AAA", marginTop: 6 },
+  emptySubText: {
+    fontSize: 20,
+    color: "#AAA",
+    fontFamily: AppFonts.body,
+    marginTop: 6,
+  },
 
   taskRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#f3f2f2",
-    padding: 16,
-    borderRadius: 15,
+    backgroundColor: "#fff",
+    borderWidth: 1.5,
+    borderColor: "#ECE4F0",
+    padding: 14,
+    borderRadius: 18,
     marginBottom: 12,
     minHeight: 60,
+    shadowColor: "#3A3342",
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
   },
   taskRowLate: {
-    backgroundColor: "#FFF0F0",
-    borderWidth: 1,
-    borderColor: "#FFCCCC",
+    backgroundColor: "#FDEDED",
+    borderColor: "#F6C9C9",
   },
   taskRowUrgent: {
-    backgroundColor: "#FFF8F0",
-    borderWidth: 1,
-    borderColor: "#FFD9A8",
+    backgroundColor: "#FFF2EC",
+    borderColor: "#FFD8BE",
   },
-  pictogram: { width: 40, height: 40, marginRight: 10, borderRadius: 6 },
-  taskTitle: { fontSize: 17, flex: 1, color: "#333" },
-  taskTime: { color: "#888", fontSize: 13 },
+  pictogram: { width: 46, height: 46, marginRight: 12, borderRadius: 14 },
+  pictogramPlaceholder: {
+    width: 46,
+    height: 46,
+    marginRight: 12,
+    borderRadius: 14,
+    backgroundColor: "#F4F0F6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  taskTitle: {
+    flex: 1,
+    fontFamily: AppFonts.displaySemibold,
+    color: "#3A3342",
+  },
+  taskTime: {
+    fontFamily: AppFonts.displayBold,
+    color: "#8A8194",
+  },
+
+  fab: {
+    position: "absolute",
+    bottom: 30,
+    right: 25,
+    width: 60,
+    height: 60,
+    borderRadius: 20,
+    shadowColor: PURPLE,
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
+  },
+  fabGradient: {
+    flex: 1,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });

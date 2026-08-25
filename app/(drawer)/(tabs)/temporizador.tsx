@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -16,8 +16,9 @@ import {
   Vibration,
   View,
 } from 'react-native';
-import { Colors } from '../../constants/theme';
-import { useAjustesCtx } from '../../context/AjustesContext';
+import Svg, { Circle } from 'react-native-svg';
+import { AppFonts, Colors } from '../../../constants/theme';
+import { useAjustesCtx } from '../../../context/AjustesContext';
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -35,7 +36,7 @@ type ConfigTiempo = {
 // Los colores semánticos del temporizador (green/amber/red) son propios de esta pantalla
 
 const C = {
-  bg:          '#F5F4F0',
+  bg:          '#FBF6F0',
   surface:     '#FFFFFF',
   border:      'rgba(0,0,0,0.08)',
   textPrimary: '#1A1A1A',
@@ -94,12 +95,44 @@ function NumPicker({ value, min, max, label, onChange }: NumPickerProps) {
 
 const p = StyleSheet.create({
   wrap:      { alignItems: 'center', gap: 4 },
-  label:     { fontSize: 11, color: C.textHint, letterSpacing: 0.6, textTransform: 'uppercase' },
+  label:     { fontSize: 11, color: C.textHint, fontFamily: AppFonts.bodyBold, letterSpacing: 0.6, textTransform: 'uppercase' },
   arrow:     { padding: 6 },
   arrowText: { fontSize: 13, color: C.textMuted },
-  numBox:    { width: 64, height: 56, backgroundColor: C.bg, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  num:       { fontSize: 26, fontWeight: '600', color: C.textPrimary },
+  numBox:    { width: 64, height: 56, backgroundColor: C.bg, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  num:       { fontSize: 26, fontFamily: AppFonts.displayBold, color: C.textPrimary },
 });
+
+// ── Anillo de progreso circular ──────────────────────────────────────────────
+
+type ProgressRingProps = {
+  size:        number;
+  strokeWidth: number;
+  progreso:    number; // 0 a 1
+  color:       string;
+  bgColor:     string;
+};
+
+function ProgressRing({ size, strokeWidth, progreso, color, bgColor }: ProgressRingProps) {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const dashoffset = circumference * (1 - Math.max(0, Math.min(1, progreso)));
+
+  return (
+    <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
+      <Circle
+        cx={size / 2} cy={size / 2} r={radius}
+        stroke={bgColor} strokeWidth={strokeWidth} fill="none"
+      />
+      <Circle
+        cx={size / 2} cy={size / 2} r={radius}
+        stroke={color} strokeWidth={strokeWidth} fill="none"
+        strokeDasharray={`${circumference} ${circumference}`}
+        strokeDashoffset={dashoffset}
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
 
 // ── Modal configurar tiempo ──────────────────────────────────────────────────
 
@@ -184,19 +217,19 @@ function ModalConfig({ visible, config, onConfirm, onClose }: ModalConfigProps) 
 const modal = StyleSheet.create({
   overlay:        { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   sheet:          { backgroundColor: C.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 36, maxHeight: '85%' },
-  title:          { fontSize: 17, fontWeight: '600', color: C.textPrimary, textAlign: 'center', marginBottom: 24 },
+  title:          { fontSize: 18, fontFamily: AppFonts.displayBold, color: C.textPrimary, textAlign: 'center', marginBottom: 24 },
   pickers:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 20 },
   sep:            { fontSize: 28, fontWeight: '300', color: C.textHint, marginTop: 16 },
   shortcuts:      { flexDirection: 'row', gap: 8, justifyContent: 'center', marginBottom: 24, flexWrap: 'wrap' },
   chip:           { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: C.bg, borderWidth: 0.5, borderColor: 'rgba(0,0,0,0.1)' },
   chipActive:     { backgroundColor: Colors.purpleLt, borderColor: Colors.purpleDk },
-  chipText:       { fontSize: 13, color: C.textMuted },
-  chipTextActive: { color: Colors.purpleDk, fontWeight: '500' },
+  chipText:       { fontSize: 13, color: C.textMuted, fontFamily: AppFonts.body },
+  chipTextActive: { color: Colors.purpleDk, fontFamily: AppFonts.bodyBold },
   actions:        { flexDirection: 'row', gap: 10 },
-  btnCancel:      { flex: 1, height: 48, borderRadius: 12, borderWidth: 0.5, borderColor: 'rgba(0,0,0,0.12)', alignItems: 'center', justifyContent: 'center' },
-  btnCancelText:  { fontSize: 15, color: C.textMuted },
-  btnConfirm:     { flex: 1, height: 48, borderRadius: 12, backgroundColor: Colors.purpleDk, alignItems: 'center', justifyContent: 'center' },
-  btnConfirmText: { fontSize: 15, fontWeight: '600', color: Colors.white },
+  btnCancel:      { flex: 1, height: 48, borderRadius: 14, borderWidth: 0.5, borderColor: 'rgba(0,0,0,0.12)', alignItems: 'center', justifyContent: 'center' },
+  btnCancelText:  { fontSize: 15, color: C.textMuted, fontFamily: AppFonts.bodyBold },
+  btnConfirm:     { flex: 1, height: 48, borderRadius: 14, backgroundColor: Colors.purpleDk, alignItems: 'center', justifyContent: 'center' },
+  btnConfirmText: { fontSize: 15, fontFamily: AppFonts.bodyBold, color: Colors.white },
   btnDisabled:    { opacity: 0.4 },
 });
 
@@ -205,7 +238,6 @@ const modal = StyleSheet.create({
 const CONFIG_DEFAULT: ConfigTiempo = { horas: 0, minutos: 25, segundos: 0 };
 
 export default function Temporizador() {
-  const router = useRouter();
   const { escala, colores } = useAjustesCtx();
   const ts = useMemo(() => ({
     title: { fontSize: Math.round(30 * escala) },
@@ -343,19 +375,7 @@ export default function Temporizador() {
     <SafeAreaView style={estilos.safe}>
       <ScrollView contentContainerStyle={estilos.container} showsVerticalScrollIndicator={false}>
 
-        <Text style={estilos.title} >Temporizador</Text>
-
-        {/* Botón Inicio */}
-        <Pressable
-          onPress={() => router.replace('/')}
-          style={estilos.btnInicio}
-          accessible
-          accessibilityRole="button"
-          accessibilityLabel="Ir a Inicio"
-        >
-          <Ionicons name="home-outline" size={16} color={Colors.purple} />
-          <Text style={estilos.btnInicioTxt}>Inicio</Text>
-        </Pressable>
+        <Text style={estilos.title}>Temporizador</Text>
 
         {/* Selector de modo */}
         <View style={estilos.modoWrap}>
@@ -376,10 +396,13 @@ export default function Temporizador() {
         <View style={estilos.clockWrap}>
           {modo === 'countdown' && (
             <View style={estilos.ringOuter}>
-              <View style={[
-                estilos.ringInner,
-                { borderColor: estado === 'finished' ? C.green.solid : estado === 'running' ? Colors.purple : C.border },
-              ]} />
+              <ProgressRing
+                size={220}
+                strokeWidth={9}
+                progreso={progreso}
+                color={estado === 'finished' ? C.green.solid : Colors.purple}
+                bgColor={C.border}
+              />
             </View>
           )}
           <View style={estilos.clockContent}>
@@ -399,10 +422,19 @@ export default function Temporizador() {
         {modo === 'countdown' && totalSeg > 0 && (
           <View style={estilos.progressBarWrap}>
             <View style={estilos.progressBarBg}>
-              <View style={[estilos.progressBarFill, {
-                width: `${progreso * 100}%` as any,
-                backgroundColor: estado === 'finished' ? C.green.solid : Colors.purple,
-              }]} />
+              {estado === 'finished' ? (
+                <View style={[estilos.progressBarFill, {
+                  width: `${progreso * 100}%` as any,
+                  backgroundColor: C.green.solid,
+                }]} />
+              ) : (
+                <LinearGradient
+                  colors={[Colors.purpleLt, Colors.purple]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={[estilos.progressBarFill, { width: `${progreso * 100}%` as any }]}
+                />
+              )}
             </View>
             <Text allowFontScaling={false} style={estilos.progressLabel}>{Math.round(progreso * 100)}%</Text>
           </View>
@@ -417,16 +449,30 @@ export default function Temporizador() {
 
           {/* Play / Pause */}
           {estado === 'running' ? (
-            <Pressable style={estilos.btnPrimary} onPress={handlePause}>
-              <Ionicons name="pause" size={30} color={Colors.white} />
+            <Pressable style={estilos.btnPrimaryWrap} onPress={handlePause}>
+              <LinearGradient
+                colors={['#C9A9DB', Colors.purple]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
+                style={estilos.btnPrimary}
+              >
+                <Ionicons name="pause" size={30} color={Colors.white} />
+              </LinearGradient>
             </Pressable>
           ) : (
             <Pressable
-              style={[estilos.btnPrimary, estado === 'finished' && estilos.btnFinished]}
+              style={[estilos.btnPrimaryWrap, estado === 'finished' && estilos.btnFinished]}
               onPress={handlePlay}
               disabled={estado === 'finished'}
             >
-              <Ionicons name="play" size={30} color={Colors.white} />
+              <LinearGradient
+                colors={['#C9A9DB', Colors.purple]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
+                style={estilos.btnPrimary}
+              >
+                <Ionicons name="play" size={30} color={Colors.white} />
+              </LinearGradient>
             </Pressable>
           )}
 
@@ -471,58 +517,59 @@ const estilos = StyleSheet.create({
   container: { paddingHorizontal: 20, paddingTop: 20, alignItems: 'center' },
 
   title: {
-    fontSize: 30, fontWeight: '800',
-    color: Colors.purple,
-    textAlign: 'center', marginBottom: 24,
+    fontSize: 26, fontFamily: AppFonts.displayBold,
+    color: '#3A3342',
+    alignSelf: 'flex-start',
+    marginBottom: 20,
   },
 
   // Selector modo
   modoWrap: {
     flexDirection: 'row', backgroundColor: C.surface,
-    borderRadius: 14, borderWidth: 0.5, borderColor: C.border,
+    borderRadius: 16, borderWidth: 0.5, borderColor: C.border,
     padding: 4, marginBottom: 36, width: '100%',
   },
-  modoBtn:          { flex: 1, paddingVertical: 10, borderRadius: 11, alignItems: 'center' },
+  modoBtn:          { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center' },
   modoBtnActive:    { backgroundColor: Colors.purpleLt },
-  modoBtnText:      { fontSize: 14, color: C.textMuted },
-  modoBtnTextActive:{ color: Colors.purple, fontWeight: '600' },
+  modoBtnText:      { fontSize: 14, color: C.textMuted, fontFamily: AppFonts.bodyBold },
+  modoBtnTextActive:{ color: Colors.purpleDk },
 
   // Reloj
   clockWrap: { width: 240, height: 240, alignItems: 'center', justifyContent: 'center', marginBottom: 28 },
   ringOuter: { position: 'absolute', width: 240, height: 240, borderRadius: 120, alignItems: 'center', justifyContent: 'center' },
-  ringInner: { width: 220, height: 220, borderRadius: 110, borderWidth: 3 },
   clockContent:  { alignItems: 'center' },
-  timeText:      { fontSize: 52, fontWeight: '300', letterSpacing: 2, fontVariant: ['tabular-nums'] },
-  estadoLabel:   { fontSize: 13, color: C.textMuted, marginTop: 6, letterSpacing: 0.4 },
+  timeText:      { fontSize: 52, fontFamily: AppFonts.displaySemibold, letterSpacing: 1, fontVariant: ['tabular-nums'] },
+  estadoLabel:   { fontSize: 13, color: Colors.purpleDk, fontFamily: AppFonts.bodyBold, marginTop: 6, letterSpacing: 0.4 },
 
   // Barra progreso
   progressBarWrap: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 32 },
-  progressBarBg:   { flex: 1, height: 6, backgroundColor: C.border, borderRadius: 3, overflow: 'hidden' },
-  progressBarFill: { height: 6, borderRadius: 3 },
-  progressLabel:   { fontSize: 12, color: C.textMuted, minWidth: 32, textAlign: 'right' },
+  progressBarBg:   { flex: 1, height: 7, backgroundColor: C.border, borderRadius: 4, overflow: 'hidden' },
+  progressBarFill: { height: 7, borderRadius: 4 },
+  progressLabel:   { fontSize: 12, color: C.textMuted, fontFamily: AppFonts.bodyBold, minWidth: 32, textAlign: 'right' },
 
   // Controles
   controls:               { flexDirection: 'row', alignItems: 'center', gap: 20, marginBottom: 20 },
-  btnPrimary:             { width: 72, height: 72, borderRadius: 36, backgroundColor: Colors.purple, alignItems: 'center', justifyContent: 'center' },
+  btnPrimaryWrap: {
+    width: 76, height: 76, borderRadius: 38,
+    shadowColor: Colors.purple, shadowOpacity: 0.45, shadowRadius: 12, shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+  btnPrimary:             { width: 76, height: 76, borderRadius: 38, alignItems: 'center', justifyContent: 'center' },
   btnFinished:            { opacity: 0.5 },
   btnPrimaryText:         { fontSize: 26, color: Colors.white },
-  btnSecondary:           { width: 52, height: 52, borderRadius: 26, backgroundColor: C.surface, borderWidth: 0.5, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
+  btnSecondary:           { width: 56, height: 56, borderRadius: 28, backgroundColor: C.surface, borderWidth: 1.5, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
   btnSecondaryIcon:       { fontSize: 20, color: C.textMuted },
-  btnSecondaryPlaceholder:{ width: 52, height: 52 },
+  btnSecondaryPlaceholder:{ width: 56, height: 56 },
 
   // Info config
-  configInfo:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 14, backgroundColor: C.surface, borderRadius: 10, borderWidth: 0.5, borderColor: C.border, marginBottom: 28 },
-  configInfoText: { fontSize: 13, color: C.textMuted },
-  configInfoEdit: { fontSize: 13, color: Colors.purple, fontWeight: '500' },
-
-  // Botón inicio
-  btnInicio:    { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: Colors.purple + '18', borderRadius: 20, alignSelf: 'flex-start', marginBottom: 20, minHeight: 44 },
-  btnInicioTxt: { color: Colors.purple, fontWeight: '600', fontSize: 13 },
+  configInfo:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 9, paddingHorizontal: 16, backgroundColor: C.surface, borderRadius: 14, borderWidth: 1.5, borderColor: C.border, marginBottom: 28 },
+  configInfoText: { fontSize: 13, color: C.textMuted, fontFamily: AppFonts.body },
+  configInfoEdit: { fontSize: 13, color: Colors.purpleDk, fontFamily: AppFonts.bodyBold },
 
   // Tarjetas info
   infoGrid:  { width: '100%', gap: 10 },
   infoCard:  { backgroundColor: C.surface, borderRadius: 14, borderWidth: 0.5, borderColor: C.border, padding: 16, flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   infoIcon:  { fontSize: 20, marginTop: 1 },
-  infoTitle: { fontSize: 14, fontWeight: '500', color: C.textPrimary, marginBottom: 2, flex: 1 },
-  infoSub:   { fontSize: 12, color: C.textMuted, lineHeight: 17, flex: 1, flexShrink: 1 },
+  infoTitle: { fontSize: 14, fontFamily: AppFonts.bodyBold, color: C.textPrimary, marginBottom: 2, flex: 1 },
+  infoSub:   { fontSize: 12, color: C.textMuted, fontFamily: AppFonts.body, lineHeight: 17, flex: 1, flexShrink: 1 },
 });

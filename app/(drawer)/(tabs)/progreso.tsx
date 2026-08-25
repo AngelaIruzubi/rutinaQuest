@@ -1,5 +1,6 @@
-import { Colors } from "@/constants/theme";
+import { AppFonts, Colors } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -15,15 +16,15 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { BarraProgreso } from "../../components/ui/BarraProgreso";
-import { useAjustesCtx } from "../../context/AjustesContext";
-import { getTareas } from "../../database/database";
-import { useGamificacion } from "../../hooks/useGamificacion";
-import { useReduceMotion } from "../../hooks/useReduceMotion";
-import { Tarea } from "../../types/tarea";
-import { ahoraApp } from "../../utils/fecha";
-import { toLocalDateStr } from "../../utils/fechaFormato";
-import { calcularProgresos } from "../../utils/gamificacion";
+import { BarraProgreso } from "../../../components/ui/BarraProgreso";
+import { useAjustesCtx } from "../../../context/AjustesContext";
+import { getTareas } from "../../../database/database";
+import { useGamificacion } from "../../../hooks/useGamificacion";
+import { useReduceMotion } from "../../../hooks/useReduceMotion";
+import { Tarea } from "../../../types/tarea";
+import { ahoraApp } from "../../../utils/fecha";
+import { toLocalDateStr } from "../../../utils/fechaFormato";
+import { calcularProgresos } from "../../../utils/gamificacion";
 
 // ─── Colores ──────────────────────────────────────────────────────────────────
 const PURPLE = "#A77BBE";
@@ -156,48 +157,45 @@ function FireHero({ racha }: { racha: number }) {
 
   return (
     <Animated.View
-      style={[
-        s.fireHeroWrap,
-        { opacity: opacityAnim, transform: [{ scale: scaleAnim }] },
-      ]}
+      style={{ opacity: opacityAnim, transform: [{ scale: scaleAnim }] }}
       accessible
       accessibilityLabel={
         racha > 0 ? `Racha de ${racha} días seguidos` : "Sin racha activa"
       }
     >
-      {/* Glow detrás del fuego */}
-      {racha > 0 && (
-        <Animated.View
-          style={[s.fireGlow, { transform: [{ scale: pulseAnim }] }]}
-        />
-      )}
-
-      <Animated.Text
-        style={[
-          s.fireEmoji,
-          racha > 0 && { transform: [{ scale: pulseAnim }] },
-        ]}
-        accessibilityElementsHidden
-        importantForAccessibility="no"
+      <LinearGradient
+        colors={["#FFFFFF", PURPLE_BG]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0.35, y: 1 }}
+        style={s.fireHeroWrap}
       >
-        {racha > 0 ? "🔥" : "💤"}
-      </Animated.Text>
+        <Animated.Text
+          style={[
+            s.fireEmoji,
+            racha > 0 && { transform: [{ scale: pulseAnim }] },
+          ]}
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+        >
+          {racha > 0 ? "🔥" : "💤"}
+        </Animated.Text>
 
-      <AnimatedRachaNum anim={numAnim} />
+        <AnimatedRachaNum anim={numAnim} />
 
-      <Text
-        style={s.fireSubLabel}
-        accessibilityElementsHidden
-        importantForAccessibility="no"
-      >
-        {racha === 1 ? "día seguido" : "días seguidos"}
-      </Text>
+        <Text
+          style={s.fireSubLabel}
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+        >
+          {racha === 1 ? "día seguido" : "días seguidos"}
+        </Text>
 
-      {racha > 0 && (
-        <View style={s.rachaBadge}>
-          <Text style={s.rachaBadgeTxt}>🔥 ¡Sigue así!</Text>
-        </View>
-      )}
+        {racha > 0 && (
+          <View style={s.rachaBadge}>
+            <Text style={s.rachaBadgeTxt}>🔥 ¡Sigue así!</Text>
+          </View>
+        )}
+      </LinearGradient>
     </Animated.View>
   );
 }
@@ -276,26 +274,22 @@ function SemanaRacha({ racha }: { racha: number }) {
             accessibilityElementsHidden
             importantForAccessibility="no"
           >
-            <View
-              style={[
-                s.diaDot,
-                activo && s.diaDotActivo,
-                esHoy && !activo && s.diaDotHoy,
-              ]}
-            >
-              {activo ? (
+            {activo ? (
+              <LinearGradient
+                colors={["#FFC98A", ORANGE]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0.4, y: 1 }}
+                style={[s.diaDot, esHoy && s.diaDotHoy]}
+              >
                 <Text style={s.diaFire}>🔥</Text>
-              ) : (
-                <Text style={[s.diaLetra, esHoy && { color: ORANGE }]}>
-                  {letra}
-                </Text>
-              )}
-            </View>
+              </LinearGradient>
+            ) : (
+              <View style={s.diaDot}>
+                <Text style={s.diaLetra}>{letra}</Text>
+              </View>
+            )}
             <Text
-              style={[
-                s.diaNombreLetra,
-                esHoy && { color: ORANGE, fontWeight: "700" },
-              ]}
+              style={[s.diaNombreLetra, esHoy && s.diaNombreLetraHoy]}
             >
               {esHoy ? "Hoy" : letra}
             </Text>
@@ -470,10 +464,10 @@ function MedalCard({
 const TABS = ["Estrellas", "Racha", "Medallas"];
 
 export default function Progreso() {
-  const [tab, setTab] = useState(0);
+  const router = useRouter();
+  const [tab, setTab] = useState(1);
   const [completadas, setCompletadas] = useState<Tarea[]>([]);
   const gami = useGamificacion();
-  const router = useRouter();
 
   useFocusEffect(
     useCallback(() => {
@@ -513,21 +507,24 @@ export default function Progreso() {
   const nextMedal = (() => {
     if (gami.estrellas < 100)
       return {
-        label: "Bronce 🥉",
+        plainLabel: "Bronce",
+        emoji: "🥉",
         req: 100,
         color: "#CD7F32",
         progreso: progresBronce,
       };
     if (gami.estrellas < 300)
       return {
-        label: "Plata 🥈",
+        plainLabel: "Plata",
+        emoji: "🥈",
         req: 200,
         color: "#9E9E9E",
         progreso: progresPlata,
       };
     if (gami.estrellas < 600)
       return {
-        label: "Oro 🥇",
+        plainLabel: "Oro",
+        emoji: "🥇",
         req: 300,
         color: "#D4A017",
         progreso: progresOro,
@@ -536,28 +533,29 @@ export default function Progreso() {
   })();
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#FBF6F0" }}>
       <View style={s.root}>
-        <Text style={[s.title]} accessibilityRole="header">
-          Progreso
-        </Text>
-
-        <Pressable
-          onPress={() => router.replace("/")}
-          style={s.btnInicio}
-          accessible
-          accessibilityRole="button"
-          accessibilityLabel="Ir a Inicio"
-        >
-          <Ionicons
-            name="home-outline"
-            size={16}
-            color={PURPLE}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-          <Text style={s.btnInicioTxt}>Inicio</Text>
-        </Pressable>
+        <View style={s.headerRow}>
+          <Text style={s.title} accessibilityRole="header">
+            Tu progreso
+          </Text>
+          <Pressable
+            onPress={() => router.push("/normas")}
+            style={s.normasBtn}
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel="Normas del juego"
+            accessibilityHint="Explica cómo se ganan estrellas y medallas"
+          >
+            <Ionicons
+              name="help-circle-outline"
+              size={22}
+              color={Colors.purpleDk}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            />
+          </Pressable>
+        </View>
 
         {/* ── Pestañas ── */}
         <View style={s.tabRow} accessible={false} accessibilityRole="tablist">
@@ -684,26 +682,11 @@ export default function Progreso() {
           >
             <FireHero racha={gami.racha} />
 
-            <Text style={[s.sectionLabel]} accessibilityRole="header">
-              Esta semana
-            </Text>
             <View style={s.semanaCard}>
               <SemanaRacha racha={gami.racha} />
             </View>
 
-            {gami.racha > 0 ? (
-              <View style={s.rachaInfoBox}>
-                <Text style={s.rachaInfoEmoji}>🎯</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={[s.rachaInfoTitle]}>¡Vas muy bien!</Text>
-                  <Text style={s.rachaInfoSub}>
-                    {gami.racha >= 7
-                      ? "¡Una semana completa! Eres increíble 🏆"
-                      : `Completa las tareas de hoy para llegar a ${gami.racha + 1} días`}
-                  </Text>
-                </View>
-              </View>
-            ) : (
+            {gami.racha === 0 && (
               <View
                 style={s.rachaVaciaBox}
                 accessible
@@ -725,6 +708,49 @@ export default function Progreso() {
                 </Text>
               </View>
             )}
+
+            {nextMedal && (
+              <View
+                style={s.teaserBox}
+                accessible
+                accessibilityLabel={`Siguiente medalla: ${nextMedal.plainLabel}. ${nextMedal.progreso} de ${nextMedal.req} estrellas, faltan ${nextMedal.req - nextMedal.progreso}`}
+              >
+                <Text
+                  style={s.teaserEmoji}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no"
+                >
+                  {nextMedal.emoji}
+                </Text>
+                <View style={{ flex: 1 }}>
+                  <View style={s.teaserHeaderRow}>
+                    <Text
+                      style={s.teaserLabel}
+                      accessibilityElementsHidden
+                      importantForAccessibility="no"
+                    >
+                      Siguiente: {nextMedal.plainLabel}
+                    </Text>
+                    <Text
+                      style={s.teaserFraction}
+                      accessibilityElementsHidden
+                      importantForAccessibility="no"
+                    >
+                      {nextMedal.progreso} / {nextMedal.req} ⭐
+                    </Text>
+                  </View>
+                  <View style={{ marginTop: 8 }}>
+                    <BarraProgreso
+                      pct={Math.min(
+                        (nextMedal.progreso / nextMedal.req) * 100,
+                        100,
+                      )}
+                      color={Colors.purple}
+                    />
+                  </View>
+                </View>
+              </View>
+            )}
           </ScrollView>
         )}
 
@@ -740,7 +766,7 @@ export default function Progreso() {
               <View
                 style={[s.nextBox, { borderColor: nextMedal.color }]}
                 accessible
-                accessibilityLabel={`Siguiente medalla: ${nextMedal.label}. ${nextMedal.progreso} de ${nextMedal.req} estrellas, faltan ${nextMedal.req - nextMedal.progreso}`}
+                accessibilityLabel={`Siguiente medalla: ${nextMedal.plainLabel}. ${nextMedal.progreso} de ${nextMedal.req} estrellas, faltan ${nextMedal.req - nextMedal.progreso}`}
               >
                 <Text
                   style={[s.nextLabel, { color: nextMedal.color }]}
@@ -754,7 +780,7 @@ export default function Progreso() {
                   accessibilityElementsHidden
                   importantForAccessibility="no"
                 >
-                  {nextMedal.label}
+                  {nextMedal.plainLabel} {nextMedal.emoji}
                 </Text>
                 <View style={{ width: "100%", marginVertical: 8 }}>
                   <BarraProgreso
@@ -813,52 +839,55 @@ export default function Progreso() {
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#FBF6F0",
     paddingTop: Platform.OS === "ios" ? 20 : 40,
     paddingHorizontal: 18,
   },
-  btnInicio: {
+  headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    backgroundColor: Colors.purple + "18",
-    borderRadius: 20,
-    alignSelf: "flex-start",
-    marginBottom: 20,
-    minHeight: 44,
+    justifyContent: "space-between",
+    marginBottom: 16,
   },
-  btnInicioTxt: { color: Colors.purple, fontWeight: "600", fontSize: 13 },
   title: {
-    fontSize: 30,
-    fontWeight: "800",
-    color: Colors.purple,
-    textAlign: "center",
-    marginBottom: 24,
+    fontSize: fs(26),
+    fontFamily: AppFonts.displayBold,
+    color: "#3A3342",
+  },
+  normasBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: Colors.purpleBg,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   tabRow: {
     flexDirection: "row",
     backgroundColor: PURPLE_BG,
-    borderRadius: 14,
-    padding: 3,
+    borderRadius: 16,
+    padding: 4,
     marginBottom: 20,
   },
   tabBtn: {
     flex: 1,
     paddingVertical: 8,
-    borderRadius: 11,
+    borderRadius: 12,
     alignItems: "center",
     minHeight: 44,
+    justifyContent: "center",
   },
   tabBtnActive: {
     backgroundColor: "#fff",
-    borderWidth: 0.5,
-    borderColor: PURPLE_LT,
+    shadowColor: PURPLE,
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
-  tabLabel: { fontSize: 14, color: "#999" },
-  tabLabelActive: { color: PURPLE, fontWeight: "600" },
+  tabLabel: { fontSize: 13.5, color: "#999", fontFamily: AppFonts.bodyBold },
+  tabLabelActive: { color: Colors.purpleDk },
 
   // Estrellas
   bigStatsRow: { flexDirection: "column", gap: 10, marginBottom: 18 },
@@ -866,26 +895,32 @@ const s = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     backgroundColor: PURPLE_BG,
-    borderRadius: 16,
-    padding: 18,
+    borderRadius: 20,
+    padding: 20,
     alignItems: "center",
+    shadowColor: PURPLE,
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
   bigStatNum: {
-    fontSize: 26,
-    fontWeight: "700",
-    color: PURPLE,
+    fontSize: 32,
+    fontFamily: AppFonts.displayExtraBold,
+    color: Colors.purpleDk,
     lineHeight: 42,
   },
   bigStatLabel: {
     fontSize: 14,
     color: "#888",
+    fontFamily: AppFonts.bodyBold,
     textAlign: "center",
     flexShrink: 1,
   },
   sectionLabel: {
     fontSize: 11,
     color: "#BBB",
-    fontWeight: "700",
+    fontFamily: AppFonts.bodyBold,
     textTransform: "uppercase",
     letterSpacing: 0.8,
     marginBottom: 10,
@@ -895,19 +930,24 @@ const s = StyleSheet.create({
   emptyText: {
     fontSize: 15,
     color: "#AAA",
-    fontWeight: "600",
+    fontFamily: AppFonts.bodyBold,
     textAlign: "center",
   },
   statCard: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: PURPLE_BG,
-    borderRadius: 16,
+    backgroundColor: "#fff",
+    borderRadius: 18,
     padding: 16,
     marginBottom: 10,
     borderWidth: 1,
     borderColor: PURPLE_LT,
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
   statCardLeft: {
     flexDirection: "row",
@@ -918,98 +958,136 @@ const s = StyleSheet.create({
   statCardEmoji: { fontSize: 28 },
   statCardTitle: {
     fontSize: 14,
-    fontWeight: "700",
+    fontFamily: AppFonts.bodyBold,
     color: "#333",
     flexShrink: 1,
   },
-  statCardSub: { fontSize: 12, color: "#AAA", marginTop: 2 },
-  statCardVal: { fontSize: 20, fontWeight: "800", color: PURPLE },
+  statCardSub: {
+    fontSize: 12,
+    color: "#AAA",
+    fontFamily: AppFonts.body,
+    marginTop: 2,
+  },
+  statCardVal: {
+    fontSize: 20,
+    fontFamily: AppFonts.displayBold,
+    color: Colors.purpleDk,
+  },
 
   // Racha Hero
-  fireHeroWrap: { alignItems: "center", paddingVertical: 28, gap: 6 },
-  fireGlow: {
-    position: "absolute",
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    backgroundColor: ORANGE,
-    opacity: 0.1,
-    top: 8,
+  fireHeroWrap: {
+    alignItems: "center",
+    paddingVertical: 34,
+    paddingHorizontal: 20,
+    gap: 6,
+    borderRadius: 28,
+    overflow: "hidden",
+    marginBottom: 20,
+    shadowColor: "#3A3342",
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
-  fireEmoji: { fontSize: 86, lineHeight: 96 },
+  fireEmoji: { fontSize: 56, lineHeight: 64 },
   fireNum: {
-    fontSize: 68,
-    fontWeight: "900",
-    color: ORANGE,
-    lineHeight: 76,
-    letterSpacing: -2,
+    fontSize: 44,
+    fontFamily: AppFonts.displayExtraBold,
+    color: "#3A3342",
+    lineHeight: 50,
   },
-  fireSubLabel: { fontSize: 16, color: "#999", fontWeight: "500" },
+  fireSubLabel: {
+    fontSize: 14,
+    color: "#8A8194",
+    fontFamily: AppFonts.bodyBold,
+  },
   rachaBadge: {
-    marginTop: 8,
-    backgroundColor: ORANGE_BG,
+    marginTop: 10,
+    backgroundColor: ORANGE,
     borderRadius: 20,
     paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: "#FFD0A8",
+    paddingVertical: 7,
   },
-  rachaBadgeTxt: { fontSize: 13, color: ORANGE, fontWeight: "700" },
+  rachaBadgeTxt: {
+    fontSize: 12.5,
+    color: "#fff",
+    fontFamily: AppFonts.bodyBold,
+  },
 
   // Semana racha
   semanaCard: {
-    backgroundColor: ORANGE_BG,
-    borderRadius: 18,
-    paddingVertical: 20,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: "#FFE0CC",
-    marginBottom: 12,
+    backgroundColor: "#fff",
+    borderRadius: 22,
+    paddingVertical: 18,
+    paddingHorizontal: 14,
+    marginBottom: 20,
+    shadowColor: "#3A3342",
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
   },
   semanaWrap: {
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "flex-end",
   },
-  diaCelda: { alignItems: "center", gap: 8 },
+  diaCelda: { alignItems: "center", gap: 6 },
   diaDot: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#EEE",
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    backgroundColor: PURPLE_BG,
     alignItems: "center",
     justifyContent: "center",
   },
-  diaDotActivo: {
-    backgroundColor: ORANGE,
+  diaDotHoy: {
     shadowColor: ORANGE,
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
     elevation: 6,
   },
-  diaDotHoy: {
-    borderWidth: 2.5,
-    borderColor: ORANGE,
-    backgroundColor: ORANGE_LT,
+  diaFire: { fontSize: 17 },
+  diaLetra: { fontSize: 13, fontFamily: AppFonts.bodyBold, color: "#C7C0CE" },
+  diaNombreLetra: {
+    fontSize: 10.5,
+    color: "#C7C0CE",
+    fontFamily: AppFonts.bodyBold,
   },
-  diaFire: { fontSize: 22 },
-  diaLetra: { fontSize: 13, fontWeight: "700", color: "#CCC" },
-  diaNombreLetra: { fontSize: 10, color: "#AAA", fontWeight: "600" },
+  diaNombreLetraHoy: { fontSize: 11, color: ORANGE, fontFamily: AppFonts.displayBold },
 
-  rachaInfoBox: {
+  teaserBox: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    backgroundColor: ORANGE_BG,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#FFD0A8",
-    marginTop: 4,
+    gap: 14,
+    backgroundColor: "#fff",
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: 12,
+    shadowColor: "#3A3342",
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
   },
-  rachaInfoEmoji: { fontSize: 28 },
-  rachaInfoTitle: { fontSize: 14, fontWeight: "700", color: "#333" },
-  rachaInfoSub: { fontSize: 12, color: "#888", marginTop: 2, lineHeight: 18 },
+  teaserEmoji: { fontSize: 34, opacity: 0.35 },
+  teaserHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+  },
+  teaserLabel: {
+    fontSize: 14.5,
+    fontFamily: AppFonts.displayBold,
+    color: "#8A8194",
+  },
+  teaserFraction: {
+    fontSize: 12,
+    color: "#C7C0CE",
+    fontFamily: AppFonts.bodyBold,
+  },
+
   rachaVaciaBox: {
     alignItems: "center",
     paddingVertical: 24,
@@ -1022,6 +1100,7 @@ const s = StyleSheet.create({
   rachaVaciaText: {
     fontSize: 14,
     color: "#AAA",
+    fontFamily: AppFonts.bodyBold,
     textAlign: "center",
     lineHeight: 22,
   },
@@ -1046,7 +1125,7 @@ const s = StyleSheet.create({
   },
   medalEmoji: { fontSize: 44, width: 54, textAlign: "center" },
   medalInfo: { flex: 1 },
-  medalLabel: { fontSize: 18, fontWeight: "800" },
+  medalLabel: { fontSize: 18, fontFamily: AppFonts.displayBold },
   medalBadge: {
     flexShrink: 1,
     alignSelf: "flex-start",
@@ -1056,28 +1135,38 @@ const s = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
   },
-  medalBadgeTxt: { fontSize: 11, fontWeight: "700" },
-  medalPending: { fontSize: 12, color: "#AAA", marginTop: 4 },
-  medalCount: { fontSize: 12, fontWeight: "600", marginTop: 4 },
+  medalBadgeTxt: { fontSize: 11, fontFamily: AppFonts.bodyBold },
+  medalPending: {
+    fontSize: 12,
+    color: "#AAA",
+    fontFamily: AppFonts.body,
+    marginTop: 4,
+  },
+  medalCount: { fontSize: 12, fontFamily: AppFonts.bodyBold, marginTop: 4 },
 
   // Siguiente medalla
   nextBox: {
-    borderRadius: 18,
-    padding: 18,
+    borderRadius: 20,
+    padding: 20,
     marginBottom: 16,
     borderWidth: 2,
     alignItems: "center",
     gap: 4,
     backgroundColor: "#fff",
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
   nextLabel: {
     fontSize: 10,
-    fontWeight: "800",
+    fontFamily: AppFonts.bodyBold,
     letterSpacing: 1.5,
     textTransform: "uppercase",
     opacity: 0.7,
   },
-  nextTitle: { fontSize: 24, fontWeight: "900" },
+  nextTitle: { fontSize: 26, fontFamily: AppFonts.displayExtraBold },
   nextFooter: {
     flexDirection: "row",
     alignItems: "center",
@@ -1085,12 +1174,12 @@ const s = StyleSheet.create({
     width: "100%",
     marginTop: 4,
   },
-  nextDetailBig: { fontSize: 15, fontWeight: "700" },
+  nextDetailBig: { fontSize: 15, fontFamily: AppFonts.bodyBold },
   nextPill: {
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 20,
     borderWidth: 1,
   },
-  nextPillTxt: { fontSize: 12, fontWeight: "700" },
+  nextPillTxt: { fontSize: 12, fontFamily: AppFonts.bodyBold },
 });

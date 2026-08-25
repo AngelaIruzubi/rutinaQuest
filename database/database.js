@@ -78,13 +78,16 @@ export function initDB() {
 // ── USUARIO ────
 
 const USUARIO_DEFAULT = {
-  tonoPiel: 0,
-  cara: 0,
-  ojos: 0,
-  peloCorto: 0,
-  peloLargo: -1,
-  shirt: 0,
-  genero: "hombre",
+  skinColor: "f1c3a5",
+  hair: "sideComed",
+  hairColor: "2c1b18",
+  rearHair: "ninguno",
+  eyebrows: "neutral",
+  eyes: "happy",
+  mouth: "smile",
+  beard: "ninguna",
+  clothes: "tShirt",
+  clothesColor: "0b3286",
   nivel: 1,
   puntos: 0,
 };
@@ -344,11 +347,17 @@ async function getFechasConTareasImpl() {
     if (!fechas[t.fechaDia]) fechas[t.fechaDia] = 0;
     fechas[t.fechaDia]++;
   }
+  // Fechas que solo tienen ocurrencias proyectadas (todavía sin generar de
+  // verdad) — el calendario las pinta con un punto hueco en vez de sólido.
+  const soloProyectadas = [];
   for (const fecha of proyectarOcurrenciasFuturas(todas, hoy)) {
-    if (!fechas[fecha]) fechas[fecha] = 0;
+    if (!fechas[fecha]) {
+      fechas[fecha] = 0;
+      soloProyectadas.push(fecha);
+    }
     fechas[fecha]++;
   }
-  return fechas;
+  return { fechas, soloProyectadas };
 }
 export function getFechasConTareas() {
   return encolar(getFechasConTareasImpl);
