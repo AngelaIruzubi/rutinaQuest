@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { Modal, Pressable, Text, View } from 'react-native';
-import { Colors } from '../../constants/theme';
+import { AppFonts, Colors } from '../../constants/theme';
 import { useAjustesCtx } from '../../context/AjustesContext';
 
 interface Opcion {
@@ -22,10 +22,10 @@ export function ModalConfirm({ visible, titulo, mensaje, opciones, onOpcion }: M
   const fs = (n: number) => Math.round(n * escala);
   return (
     <Modal visible={visible} transparent animationType="fade" accessibilityViewIsModal>
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 32 }}>
-        <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 24, width: '100%', maxWidth: 340 }}>
-          <Text style={{ fontSize: fs(18), fontWeight: '700', color: '#333', marginBottom: 8 }}>{titulo}</Text>
-          <Text style={{ fontSize: fs(15), color: '#666', marginBottom: 24, lineHeight: 22 }}>{mensaje}</Text>
+      <View style={{ flex: 1, backgroundColor: 'rgba(46,32,58,0.45)', justifyContent: 'center', alignItems: 'center', padding: 32 }}>
+        <View style={{ backgroundColor: '#fff', borderRadius: 24, padding: 24, width: '100%', maxWidth: 340 }}>
+          <Text style={{ fontSize: fs(18), fontFamily: AppFonts.displayBold, color: '#3A3140', marginBottom: 8 }}>{titulo}</Text>
+          <Text style={{ fontSize: fs(15), color: '#786F82', fontFamily: AppFonts.body, marginBottom: 24, lineHeight: 22 }}>{mensaje}</Text>
           <View style={{ gap: 10 }}>
             {opciones.map((op, i) => (
               <Pressable
@@ -39,14 +39,15 @@ export function ModalConfirm({ visible, titulo, mensaje, opciones, onOpcion }: M
                   onOpcion(op.valor);
                 }}
                 style={{
-                  paddingVertical: 12, borderRadius: 12, alignItems: 'center',
-                  backgroundColor: op.destructivo ? '#FDE8E8' : op.valor === null ? '#f5f5f5' : Colors.purpleBg,
-                  borderWidth: 1,
-                  borderColor: op.destructivo ? '#E4A0A0' : op.valor === null ? '#ddd' : Colors.purpleLt,
+                  paddingVertical: 13, borderRadius: 14, alignItems: 'center',
+                  backgroundColor: op.destructivo ? '#FDE8E8' : op.valor === null ? '#F5F3F6' : Colors.purpleBg,
+                  borderWidth: 1.5,
+                  borderColor: op.destructivo ? '#F5C6C6' : op.valor === null ? '#E5E0E8' : Colors.purpleLt,
+                  minHeight: 44, justifyContent: 'center',
                 }}
                 accessible accessibilityRole="button" accessibilityLabel={op.texto}
               >
-                <Text style={{ fontWeight: '700', fontSize: fs(15), color: op.destructivo ? Colors.red : op.valor === null ? '#888' : Colors.purple }}>
+                <Text style={{ fontFamily: AppFonts.bodyBold, fontSize: fs(15), color: op.destructivo ? Colors.red : op.valor === null ? '#8A8092' : Colors.purpleDk }}>
                   {op.texto}
                 </Text>
               </Pressable>

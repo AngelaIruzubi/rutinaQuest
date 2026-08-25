@@ -65,7 +65,7 @@ import {
 import { detectarMedalla } from "../../../utils/gamificacion";
 
 if (__DEV__) {
-  setFechaSimulada("2027-08-20");
+  setFechaSimulada("2027-08-21");
   setHoraSimulada(12, 0);
 }
 const SONIDOS: Record<string, any> = {

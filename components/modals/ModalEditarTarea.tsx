@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
 import {
@@ -14,7 +15,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Colors } from '../../constants/theme';
+import { AppFonts, Colors } from '../../constants/theme';
 import { useAjustesCtx } from '../../context/AjustesContext';
 import { buscarPictogramas } from '../../services/arasaac';
 import { Tarea } from '../../types/tarea';
@@ -76,21 +77,27 @@ export function ModalEditarTarea({ visible, tarea, onCerrar, onGuardar }: ModalE
     >
       <View style={s.overlay} accessible={false}>
         <View style={s.modalBox} accessible={false} importantForAccessibility="yes">
-          <ScrollView keyboardShouldPersistTaps="handled" accessible={false}>
+          <LinearGradient
+            colors={['#C9A9DB', Colors.purple]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={s.header}
+          >
+            <Text style={[s.headerTitle, { fontSize: fs(19) }]} accessibilityRole="header">
+              Editar tarea
+            </Text>
+            <Pressable
+              onPress={onCerrar}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel="Cerrar edición"
+              style={s.closeBtn}
+            >
+              <Ionicons name="close" size={20} color="#fff" accessibilityElementsHidden importantForAccessibility="no" />
+            </Pressable>
+          </LinearGradient>
 
-            {/* Cabecera */}
-            <View style={s.topBar} accessible={false}>
-              <Pressable
-                onPress={onCerrar}
-                accessible
-                accessibilityRole="button"
-                accessibilityLabel="Cerrar edición"
-                style={{ padding: 8 }}
-              >
-                <Ionicons name="close" size={26} color={Colors.purple} accessibilityElementsHidden importantForAccessibility="no" />
-              </Pressable>
-              <Text style={[s.topTitle, { fontSize: fs(20) }]} accessibilityRole="header">Editar tarea</Text>
-            </View>
+          <ScrollView keyboardShouldPersistTaps="handled" accessible={false} contentContainerStyle={s.body}>
 
             {/* Título */}
             <View style={s.inputRow} accessible={false}>
@@ -103,7 +110,7 @@ export function ModalEditarTarea({ visible, tarea, onCerrar, onGuardar }: ModalE
                     setEditPictogramas(ids);
                   }
                 }}
-                style={{ flex: 1, paddingVertical: 10, fontSize: fs(16) }}
+                style={{ flex: 1, paddingVertical: 12, fontSize: fs(16), fontFamily: AppFonts.body, color: '#3A3140' }}
                 accessibilityLabel="Título de la tarea"
                 returnKeyType="done"
                 clearButtonMode="while-editing"
@@ -113,7 +120,7 @@ export function ModalEditarTarea({ visible, tarea, onCerrar, onGuardar }: ModalE
 
             {/* Selector de pictogramas */}
             {editPictogramas.length > 0 && (
-              <View style={{ marginTop: 16 }} accessible={false}>
+              <View style={{ marginTop: 18 }} accessible={false}>
                 <Text style={s.pictoLabel} accessibilityRole="header">Elige un pictograma</Text>
                 <ScrollView
                   horizontal
@@ -146,7 +153,7 @@ export function ModalEditarTarea({ visible, tarea, onCerrar, onGuardar }: ModalE
                     accessibilityLabel={`Sin pictograma${editPictogramId === null ? ', seleccionado' : ''}`}
                     accessibilityState={{ selected: editPictogramId === null }}
                   >
-                    <Ionicons name="close" size={24} color={editPictogramId === null ? Colors.purple : '#CCC'} accessibilityElementsHidden importantForAccessibility="no" />
+                    <Ionicons name="close" size={22} color={editPictogramId === null ? Colors.purple : '#CCC'} accessibilityElementsHidden importantForAccessibility="no" />
                     <Text style={[s.pictoNingunoTxt, editPictogramId === null && { color: Colors.purple }]} accessibilityElementsHidden importantForAccessibility="no">
                       Ninguno
                     </Text>
@@ -156,13 +163,13 @@ export function ModalEditarTarea({ visible, tarea, onCerrar, onGuardar }: ModalE
             )}
 
             {/* Hora */}
-            <Text style={[s.pictoLabel, { marginTop: 16 }]}>Hora (opcional)</Text>
+            <Text style={[s.pictoLabel, { marginTop: 18 }]}>Hora (opcional)</Text>
             {Platform.OS === 'web' ? (
               <input
                 type="time"
                 value={editHora ?? ''}
                 onChange={e => setEditHora(e.target.value || null)}
-                style={{ padding: 10, fontSize: 15, borderRadius: 10, marginBottom: 8 }}
+                style={{ padding: 10, fontSize: 16, borderRadius: 10, marginBottom: 8 }}
               />
             ) : (
               <>
@@ -173,9 +180,9 @@ export function ModalEditarTarea({ visible, tarea, onCerrar, onGuardar }: ModalE
                   accessibilityRole="button"
                   accessibilityLabel={editHora ? `Hora: ${editHora}. Pulsa para cambiar` : 'Seleccionar hora, opcional'}
                 >
-                  <Ionicons name="time-outline" size={18} color={Colors.purple} style={{ marginRight: 8 }} accessibilityElementsHidden importantForAccessibility="no" />
+                  <Ionicons name="time-outline" size={18} color={Colors.purpleDk} style={{ marginRight: 4 }} accessibilityElementsHidden importantForAccessibility="no" />
                   <Text
-                    style={[s.inputRow, { color: editHora ? '#333' : '#AAA', flex: 1, borderWidth: 0, paddingVertical: 12 }]}
+                    style={{ color: editHora ? '#3A3140' : '#B9AFC4', flex: 1, paddingVertical: 12, fontSize: fs(15), fontFamily: editHora ? AppFonts.bodyBold : AppFonts.body }}
                     accessibilityElementsHidden importantForAccessibility="no"
                   >
                     {editHora ?? 'Sin hora seleccionada'}
@@ -216,7 +223,7 @@ export function ModalEditarTarea({ visible, tarea, onCerrar, onGuardar }: ModalE
                         accessibilityRole="button"
                         accessibilityLabel="Confirmar hora"
                       >
-                        <Text style={{ color: Colors.purple, fontWeight: '700', fontSize: 15 }}>Listo</Text>
+                        <Text style={{ color: Colors.purple, fontFamily: AppFonts.bodyBold, fontSize: 15 }}>Listo</Text>
                       </Pressable>
                     )}
                   </View>
@@ -227,14 +234,23 @@ export function ModalEditarTarea({ visible, tarea, onCerrar, onGuardar }: ModalE
             {/* Botón guardar */}
             <Pressable
               onPress={guardar}
-              style={[s.btnPrimary, !editTitulo.trim() && { opacity: 0.4 }]}
+              disabled={!editTitulo.trim()}
               accessible
               accessibilityRole="button"
               accessibilityLabel={editTitulo.trim() ? `Guardar cambios en ${editTitulo}` : 'Escribe un título primero'}
+              style={({ pressed }) => [{ opacity: !editTitulo.trim() ? 0.4 : pressed ? 0.9 : 1 }]}
             >
-              <Text style={[s.btnPrimaryText, { fontSize: fs(20) }]} accessibilityElementsHidden importantForAccessibility="no">
-                Guardar cambios ✓
-              </Text>
+              <LinearGradient
+                colors={['#C9A9DB', Colors.purple]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={s.btnPrimary}
+              >
+                <Ionicons name="checkmark-circle" size={20} color="#fff" accessibilityElementsHidden importantForAccessibility="no" />
+                <Text style={[s.btnPrimaryText, { fontSize: fs(18) }]} accessibilityElementsHidden importantForAccessibility="no">
+                  Guardar cambios
+                </Text>
+              </LinearGradient>
             </Pressable>
 
           </ScrollView>
@@ -247,17 +263,78 @@ export function ModalEditarTarea({ visible, tarea, onCerrar, onGuardar }: ModalE
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  overlay:         { flex: 1, backgroundColor: 'rgba(0,0,0,0.28)', justifyContent: 'center', alignItems: 'center' },
-  modalBox:        { backgroundColor: Colors.purpleBg, borderRadius: 22, padding: 20, width: '90%', maxHeight: '90%' },
-  topBar:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
-  topTitle:        { fontSize: 20, fontWeight: '600', color: Colors.purple, flex: 1, textAlign: 'center', marginHorizontal: 8 },
-  inputRow:        { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#DDD', borderRadius: 12, paddingHorizontal: 12, backgroundColor: 'white', minHeight: 44 },
-  pictoLabel:      { fontSize: 12, fontWeight: '700', color: '#999', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10 },
-  pictoOpcion:     { width: 80, height: 80, borderRadius: 14, borderWidth: 2, borderColor: '#E5E5E5', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', padding: 4 },
-  pictoOpcionSelec:{ borderColor: Colors.purple, borderWidth: 3, backgroundColor: Colors.purpleBg },
-  pictoImg:        { width: 68, height: 68, borderRadius: 10 },
+  overlay:    { flex: 1, backgroundColor: 'rgba(46,32,58,0.4)', justifyContent: 'center', alignItems: 'center' },
+  modalBox:   { backgroundColor: '#fff', borderRadius: 28, width: '90%', maxHeight: '90%', overflow: 'hidden' },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+  },
+  headerTitle: { fontFamily: AppFonts.displayBold, color: '#fff' },
+  closeBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  body: { padding: 20, paddingTop: 18 },
+
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: Colors.purpleLt,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    backgroundColor: '#FBF9FC',
+    minHeight: 48,
+  },
+
+  pictoLabel: {
+    fontSize: 12,
+    fontFamily: AppFonts.bodyBold,
+    color: Colors.purpleDk,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 10,
+  },
+  pictoOpcion: {
+    width: 78,
+    height: 78,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#EDEAF1',
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 4,
+  },
+  pictoOpcionSelec: {
+    borderColor: Colors.purple,
+    borderWidth: 3,
+    backgroundColor: Colors.purpleBg,
+    shadowColor: Colors.purple,
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  pictoImg:        { width: 64, height: 64, borderRadius: 10 },
   pictoNinguno:    { gap: 2 },
-  pictoNingunoTxt: { fontSize: 10, color: '#CCC', fontWeight: '600' },
-  btnPrimary:      { backgroundColor: Colors.purpleLt, padding: 15, borderRadius: 15, alignItems: 'center', marginTop: 16, minHeight: 44 },
-  btnPrimaryText:  { fontSize: 20, color: Colors.purple, fontWeight: '600' },
+  pictoNingunoTxt: { fontSize: 10, color: '#CCC', fontFamily: AppFonts.bodyBold },
+
+  btnPrimary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    borderRadius: 18,
+    marginTop: 6,
+    minHeight: 44,
+  },
+  btnPrimaryText: { color: '#fff', fontFamily: AppFonts.displayBold },
 });

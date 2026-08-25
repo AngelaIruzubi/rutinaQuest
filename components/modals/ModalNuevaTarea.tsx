@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
 import {
@@ -14,7 +15,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Colors } from '../../constants/theme';
+import { AppFonts, Colors } from '../../constants/theme';
 import { useAjustesCtx } from '../../context/AjustesContext';
 import { buscarPictogramas } from '../../services/arasaac';
 import { Tarea } from '../../types/tarea';
@@ -107,29 +108,36 @@ const buscarPictogramasDebounced = async (texto: string) => {
     >
       <View style={s.overlay}>
         <View style={s.modalBox}>
-          <ScrollView keyboardShouldPersistTaps="handled">
+          <LinearGradient
+            colors={['#C9A9DB', Colors.purple]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={s.header}
+          >
+            <Text style={[s.headerTitle, { fontSize: fs(19) }]} accessibilityRole="header">
+              Nueva tarea
+            </Text>
+            <Pressable
+              onPress={cerrar}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel="Cerrar"
+              style={s.closeBtn}
+            >
+              <Ionicons name="close" size={20} color="#fff" />
+            </Pressable>
+          </LinearGradient>
 
-            {/* Cabecera */}
-            <View style={s.topBar}>
-              <Pressable
-                onPress={cerrar}
-                accessible
-                accessibilityRole="button"
-                accessibilityLabel="Cerrar"
-                style={{ padding: 8 }}
-              >
-                <Ionicons name="close" size={26} color={Colors.purple} />
-              </Pressable>
-              <Text style={[s.topTitle, { fontSize: fs(20) }]} accessibilityRole="header">Nueva tarea</Text>
-            </View>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.body}>
 
             {/* Título */}
             <View style={s.inputRow}>
               <TextInput
                 placeholder="Escribe tu tarea..."
+                placeholderTextColor="#B9AFC4"
                 value={titulo}
                 onChangeText={buscarImagen}
-                style={{ flex: 1, paddingVertical: 10, fontSize: fs(16) }}
+                style={{ flex: 1, paddingVertical: 12, fontSize: fs(16), fontFamily: AppFonts.body, color: '#3A3140' }}
                 accessibilityLabel="Título de la tarea"
                 accessibilityHint="Escribe el nombre de la tarea. Se buscarán pictogramas automáticamente"
                 returnKeyType="done"
@@ -143,20 +151,24 @@ const buscarPictogramasDebounced = async (texto: string) => {
                 accessibilityRole="button"
                 accessibilityLabel="Seleccionar hora"
                 accessibilityHint="Abre el selector de hora para esta tarea"
-                style={{ padding: 8 }}
+                style={s.iconBtn}
               >
-                <Ionicons name="calendar-outline" size={22} color={Colors.purple} />
+                <Ionicons name="alarm-outline" size={20} color={Colors.purpleDk} />
               </Pressable>
             </View>
 
             {/* Hora seleccionada */}
-            <Text
-              style={s.timeText}
+            <View
+              style={[s.timePill, selectedTime && s.timePillActivo]}
+              accessible
               accessibilityLiveRegion="polite"
               accessibilityLabel={selectedTime ? `Hora seleccionada: ${selectedTime}` : 'Sin hora seleccionada'}
             >
-              {selectedTime ? `Hora: ${selectedTime}` : 'Sin hora seleccionada'}
-            </Text>
+              <Ionicons name="time-outline" size={14} color={selectedTime ? Colors.purpleDk : '#A9A0B3'} accessibilityElementsHidden importantForAccessibility="no" />
+              <Text style={[s.timeText, selectedTime && { color: Colors.purpleDk, fontFamily: AppFonts.bodyBold }]} accessibilityElementsHidden importantForAccessibility="no">
+                {selectedTime ? `Hora: ${selectedTime}` : 'Sin hora seleccionada'}
+              </Text>
+            </View>
 
             {/* Selector de hora nativo */}
             {showPicker && Platform.OS !== 'web' && (
@@ -176,7 +188,7 @@ const buscarPictogramasDebounced = async (texto: string) => {
                     accessibilityRole="button"
                     accessibilityLabel="Confirmar hora"
                   >
-                    <Text style={{ color: Colors.purple, fontWeight: '700', fontSize: 15 }}>Listo</Text>
+                    <Text style={{ color: Colors.purple, fontFamily: AppFonts.bodyBold, fontSize: 15 }}>Listo</Text>
                   </Pressable>
                 )}
               </View>
@@ -193,8 +205,8 @@ const buscarPictogramasDebounced = async (texto: string) => {
 
             {/* Selector de pictogramas */}
             {pictogramas.length > 0 && (
-              <View style={{ marginTop: 16 }}>
-                <Text style={s.pictoLabel}>Elige un pictograma:</Text>
+              <View style={{ marginTop: 18 }}>
+                <Text style={s.pictoLabel}>Elige un pictograma</Text>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -225,7 +237,7 @@ const buscarPictogramasDebounced = async (texto: string) => {
                     accessibilityLabel="Sin pictograma"
                     accessibilityState={{ selected: pictogramId === null }}
                   >
-                    <Ionicons name="close" size={24} color={pictogramId === null ? Colors.purple : '#CCC'} />
+                    <Ionicons name="close" size={22} color={pictogramId === null ? Colors.purple : '#CCC'} />
                     <Text style={[s.pictoNingunoTxt, pictogramId === null && { color: Colors.purple }]}>
                       Ninguno
                     </Text>
@@ -237,13 +249,21 @@ const buscarPictogramasDebounced = async (texto: string) => {
             {/* Botón guardar */}
             <Pressable
               onPress={guardar}
-              style={s.btnPrimary}
               accessible
               accessibilityRole="button"
               accessibilityLabel="Añadir tarea"
               accessibilityHint={titulo.trim() ? `Guardará la tarea ${titulo}` : 'Escribe un título primero'}
+              style={({ pressed }) => [{ opacity: pressed ? 0.9 : 1 }]}
             >
-              <Text style={[s.btnPrimaryText, { fontSize: fs(20) }]}>Añadir ✓</Text>
+              <LinearGradient
+                colors={['#C9A9DB', Colors.purple]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={s.btnPrimary}
+              >
+                <Ionicons name="checkmark-circle" size={20} color="#fff" accessibilityElementsHidden importantForAccessibility="no" />
+                <Text style={[s.btnPrimaryText, { fontSize: fs(18) }]}>Añadir tarea</Text>
+              </LinearGradient>
             </Pressable>
 
           </ScrollView>
@@ -256,18 +276,101 @@ const buscarPictogramasDebounced = async (texto: string) => {
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  overlay:         { flex: 1, backgroundColor: 'rgba(0,0,0,0.28)', justifyContent: 'center', alignItems: 'center' },
-  modalBox:        { backgroundColor: Colors.purpleBg, borderRadius: 22, padding: 20, width: '90%', maxHeight: '90%' },
-  topBar:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
-  topTitle:        { fontSize: 20, fontWeight: '600', color: Colors.purple, flex: 1, textAlign: 'center', marginHorizontal: 8 },
-  inputRow:        { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#DDD', borderRadius: 12, paddingHorizontal: 12, backgroundColor: 'white', minHeight: 44 },
-  timeText:        { marginTop: 8, textAlign: 'center', color: '#888', fontSize: 13 },
-  pictoLabel:      { fontSize: 12, fontWeight: '700', color: '#999', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10 },
-  pictoOpcion:     { width: 80, height: 80, borderRadius: 14, borderWidth: 2, borderColor: '#E5E5E5', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', padding: 4 },
-  pictoOpcionSelec:{ borderColor: Colors.purple, borderWidth: 3, backgroundColor: Colors.purpleBg },
-  pictoImg:        { width: 68, height: 68, borderRadius: 10 },
+  overlay:    { flex: 1, backgroundColor: 'rgba(46,32,58,0.4)', justifyContent: 'center', alignItems: 'center' },
+  modalBox:   { backgroundColor: '#fff', borderRadius: 28, width: '90%', maxHeight: '90%', overflow: 'hidden' },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+  },
+  headerTitle: { fontFamily: AppFonts.displayBold, color: '#fff' },
+  closeBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  body: { padding: 20, paddingTop: 18 },
+
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1.5,
+    borderColor: Colors.purpleLt,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingRight: 8,
+    backgroundColor: '#FBF9FC',
+    minHeight: 48,
+  },
+  iconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: Colors.purpleBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    alignSelf: 'center',
+    marginTop: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+  },
+  timePillActivo: { backgroundColor: Colors.purpleBg },
+  timeText:   { color: '#A9A0B3', fontSize: 13, fontFamily: AppFonts.body },
+
+  pictoLabel: {
+    fontSize: 12,
+    fontFamily: AppFonts.bodyBold,
+    color: Colors.purpleDk,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 10,
+  },
+  pictoOpcion: {
+    width: 78,
+    height: 78,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#EDEAF1',
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 4,
+  },
+  pictoOpcionSelec: {
+    borderColor: Colors.purple,
+    borderWidth: 3,
+    backgroundColor: Colors.purpleBg,
+    shadowColor: Colors.purple,
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  pictoImg:        { width: 64, height: 64, borderRadius: 10 },
   pictoNinguno:    { gap: 2 },
-  pictoNingunoTxt: { fontSize: 10, color: '#CCC', fontWeight: '600' },
-  btnPrimary:      { backgroundColor: Colors.purpleLt, padding: 15, borderRadius: 15, alignItems: 'center', marginTop: 16, minHeight: 44 },
-  btnPrimaryText:  { fontSize: 20, color: Colors.purple, fontWeight: '600' },
+  pictoNingunoTxt: { fontSize: 10, color: '#CCC', fontFamily: AppFonts.bodyBold },
+
+  btnPrimary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    borderRadius: 18,
+    marginTop: 22,
+    minHeight: 44,
+  },
+  btnPrimaryText: { color: '#fff', fontFamily: AppFonts.displayBold },
 });
