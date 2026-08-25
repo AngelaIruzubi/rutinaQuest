@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Haptics from "expo-haptics";
-import { router, useFocusEffect } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   AccessibilityInfo,
@@ -16,24 +16,25 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { DIAS_SEMANA, MESES } from "../../constants/diasSemana";
-import { Colors } from "../../constants/theme";
-import { useAjustesCtx } from "../../context/AjustesContext";
-import { useDBReady } from "../../context/Dbreadycontext";
+import { DIAS_SEMANA, MESES } from "../../../constants/diasSemana";
+import { AppFonts, Colors } from "../../../constants/theme";
+import { useAjustesCtx } from "../../../context/AjustesContext";
+import { useDBReady } from "../../../context/Dbreadycontext";
 import {
   deleteTarea,
   getFechasConTareas,
   getTareasPorFecha,
   insertTarea,
   updateTareaNotifId,
-} from "../../database/database";
-import { buscarPictogramas } from "../../services/arasaac";
-import { ahoraApp, ahoraAppMs, hoyAppStr } from "../../utils/fecha";
+} from "../../../database/database";
+import { useConfirm } from "../../../hooks/useConfirm";
+import { buscarPictogramas } from "../../../services/arasaac";
+import { ahoraApp, ahoraAppMs, hoyAppStr } from "../../../utils/fecha";
 import {
   cancelarNotifTarea,
   programarNotif5MinAntes,
-} from "../../utils/notificacionesTarea";
-import { fechaLegible } from "../../utils/fechaFormato";
+} from "../../../utils/notificacionesTarea";
+import { fechaLegible } from "../../../utils/fechaFormato";
 
 const PURPLE = Colors.purple;
 const PURPLE_LT = Colors.purpleLt;
@@ -52,12 +53,14 @@ function CalendarioMes({
   anyo,
   mes,
   fechasConTareas,
+  fechasProyectadas,
   fechaSeleccionada,
   onSelectFecha,
 }: {
   anyo: number;
   mes: number;
   fechasConTareas: Record<string, number>;
+  fechasProyectadas: Set<string>;
   fechaSeleccionada: string | null;
   onSelectFecha: (f: string) => void;
 }) {
@@ -114,6 +117,7 @@ function CalendarioMes({
             const esPasado = fecha < hoy;
             const selec = fecha === fechaSeleccionada;
             const tieneTareas = !!fechasConTareas[fecha];
+            const esSoloProyectada = fechasProyectadas.has(fecha);
             const diaSemana = DIAS_SEMANA[idx % 7];
 
             let a11yLabel = `${dia} de ${MESES[mes]}, ${diaSemana}`;
@@ -128,7 +132,7 @@ function CalendarioMes({
                 style={[
                   s.celda,
                   esHoy && s.celdaHoy,
-                  selec && s.celdaSelec,
+                  selec && !esHoy && s.celdaSelec,
                   esPasado && !esHoy && s.celdaPasado,
                 ]}
                 onPress={() => onSelectFecha(fecha)}
@@ -141,19 +145,26 @@ function CalendarioMes({
                   style={[
                     s.celdaTxt,
                     esHoy && s.celdaHoyTxt,
-                    selec && s.celdaSelecTxt,
+                    selec && !esHoy && s.celdaSelecTxt,
                     esPasado && !esHoy && { color: "#CCC" },
                   ]}
                 >
                   {dia}
                 </Text>
-                {tieneTareas && (
-                  <View
-                    style={[s.punto, selec && { backgroundColor: "#fff" }]}
-                    accessibilityElementsHidden
-                    importantForAccessibility="no"
-                  />
-                )}
+                {tieneTareas &&
+                  (esSoloProyectada ? (
+                    <View
+                      style={[s.puntoHueco, esHoy && s.puntoHuecoHoy]}
+                      accessibilityElementsHidden
+                      importantForAccessibility="no"
+                    />
+                  ) : (
+                    <View
+                      style={[s.punto, esHoy && { backgroundColor: "#fff" }]}
+                      accessibilityElementsHidden
+                      importantForAccessibility="no"
+                    />
+                  ))}
               </Pressable>
             );
           })}
@@ -632,6 +643,7 @@ function ModalNuevaTarea({
 
 export default function Calendario() {
   const { escala, colores } = useAjustesCtx();
+  const { mostrarConfirm, confirmModal } = useConfirm();
   const ahora = ahoraApp();
   const [anyo, setAnyo] = useState(ahora.getFullYear());
   const [mes, setMes] = useState(ahora.getMonth());
@@ -642,6 +654,9 @@ export default function Calendario() {
   const [fechasConTareas, setFechasConTareas] = useState<
     Record<string, number>
   >({});
+  const [fechasProyectadas, setFechasProyectadas] = useState<Set<string>>(
+    new Set(),
+  );
   const [modalVisible, setModalVisible] = useState(false);
 
   const hoy = hoyAppStr();
@@ -649,13 +664,22 @@ export default function Calendario() {
   const esPendiente = (t: any) =>
     t.estado === "pendiente" || (!t.estado && t.completed !== 1);
 
+  const actualizarFechasConTareas = async () => {
+    const { fechas, soloProyectadas } = (await getFechasConTareas()) as any;
+    setFechasConTareas(fechas);
+    setFechasProyectadas(new Set(soloProyectadas));
+  };
+
   useFocusEffect(
     useCallback(() => {
       if (!dbReady) return;
       let cancelado = false;
       (async () => {
-        const fechas = await getFechasConTareas();
-        if (!cancelado) setFechasConTareas(fechas as any);
+        const { fechas, soloProyectadas } = (await getFechasConTareas()) as any;
+        if (!cancelado) {
+          setFechasConTareas(fechas);
+          setFechasProyectadas(new Set(soloProyectadas));
+        }
         if (fechaSelec) {
           const rows = ((await getTareasPorFecha(fechaSelec)) as any[]).filter(
             esPendiente,
@@ -709,15 +733,27 @@ export default function Calendario() {
       esPendiente,
     );
     setTareasDia(pendientes);
-    setFechasConTareas((await getFechasConTareas()) as any);
+    await actualizarFechasConTareas();
   };
 
   const eliminar = async (id: string, titulo: string) => {
+    const confirmado = await mostrarConfirm(
+      "Eliminar tarea",
+      `¿Seguro que quieres eliminar "${titulo}"?`,
+      [
+        { texto: "Cancelar", valor: false },
+        { texto: "Eliminar", valor: true, destructivo: true },
+      ],
+    );
+    if (!confirmado) return;
+    if (Platform.OS !== "web")
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+
     const tarea = tareasDia.find((t) => t.id === id);
     await cancelarNotifTarea(tarea?.notifId);
     await deleteTarea(id);
     setTareasDia((prev) => prev.filter((t) => t.id !== id));
-    setFechasConTareas((await getFechasConTareas()) as any);
+    await actualizarFechasConTareas();
     AccessibilityInfo.announceForAccessibility(`Tarea ${titulo} eliminada`);
   };
 
@@ -735,23 +771,6 @@ export default function Calendario() {
           Calendario
         </Text>
 
-        <Pressable
-          onPress={() => router.replace("/")}
-          style={s.btnInicio}
-          accessible
-          accessibilityRole="button"
-          accessibilityLabel="Ir a Inicio"
-        >
-          <Ionicons
-            name="home-outline"
-            size={16}
-            color={PURPLE}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-          <Text style={s.btnInicioTxt}>Inicio</Text>
-        </Pressable>
-
         {/* ── Cabecera mes ── */}
         <View style={s.mesHeader}>
           <Pressable
@@ -761,7 +780,7 @@ export default function Calendario() {
             accessibilityRole="button"
             accessibilityLabel="Mes anterior"
           >
-            <Ionicons name="chevron-back" size={22} color={PURPLE} />
+            <Ionicons name="chevron-back" size={20} color={PURPLE} />
           </Pressable>
           <Text
             style={s.mesTitulo}
@@ -778,7 +797,7 @@ export default function Calendario() {
             accessibilityRole="button"
             accessibilityLabel="Mes siguiente"
           >
-            <Ionicons name="chevron-forward" size={22} color={PURPLE} />
+            <Ionicons name="chevron-forward" size={20} color={PURPLE} />
           </Pressable>
         </View>
 
@@ -786,6 +805,7 @@ export default function Calendario() {
         <CalendarioMes
           anyo={anyo}
           mes={mes}
+          fechasProyectadas={fechasProyectadas}
           fechasConTareas={fechasConTareas}
           fechaSeleccionada={fechaSelec}
           onSelectFecha={seleccionarFecha}
@@ -943,6 +963,7 @@ export default function Calendario() {
         onClose={() => setModalVisible(false)}
         onGuardar={onGuardar}
       />
+      {confirmModal}
     </View>
   );
 }
@@ -950,148 +971,188 @@ export default function Calendario() {
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#FBF6F0",
     paddingTop: Platform.OS === "ios" ? 20 : 16,
-    paddingHorizontal: 14,
-  },
-  btnInicio: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
     paddingHorizontal: 18,
-    paddingVertical: 7,
-    backgroundColor: Colors.purple + "18",
-    borderRadius: 20,
-    alignSelf: "flex-start",
-    marginBottom: 20,
-    minHeight: 44,
   },
-  btnInicioTxt: { color: Colors.purple, fontWeight: "600", fontSize: 15 },
   headerTitle: {
-    fontSize: 30,
-    fontWeight: "800",
-    color: Colors.purple,
-    textAlign: "center",
-    marginBottom: 24,
+    fontSize: 26,
+    fontFamily: AppFonts.displayBold,
+    color: "#3A3342",
+    marginBottom: 18,
   },
 
   // Cabecera mes
   mesHeader: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 20,
-    marginTop: 16,
-    marginBottom: 16,
+    justifyContent: "space-between",
+    marginTop: 8,
+    marginBottom: 12,
   },
   mesBtn: {
-    minWidth: 49,
-    height: 49,
+    width: 38,
+    height: 38,
     minHeight: 44,
+    minWidth: 44,
+    borderRadius: 12,
+    backgroundColor: "#fff",
+    borderWidth: 1.5,
+    borderColor: "#ECE4F0",
     alignItems: "center",
     justifyContent: "center",
   },
-  mesTitulo: { fontSize: 29, fontWeight: "700", color: Colors.purple },
+  mesTitulo: {
+    fontSize: 19,
+    fontFamily: AppFonts.displayBold,
+    color: Colors.purpleDk,
+  },
 
   // Calendario
-  semanaCab: { flexDirection: "row", marginBottom: 6 },
+  semanaCab: { flexDirection: "row", marginBottom: 8 },
   semanaCabTxt: {
     flex: 1,
     textAlign: "center",
     fontSize: 11,
-    fontWeight: "700",
-    color: "#BBB",
+    fontFamily: AppFonts.bodyBold,
+    color: "#C7C0CE",
+    letterSpacing: 0.4,
   },
-  semanaFila: { flexDirection: "row", marginBottom: 2 },
+  semanaFila: { flexDirection: "row", marginBottom: 4, gap: 2 },
   celda: {
     flex: 1,
     alignItems: "center",
     paddingVertical: 4,
-    borderRadius: 10,
-    minHeight: 36,
+    borderRadius: 14,
+    minHeight: 38,
     justifyContent: "center",
+    gap: 3,
   },
-  celdaTxt: { fontSize: 14, color: "#333", fontWeight: "500" },
-  celdaHoy: { backgroundColor: Colors.purple },
-  celdaHoyTxt: { color: "#fff", fontWeight: "700" },
+  celdaTxt: {
+    fontSize: 14.5,
+    color: "#3A3342",
+    fontFamily: AppFonts.bodyBold,
+  },
+  celdaHoy: {
+    backgroundColor: Colors.purple,
+    shadowColor: Colors.purple,
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  celdaHoyTxt: { color: "#fff" },
   celdaSelec: {
     backgroundColor: Colors.purpleLt,
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: Colors.purple,
   },
-  celdaSelecTxt: { color: Colors.purple, fontWeight: "700" },
+  celdaSelecTxt: { color: Colors.purpleDk },
   celdaPasado: {},
   punto: {
     width: 5,
     height: 5,
     borderRadius: 3,
     backgroundColor: Colors.purple,
-    marginTop: 2,
   },
+  puntoHueco: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    borderWidth: 1,
+    borderColor: Colors.purple,
+    backgroundColor: "transparent",
+  },
+  puntoHuecoHoy: { borderColor: "#fff" },
 
   // Panel día
   diaPanel: {
     minHeight: 200,
-    marginTop: 16,
-    backgroundColor: Colors.purpleBg,
-    borderRadius: 20,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: Colors.purpleLt,
+    marginTop: 18,
+    backgroundColor: "#fff",
+    borderRadius: 24,
+    padding: 20,
+    shadowColor: "#3A3342",
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: -4 },
+    elevation: 3,
   },
   diaPanelHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 14,
   },
-  diaPanelFecha: { fontSize: 15, fontWeight: "700", color: PURPLE },
+  diaPanelFecha: {
+    fontSize: 17,
+    fontFamily: AppFonts.displayBold,
+    color: "#3A3342",
+  },
   hoyBadge: {
     backgroundColor: GREEN + "22",
     borderRadius: 10,
     paddingHorizontal: 8,
     paddingVertical: 2,
     alignSelf: "flex-start",
-    marginTop: 3,
+    marginTop: 4,
   },
-  hoyBadgeTxt: { fontSize: 11, fontWeight: "700", color: GREEN },
+  hoyBadgeTxt: { fontSize: 11, fontFamily: AppFonts.bodyBold, color: GREEN },
   btnAdd: {
     backgroundColor: PURPLE,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: PURPLE,
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
   },
 
   emptyDia: { alignItems: "center", paddingVertical: 28, gap: 8 },
-  emptyDiaTxt: { fontSize: 13, color: "#BBB", textAlign: "center" },
+  emptyDiaTxt: {
+    fontSize: 13,
+    fontFamily: AppFonts.body,
+    color: "#BBB",
+    textAlign: "center",
+  },
 
   tareaFila: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    paddingVertical: 12,
+    backgroundColor: "#F4F0F6",
+    borderRadius: 16,
+    paddingVertical: 13,
     paddingHorizontal: 14,
     marginBottom: 8,
-    borderWidth: 1,
-    borderColor: PURPLE_LT,
     minHeight: 52,
     gap: 10,
   },
   tareaFilaVirtual: {
     backgroundColor: "#FAFAFA",
+    borderWidth: 1.5,
     borderStyle: "dashed",
     borderColor: "#DDD",
   },
   tareaIconWrap: { width: 20, alignItems: "center" },
-  tareaTitulo: { fontSize: 14, color: "#333", fontWeight: "600" },
-  tareaHora: { fontSize: 12, color: "#888", marginTop: 2 },
+  tareaTitulo: {
+    fontSize: 14.5,
+    color: "#3A3342",
+    fontFamily: AppFonts.displaySemibold,
+  },
+  tareaHora: {
+    fontSize: 12,
+    color: "#8A8194",
+    fontFamily: AppFonts.body,
+    marginTop: 2,
+  },
   tareaVirtualTxt: {
     fontSize: 10,
     color: "#AAA",
-    fontWeight: "600",
+    fontFamily: AppFonts.bodyBold,
     marginTop: 2,
   },
   btnEliminar: { padding: 10 },

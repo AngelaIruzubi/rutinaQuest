@@ -1,28 +1,28 @@
-import { Ionicons } from "@expo/vector-icons";
 import {
-  DrawerContentScrollView,
-  DrawerItemList,
-} from "@react-navigation/drawer";
+  AtkinsonHyperlegible_400Regular,
+  AtkinsonHyperlegible_700Bold,
+} from "@expo-google-fonts/atkinson-hyperlegible";
+import {
+  Baloo2_600SemiBold,
+  Baloo2_700Bold,
+  Baloo2_800ExtraBold,
+} from "@expo-google-fonts/baloo-2";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Sentry from "@sentry/react-native";
+import { useFonts } from "expo-font";
 import * as Notifications from "expo-notifications";
-import { useRouter } from "expo-router";
-import { Drawer } from "expo-router/drawer";
+import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
-import {
-  PixelRatio,
-  Platform,
-  Pressable,
-  Text,
-  useWindowDimensions,
-  View,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Platform } from "react-native";
+import { Bienvenida } from "../../components/Bienvenida";
 import { Colors } from "../../constants/theme";
 import { AjustesProvider } from "../../context/AjustesContext";
 import { AvatarProvider } from "../../context/AvatarContext";
 import { DBReadyContext } from "../../context/Dbreadycontext";
 import { initDB } from "../../database/database";
+
+const CLAVE_BIENVENIDA_VISTA = "rutinaquest_bienvenida_vista";
 
 Sentry.init({
   dsn: "https://7d8296b71552a8579eb246c9fe060bd0@o4511767324393472.ingest.de.sentry.io/4511767331536976",
@@ -43,89 +43,31 @@ Notifications.setNotificationHandler({
   }),
 });
 
-const PURPLE = "#A77BBE";
-const WHITE = "#ffffff";
-
-function DL({
-  icono,
-  label,
-  color = "#333",
-}: {
-  icono: string;
-  label: string;
-  color?: string;
-}) {
-  return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-      <Ionicons name={icono as any} size={20} color={PURPLE} />
-      <Text
-        style={{ fontSize: 15, fontWeight: "600", color }}
-        allowFontScaling={false}
-      >
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-function CustomDrawerContent(props: any) {
-  const insets = useSafeAreaInsets();
-  return (
-    <DrawerContentScrollView
-      {...props}
-      contentContainerStyle={{ paddingTop: -insets.top + 40 }}
-    >
-      <DrawerItemList {...props} />
-    </DrawerContentScrollView>
-  );
-}
-
-const LabelInicio = () => <DL icono="home-outline" label="Inicio" />;
-const LabelCalendario = () => (
-  <DL icono="calendar-outline" label="Calendario" />
-);
-const LabelTemporizador = () => (
-  <DL icono="timer-outline" label="Temporizador" />
-);
-const LabelProgreso = () => <DL icono="bar-chart-outline" label="Progreso" />;
-const LabelHistorial = () => <DL icono="time-outline" label="Historial" />;
-const LabelNormas = () => <DL icono="document-text-outline" label="Normas" />;
-
-function HeaderPerfilBtn() {
-  const router = useRouter();
-  return (
-    <Pressable
-      onPress={() => router.push("/perfil")}
-      style={{
-        width: 46,
-        height: 44,
-        alignItems: "center",
-        justifyContent: "center",
-        marginRight: 6,
-      }}
-      accessible
-      accessibilityRole="button"
-      accessibilityLabel="Mi perfil"
-      accessibilityHint="Abre la pantalla de personalización del avatar"
-    >
-      <Ionicons
-        name="person-circle-outline"
-        size={32}
-        color={WHITE}
-        accessibilityElementsHidden
-        importantForAccessibility="no"
-      />
-    </Pressable>
-  );
-}
-const HeaderRight = () => <HeaderPerfilBtn />;
-
 export default function Layout() {
+  const [fontsLoaded, fontError] = useFonts({
+    Baloo2_600SemiBold,
+    Baloo2_700Bold,
+    Baloo2_800ExtraBold,
+    AtkinsonHyperlegible_400Regular,
+    AtkinsonHyperlegible_700Bold,
+  });
   const [dbReady, setDbReady] = useState(false);
-  const { width } = useWindowDimensions();
-  const fontScale = PixelRatio.getFontScale();
-  const clampedScale = Math.min(fontScale, 1.4);
-  const titleSize = Math.max(16, Math.min(30, (width * 0.072) / clampedScale));
+  const [mostrarBienvenida, setMostrarBienvenida] = useState<boolean | null>(
+    null,
+  );
+
+  useEffect(() => {
+    // TEMPORAL: mientras se ajusta el diseño de la bienvenida, se muestra
+    // siempre (sin guardar el flag en AsyncStorage) para poder verla en
+    // cada recarga. Volver a activar la persistencia cuando esté cerrada:
+    // const vista = await AsyncStorage.getItem(CLAVE_BIENVENIDA_VISTA);
+    // setMostrarBienvenida(vista !== "true");
+    setMostrarBienvenida(true);
+  }, []);
+
+  const handleEmpezar = () => {
+    setMostrarBienvenida(false);
+  };
 
   // initDB() ya no hace nada real (los datos se guardan con AsyncStorage,
   // sin migraciones que ejecutar), pero se mantiene la señal dbReady porque
@@ -157,80 +99,41 @@ export default function Layout() {
             sound: "default",
           });
         }
-
-        SplashScreen.hideAsync().catch(() => {});
-      } else {
+      }
+      // Solo se oculta el splash una vez las fuentes están listas (o han
+      // fallado) y ya sabemos si hay que mostrar la bienvenida — si no,
+      // habría un parpadeo con texto sin la tipografía definitiva, o un
+      // flash de la app antes de la bienvenida.
+      if ((fontsLoaded || fontError) && mostrarBienvenida !== null) {
         SplashScreen.hideAsync().catch(() => {});
       }
     })();
-  }, []);
+  }, [fontsLoaded, fontError, mostrarBienvenida]);
+
+  if ((!fontsLoaded && !fontError) || mostrarBienvenida === null) return null;
+
+  if (mostrarBienvenida) {
+    return <Bienvenida onEmpezar={handleEmpezar} />;
+  }
 
   return (
     <DBReadyContext.Provider value={dbReady}>
       <AjustesProvider>
         <AvatarProvider>
-          <Drawer
-            drawerContent={CustomDrawerContent}
+          <Stack
             screenOptions={{
               headerStyle: {
-                backgroundColor: Colors.light.primary,
-                shadowColor: "transparent",
+                backgroundColor: "#FBF6F0",
               },
-              headerTintColor: WHITE,
-              headerTitleAlign: "center",
-              headerTitleStyle: { fontSize: titleSize, fontWeight: "bold" },
-              headerTitleAllowFontScaling: false,
-              headerRight: HeaderRight,
-              drawerStyle: { backgroundColor: "#fff" },
-              drawerActiveTintColor: PURPLE,
-              drawerInactiveTintColor: "#555",
-              drawerActiveBackgroundColor: PURPLE + "15",
+              headerTintColor: Colors.purpleDk,
+              headerTitle: () => null,
+              headerShadowVisible: false,
             }}
           >
-            <Drawer.Screen
-              name="index"
-              options={{ drawerLabel: LabelInicio, headerTitle: "RutinaQuest" }}
-            />
-            <Drawer.Screen
-              name="calendario"
-              options={{
-                drawerLabel: LabelCalendario,
-                headerTitle: "RutinaQuest",
-              }}
-            />
-            <Drawer.Screen
-              name="temporizador"
-              options={{
-                drawerLabel: LabelTemporizador,
-                headerTitle: "RutinaQuest",
-              }}
-            />
-            <Drawer.Screen
-              name="progreso"
-              options={{
-                drawerLabel: LabelProgreso,
-                headerTitle: "RutinaQuest",
-              }}
-            />
-            <Drawer.Screen
-              name="historial"
-              options={{
-                drawerLabel: LabelHistorial,
-                headerTitle: "RutinaQuest",
-              }}
-            />
-            <Drawer.Screen
-              name="perfil"
-              options={{
-                drawerItemStyle: { display: "none" },
-                headerTitle: "RutinaQuest",
-              }}
-            />
-            <Drawer.Screen
-              name="normas"
-              options={{ drawerLabel: LabelNormas, headerTitle: "RutinaQuest" }}
-            />
-          </Drawer>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="perfil" options={{ headerShown: false }} />
+            <Stack.Screen name="normas" options={{ headerShown: false }} />
+          </Stack>
         </AvatarProvider>
       </AjustesProvider>
     </DBReadyContext.Provider>

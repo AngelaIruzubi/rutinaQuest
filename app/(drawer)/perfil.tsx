@@ -1,274 +1,60 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
-import { memo, useCallback, useState } from "react";
-import {
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from "react-native";
+import { useRouter } from "expo-router";
+import { memo, useCallback, useMemo, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SvgXml } from "react-native-svg";
+import { AppFonts, Colors } from "../../constants/theme";
 import { useAjustesCtx } from "../../context/AjustesContext";
 import { useAvatar } from "../../context/AvatarContext";
+import { EstadoAvatar } from "../../types/avatar";
+import {
+  BARBA_OPCIONES,
+  BOCA_OPCIONES,
+  CAMISETA_COLORES,
+  CAMISETA_OPCIONES,
+  CEJAS_OPCIONES,
+  generarAvatarSvg,
+  OJOS_OPCIONES,
+  PELO_COLORES,
+  PELO_OPCIONES,
+  PELO_TRASERO_OPCIONES,
+  PIEL_COLORES,
+} from "../../utils/avatarDicebear";
 
-// ─── Constantes ───────────────────────────────────────────────────────────────
-
-const TONOS_PIEL = ["#F5C89A", "#D4956A", "#C17840", "#8B5E3C", "#7B3F2C"];
-const COLORES_PELO = [
-  "#1a1a1a",
-  "#3B1F0E",
-  "#8B4513",
-  "#DAA520",
-  "#E8C47A",
-  "#E8E8E8",
-];
-const NOMBRES_TONO = ["Muy claro", "Claro", "Medio", "Medio oscuro", "Oscuro"];
-const NOMBRES_PELO = [
-  "Negro",
-  "Marrón oscuro",
-  "Castaño",
-  "Rubio oscuro",
-  "Rubio claro",
-  "Blanco",
-];
-
-const PURPLE = "#e9d3f5";
+// ─── Pestañas ─────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: "genero", icon: "account-outline", title: "Género" },
   { id: "piel", icon: "palette-outline", title: "Tono de piel" },
-  { id: "cara", icon: "emoticon-outline", title: "Cara" },
   { id: "pelo", icon: "hair-dryer-outline", title: "Pelo" },
-  { id: "colorPelo", icon: "brush-outline", title: "Color de pelo" },
-  { id: "camiseta", icon: "tshirt-crew-outline", title: "Camiseta" },
+  { id: "cara", icon: "emoticon-outline", title: "Cara" },
+  { id: "barba", icon: "face-man-outline", title: "Barba" },
+  { id: "camiseta", icon: "tshirt-crew-outline", title: "Ropa" },
 ];
-
-// ─── Imágenes ─────────────────────────────────────────────────────────────────
-
-// Caras hombre: [tono0..tono4] por cada cara
-const CARAS_HOMBRE = [
-  [
-    require("../../assets/images/avatar/cara_h1_t1.png"),
-    require("../../assets/images/avatar/cara_h1_t2.png"),
-    require("../../assets/images/avatar/cara_h1_t3.png"),
-    require("../../assets/images/avatar/cara_h1_t4.png"),
-    require("../../assets/images/avatar/cara_h1_t5.png"),
-  ],
-  [
-    require("../../assets/images/avatar/cara_h2_t1.png"),
-    require("../../assets/images/avatar/cara_h2_t2.png"),
-    require("../../assets/images/avatar/cara_h2_t3.png"),
-    require("../../assets/images/avatar/cara_h2_t4.png"),
-    require("../../assets/images/avatar/cara_h2_t5.png"),
-  ],
-  [
-    require("../../assets/images/avatar/cara_h3_t1.png"),
-    require("../../assets/images/avatar/cara_h3_t2.png"),
-    require("../../assets/images/avatar/cara_h3_t3.png"),
-    require("../../assets/images/avatar/cara_h3_t4.png"),
-    require("../../assets/images/avatar/cara_h3_t5.png"),
-  ],
-  [
-    require("../../assets/images/avatar/cara_h4_t1.png"),
-    require("../../assets/images/avatar/cara_h4_t2.png"),
-    require("../../assets/images/avatar/cara_h4_t3.png"),
-    require("../../assets/images/avatar/cara_h4_t4.png"),
-    require("../../assets/images/avatar/cara_h4_t5.png"),
-  ],
-];
-
-// Caras mujer: [tono0..tono4] por cada cara
-const CARAS_MUJER = [
-  [
-    require("../../assets/images/avatar/cara_m1_t1.png"),
-    require("../../assets/images/avatar/cara_m1_t2.png"),
-    require("../../assets/images/avatar/cara_m1_t3.png"),
-    require("../../assets/images/avatar/cara_m1_t4.png"),
-    require("../../assets/images/avatar/cara_m1_t5.png"),
-  ],
-  [
-    require("../../assets/images/avatar/cara_m2_t1.png"),
-    require("../../assets/images/avatar/cara_m2_t2.png"),
-    require("../../assets/images/avatar/cara_m2_t3.png"),
-    require("../../assets/images/avatar/cara_m2_t4.png"),
-    require("../../assets/images/avatar/cara_m2_t5.png"),
-  ],
-  [
-    require("../../assets/images/avatar/cara_m3_t1.png"),
-    require("../../assets/images/avatar/cara_m3_t2.png"),
-    require("../../assets/images/avatar/cara_m3_t3.png"),
-    require("../../assets/images/avatar/cara_m3_t4.png"),
-    require("../../assets/images/avatar/cara_m3_t5.png"),
-  ],
-  [
-    require("../../assets/images/avatar/cara_m4_t1.png"),
-    require("../../assets/images/avatar/cara_m4_t2.png"),
-    require("../../assets/images/avatar/cara_m4_t3.png"),
-    require("../../assets/images/avatar/cara_m4_t4.png"),
-    require("../../assets/images/avatar/cara_m4_t5.png"),
-  ],
-];
-
-// Camisetas: [tono0..tono4] por cada color
-const CAMISETAS = [
-  [
-    require("../../assets/images/avatar/camiseta_rosa_1.png"),
-    require("../../assets/images/avatar/camiseta_rosa_2.png"),
-    require("../../assets/images/avatar/camiseta_rosa_3.png"),
-    require("../../assets/images/avatar/camiseta_rosa_4.png"),
-    require("../../assets/images/avatar/camiseta_rosa_5.png"),
-  ],
-  [
-    require("../../assets/images/avatar/camiseta_azul_1.png"),
-    require("../../assets/images/avatar/camiseta_azul_2.png"),
-    require("../../assets/images/avatar/camiseta_azul_3.png"),
-    require("../../assets/images/avatar/camiseta_azul_4.png"),
-    require("../../assets/images/avatar/camiseta_azul_5.png"),
-  ],
-  [
-    require("../../assets/images/avatar/camiseta_morada_1.png"),
-    require("../../assets/images/avatar/camiseta_morada_2.png"),
-    require("../../assets/images/avatar/camiseta_morado_3.png"),
-    require("../../assets/images/avatar/camiseta_morado_4.png"),
-    require("../../assets/images/avatar/camiseta_morada_5.png"),
-  ],
-  [
-    require("../../assets/images/avatar/camiseta_verde_1.png"),
-    require("../../assets/images/avatar/camiseta_verde_2.png"),
-    require("../../assets/images/avatar/camiseta_verde_3.png"),
-    require("../../assets/images/avatar/camiseta_verde_4.png"),
-    require("../../assets/images/avatar/camiseta_verde_5.png"),
-  ],
-];
-
-const PELO_CORTO_MUJER = [
-  require("../../assets/images/avatar/pelo1.png"),
-  require("../../assets/images/avatar/pelo3.png"),
-];
-
-const PELO_LARGO_MUJER = [
-  require("../../assets/images/avatar/pelo5.png"),
-  require("../../assets/images/avatar/pelo6.png"),
-];
-
-const PELO_CORTO_HOMBRE = [
-  require("../../assets/images/avatar/pelo_hombre_1.png"),
-];
-
-const PELO_LARGO_HOMBRE = [
-  require("../../assets/images/avatar/pelo_hombre_3.png"),
-  require("../../assets/images/avatar/pelo_hombre_4.png"),
-];
-
-// ─── Tipos ────────────────────────────────────────────────────────────────────
-
-interface AvatarPreviewProps {
-  size?: number;
-  tonoPiel: number;
-  shirt: number;
-  cara: number;
-  peloCorto: number;
-  peloLargo: number;
-  colorPeloSeguro: string;
-  genero: "hombre" | "mujer";
-}
-
-interface TabBarProps {
-  tabActivo: string;
-  onTabPress: (id: string) => void;
-}
 
 // ─── AvatarPreview ────────────────────────────────────────────────────────────
 
 const AvatarPreview = memo(function AvatarPreview({
-  size = 290,
-  tonoPiel,
-  shirt,
-  cara,
-  peloCorto,
-  peloLargo,
-  colorPeloSeguro,
-  genero,
-}: AvatarPreviewProps) {
-  const peloCortoOptions =
-    genero === "mujer" ? PELO_CORTO_MUJER : PELO_CORTO_HOMBRE;
-  const peloLargoOptions =
-    genero === "mujer" ? PELO_LARGO_MUJER : PELO_LARGO_HOMBRE;
-  const caras = genero === "mujer" ? CARAS_MUJER : CARAS_HOMBRE;
-  const caraImg = caras[cara]?.[tonoPiel] ?? caras[0][0];
-  // shirt es el índice de COLOR de camiseta (0=rosa,1=azul,2=morada,3=verde)
-  const camisetaImg = CAMISETAS[shirt]?.[tonoPiel] ?? CAMISETAS[0][0];
-
+  avatar,
+  size = 240,
+}: {
+  avatar: EstadoAvatar;
+  size?: number;
+}) {
+  const svg = useMemo(
+    () => generarAvatarSvg(avatar, size),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [JSON.stringify(avatar), size],
+  );
   return (
     <View
-      style={{ width: size, height: size * 1.2, position: "relative" }}
       accessible
       accessibilityLabel="Vista previa de tu avatar"
+      style={{ width: size, height: size }}
     >
-      {/* Camiseta */}
-      <Image
-        source={camisetaImg}
-        style={{
-          position: "absolute",
-          top: size * 0.65,
-          left: -size * 0.49,
-          width: size * 2,
-          height: size * 1.35,
-          zIndex: 3,
-        }}
-        resizeMode="contain"
-        accessibilityIgnoresInvertColors
-      />
-      {/* Cara */}
-      <Image
-        source={caraImg}
-        style={{
-          position: "absolute",
-          top: genero === "mujer" ? -size * 0.02 : -size * 0.02,
-          left: genero === "mujer" ? size * 0.12 : size * 0.09,
-          width: genero === "mujer" ? size * 0.8 : size * 0.8,
-          height: genero === "mujer" ? size : size,
-          zIndex: 1,
-        }}
-        resizeMode="contain"
-        accessibilityIgnoresInvertColors
-      />
-      {/* Pelo corto */}
-      {peloCorto >= 0 && peloCortoOptions[peloCorto] && (
-        <Image
-          source={peloCortoOptions[peloCorto]}
-          style={{
-            position: "absolute",
-            top: genero === "mujer" ? -size * 0.22 : -size * 0.17,
-            left: genero === "mujer" ? size * 0.16 : size * 0.1,
-            width: genero === "mujer" ? size * 0.7 : size * 0.85,
-            height: genero === "mujer" ? size * 0.8 : size * 0.9,
-            zIndex: 4,
-            tintColor: colorPeloSeguro,
-          }}
-          resizeMode="contain"
-          accessibilityIgnoresInvertColors
-        />
-      )}
-      {/* Pelo largo */}
-      {peloCorto < 0 && peloLargo >= 0 && peloLargoOptions[peloLargo] && (
-        <Image
-          source={peloLargoOptions[peloLargo]}
-          style={{
-            position: "absolute",
-            top: genero === "mujer" ? -size * 0.6 : -size * 0.6,
-            left: genero === "mujer" ? size * 0.12 : -size * 0.04,
-            width: genero === "mujer" ? size * 0.75 : size * 1.1,
-            height: genero === "mujer" ? size * 2 : size * 2,
-            zIndex: 4,
-            tintColor: colorPeloSeguro,
-          }}
-          resizeMode="contain"
-          accessibilityIgnoresInvertColors
-        />
-      )}
+      <SvgXml xml={svg} width={size} height={size} />
     </View>
   );
 });
@@ -278,136 +64,217 @@ const AvatarPreview = memo(function AvatarPreview({
 const TabBar = memo(function TabBar({
   tabActivo,
   onTabPress,
-  escala = 1,
-}: TabBarProps & { escala?: number }) {
+}: {
+  tabActivo: string;
+  onTabPress: (id: string) => void;
+}) {
   return (
     <View style={estilos.tabBar} accessible={false} accessibilityRole="tablist">
-      {TABS.map((tab) => (
-        <Pressable
-          key={tab.id}
-          onPress={() => onTabPress(tab.id)}
-          style={[estilos.tabBtn, tabActivo === tab.id && estilos.tabBtnActive]}
-          accessible
-          accessibilityRole="tab"
-          accessibilityLabel={tab.title}
-          accessibilityState={{ selected: tabActivo === tab.id }}
-        >
-          <Text
-            style={[
-              estilos.tabEmoji,
-              { fontSize: Math.round(22 * escala) },
-              tabActivo === tab.id && { opacity: 1 },
-            ]}
+      {TABS.map((tab) => {
+        const activo = tabActivo === tab.id;
+        return (
+          <Pressable
+            key={tab.id}
+            onPress={() => onTabPress(tab.id)}
+            style={estilos.tabBtn}
+            accessible
+            accessibilityRole="tab"
+            accessibilityLabel={tab.title}
+            accessibilityState={{ selected: activo }}
           >
             <MaterialCommunityIcons
               name={tab.icon as any}
-              size={24}
+              size={22}
+              color={activo ? Colors.purple : "#C7C0CE"}
               accessibilityElementsHidden
               importantForAccessibility="no"
             />
-          </Text>
-          {tabActivo === tab.id && (
-            <View
-              style={estilos.tabActiveLine}
-              accessibilityElementsHidden
-              importantForAccessibility="no"
-            />
-          )}
-        </Pressable>
-      ))}
+            {activo && (
+              <View
+                style={estilos.tabActiveLine}
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+              />
+            )}
+          </Pressable>
+        );
+      })}
     </View>
   );
 });
 
+// ─── Flecha morada ─────────────────────────────────────────────────────────────
+
+function FlechaSelector({
+  direccion,
+  onPress,
+}: {
+  direccion: "izquierda" | "derecha";
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress();
+      }}
+      style={estilos.flechaBtn}
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel={direccion === "izquierda" ? "Opción anterior" : "Opción siguiente"}
+    >
+      <MaterialCommunityIcons
+        name={direccion === "izquierda" ? "chevron-left" : "chevron-right"}
+        size={26}
+        color="#fff"
+      />
+    </Pressable>
+  );
+}
+
+// ─── Selector de estilo (con flechas) ──────────────────────────────────────────
+
+function SelectorEstilo<T extends string>({
+  titulo,
+  opciones,
+  valorActual,
+  onCambiar,
+}: {
+  titulo: string;
+  opciones: { valor: T; nombre: string }[];
+  valorActual: T;
+  onCambiar: (valor: T) => void;
+}) {
+  const indice = Math.max(
+    0,
+    opciones.findIndex((op) => op.valor === valorActual),
+  );
+  const actual = opciones[indice] ?? opciones[0];
+
+  const mover = (delta: 1 | -1) => {
+    const siguiente = (indice + delta + opciones.length) % opciones.length;
+    onCambiar(opciones[siguiente].valor);
+  };
+
+  return (
+    <>
+      <Text style={estilos.opcionTitulo} accessibilityRole="header">
+        {titulo}
+      </Text>
+      <View style={estilos.selectorRow}>
+        <FlechaSelector direccion="izquierda" onPress={() => mover(-1)} />
+        <View
+          style={estilos.valorPill}
+          accessible
+          accessibilityLabel={`${titulo}: ${actual.nombre}`}
+        >
+          <Text style={estilos.valorPillText} numberOfLines={1}>
+            {actual.nombre}
+          </Text>
+        </View>
+        <FlechaSelector direccion="derecha" onPress={() => mover(1)} />
+      </View>
+    </>
+  );
+}
+
+// ─── Selector de color (círculo) ──────────────────────────────────────────────
+
+function SelectorColor({
+  titulo,
+  colores,
+  valorActual,
+  onCambiar,
+}: {
+  titulo: string;
+  colores: string[];
+  valorActual: string;
+  onCambiar: (valor: string) => void;
+}) {
+  return (
+    <>
+      <Text style={estilos.opcionTitulo} accessibilityRole="header">
+        {titulo}
+      </Text>
+      <View style={estilos.gridColores} accessible={false}>
+        {colores.map((color) => {
+          const activo = valorActual === color;
+          return (
+            <Pressable
+              key={color}
+              onPress={() => onCambiar(color)}
+              style={[
+                estilos.circleColor,
+                { backgroundColor: `#${color}` },
+                activo && estilos.circleSelected,
+              ]}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel={`Color ${color}${activo ? ", seleccionado" : ""}`}
+              accessibilityState={{ selected: activo }}
+            />
+          );
+        })}
+      </View>
+    </>
+  );
+}
+
 // ─── Perfil ───────────────────────────────────────────────────────────────────
 
 export default function Perfil() {
-  const { escala, colores } = useAjustesCtx();
-  const fs = (n: number) => Math.round(n * escala);
-  const { width } = useWindowDimensions();
-  const isTablet = width >= 768;
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { avatar, updateAvatar } = useAvatar();
-  const { tonoPiel, cara, colorPelo, peloCorto, peloLargo, shirt, genero } =
-    avatar;
 
-  const [tabActivo, setTabActivo] = useState("genero");
+  const [tabActivo, setTabActivo] = useState("piel");
 
   const handleTabPress = useCallback((id: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setTabActivo(id);
   }, []);
 
-  const colorPeloSeguro = COLORES_PELO[colorPelo] ?? COLORES_PELO[0];
-  const carasActuales = genero === "mujer" ? CARAS_MUJER : CARAS_HOMBRE;
+  const cambiar = useCallback(
+    (campo: keyof EstadoAvatar) => (valor: string) => updateAvatar(campo, valor),
+    [updateAvatar],
+  );
 
-  const renderOpciones = useCallback(() => {
+  const renderOpciones = () => {
     switch (tabActivo) {
-      case "genero":
-        return (
-          <>
-            <Text
-              style={[estilos.opcionTitulo, { fontSize: fs(16) }]}
-              accessibilityRole="header"
-            >
-              Género
-            </Text>
-            <View style={estilos.gridColores} accessible={false}>
-              {(["hombre", "mujer"] as const).map((g) => (
-                <Pressable
-                  key={g}
-                  onPress={() => {
-                    updateAvatar("genero" as any, g as any);
-                    updateAvatar("cara", 0);
-                  }}
-                  style={[
-                    estilos.generoBtn,
-                    genero === g && estilos.generoBtnActive,
-                  ]}
-                  accessible
-                  accessibilityRole="button"
-                  accessibilityLabel={g === "hombre" ? "Hombre" : "Mujer"}
-                  accessibilityState={{ selected: genero === g }}
-                >
-                  <Text
-                    style={[
-                      estilos.generoBtnText,
-                      genero === g && estilos.generoBtnTextActive,
-                    ]}
-                  >
-                    {g === "hombre" ? "👦 Hombre" : "👧 Mujer"}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </>
-        );
-
       case "piel":
         return (
+          <SelectorColor
+            titulo="Tono de piel"
+            colores={PIEL_COLORES}
+            valorActual={avatar.skinColor}
+            onCambiar={cambiar("skinColor")}
+          />
+        );
+
+      case "pelo":
+        return (
           <>
-            <Text
-              style={[estilos.opcionTitulo, { fontSize: fs(16) }]}
-              accessibilityRole="header"
-            >
-              Tono de piel
-            </Text>
-            <View style={estilos.gridColores} accessible={false}>
-              {TONOS_PIEL.map((color, i) => (
-                <Pressable
-                  key={i}
-                  onPress={() => updateAvatar("tonoPiel", i)}
-                  style={[
-                    estilos.circleColor,
-                    { backgroundColor: color },
-                    tonoPiel === i && estilos.circleSelected,
-                  ]}
-                  accessible
-                  accessibilityRole="button"
-                  accessibilityLabel={`Tono de piel ${NOMBRES_TONO[i]}${tonoPiel === i ? ", seleccionado" : ""}`}
-                  accessibilityHint="Pulsa para cambiar el tono de piel de tu avatar"
-                  accessibilityState={{ selected: tonoPiel === i }}
-                />
-              ))}
+            <SelectorEstilo
+              titulo="Pelo delantero"
+              opciones={PELO_OPCIONES}
+              valorActual={avatar.hair}
+              onCambiar={cambiar("hair")}
+            />
+            <View style={{ marginTop: 20 }}>
+              <SelectorEstilo
+                titulo="Pelo trasero / largo"
+                opciones={PELO_TRASERO_OPCIONES}
+                valorActual={avatar.rearHair}
+                onCambiar={cambiar("rearHair")}
+              />
+            </View>
+            <View style={{ marginTop: 20 }}>
+              <SelectorColor
+                titulo="Color de pelo"
+                colores={PELO_COLORES}
+                valorActual={avatar.hairColor}
+                onCambiar={cambiar("hairColor")}
+              />
             </View>
           </>
         );
@@ -415,223 +282,57 @@ export default function Perfil() {
       case "cara":
         return (
           <>
-            <Text
-              style={[estilos.opcionTitulo, { fontSize: fs(16) }]}
-              accessibilityRole="header"
-            >
-              Cara
-            </Text>
-            <View style={estilos.gridImagenes} accessible={false}>
-              {carasActuales.map((caraOpts, i) => (
-                <Pressable
-                  key={i}
-                  onPress={() => updateAvatar("cara", i)}
-                  style={[
-                    estilos.imgCard,
-                    cara === i && estilos.imgCardSelected,
-                  ]}
-                  accessible
-                  accessibilityRole="button"
-                  accessibilityLabel={`Cara opción ${i + 1}${cara === i ? ", seleccionada" : ""}`}
-                  accessibilityHint="Pulsa para usar esta cara en tu avatar"
-                  accessibilityState={{ selected: cara === i }}
-                >
-                  <Image
-                    source={caraOpts[tonoPiel] ?? caraOpts[0]}
-                    style={estilos.imgCardImg}
-                    resizeMode="contain"
-                    accessibilityElementsHidden
-                    importantForAccessibility="no"
-                    accessibilityIgnoresInvertColors
-                  />
-                </Pressable>
-              ))}
+            <SelectorEstilo
+              titulo="Cejas"
+              opciones={CEJAS_OPCIONES}
+              valorActual={avatar.eyebrows}
+              onCambiar={cambiar("eyebrows")}
+            />
+            <View style={{ marginTop: 20 }}>
+              <SelectorEstilo
+                titulo="Ojos"
+                opciones={OJOS_OPCIONES}
+                valorActual={avatar.eyes}
+                onCambiar={cambiar("eyes")}
+              />
+            </View>
+            <View style={{ marginTop: 20 }}>
+              <SelectorEstilo
+                titulo="Boca"
+                opciones={BOCA_OPCIONES}
+                valorActual={avatar.mouth}
+                onCambiar={cambiar("mouth")}
+              />
             </View>
           </>
         );
 
-      case "pelo":
+      case "barba":
         return (
-          <>
-            <Text
-              style={[estilos.opcionTitulo, { fontSize: fs(16) }]}
-              accessibilityRole="header"
-            >
-              Pelo corto
-            </Text>
-            <View style={estilos.gridImagenes} accessible={false}>
-              {/* Opción sin pelo - solo hombre */}
-              {genero === "hombre" && (
-                <Pressable
-                  onPress={() => {
-                    updateAvatar("peloCorto", -1);
-                    updateAvatar("peloLargo", -1);
-                  }}
-                  style={[
-                    estilos.imgCard,
-                    peloCorto === -1 &&
-                      peloLargo === -1 &&
-                      estilos.imgCardSelected,
-                  ]}
-                  accessible
-                  accessibilityRole="button"
-                  accessibilityLabel="Sin pelo"
-                  accessibilityState={{
-                    selected: peloCorto === -1 && peloLargo === -1,
-                  }}
-                >
-                  <Text
-                    style={{ fontSize: 14, fontWeight: "700", color: "#888" }}
-                  >
-                    No
-                  </Text>
-                </Pressable>
-              )}
-              {(genero === "mujer" ? PELO_CORTO_MUJER : PELO_CORTO_HOMBRE).map(
-                (img, i) => (
-                  <Pressable
-                    key={i}
-                    onPress={() => {
-                      updateAvatar("peloCorto", i);
-                      updateAvatar("peloLargo", -1);
-                    }}
-                    style={[
-                      estilos.imgCard,
-                      peloCorto === i && estilos.imgCardSelected,
-                    ]}
-                    accessible
-                    accessibilityRole="button"
-                    accessibilityLabel={`Pelo corto opción ${i + 1}${peloCorto === i ? ", seleccionado" : ""}`}
-                    accessibilityHint="Pulsa para usar este pelo en tu avatar"
-                    accessibilityState={{ selected: peloCorto === i }}
-                  >
-                    <Image
-                      source={img}
-                      style={[
-                        estilos.imgCardImg,
-                        { tintColor: colorPeloSeguro },
-                      ]}
-                      resizeMode="contain"
-                      accessibilityElementsHidden
-                      importantForAccessibility="no"
-                      accessibilityIgnoresInvertColors
-                    />
-                  </Pressable>
-                ),
-              )}
-            </View>
-
-            <Text
-              style={[
-                estilos.opcionTitulo,
-                { fontSize: fs(16) },
-                { marginTop: 20 },
-              ]}
-              accessibilityRole="header"
-            >
-              Pelo largo
-            </Text>
-            <View style={estilos.gridImagenes} accessible={false}>
-              {(genero === "mujer" ? PELO_LARGO_MUJER : PELO_LARGO_HOMBRE).map(
-                (img, i) => (
-                  <Pressable
-                    key={i}
-                    onPress={() => {
-                      updateAvatar("peloLargo", i);
-                      updateAvatar("peloCorto", -1);
-                    }}
-                    style={[
-                      estilos.imgCard,
-                      peloLargo === i && estilos.imgCardSelected,
-                    ]}
-                    accessible
-                    accessibilityRole="button"
-                    accessibilityLabel={`Pelo largo opción ${i + 1}${peloLargo === i ? ", seleccionado" : ""}`}
-                    accessibilityHint="Pulsa para usar este pelo en tu avatar"
-                    accessibilityState={{ selected: peloLargo === i }}
-                  >
-                    <Image
-                      source={img}
-                      style={[
-                        estilos.imgCardImg,
-                        { tintColor: colorPeloSeguro },
-                      ]}
-                      resizeMode="contain"
-                      accessibilityElementsHidden
-                      importantForAccessibility="no"
-                      accessibilityIgnoresInvertColors
-                    />
-                  </Pressable>
-                ),
-              )}
-            </View>
-          </>
-        );
-
-      case "colorPelo":
-        return (
-          <>
-            <Text
-              style={[estilos.opcionTitulo, { fontSize: fs(16) }]}
-              accessibilityRole="header"
-            >
-              Color de pelo
-            </Text>
-            <View style={estilos.gridColores} accessible={false}>
-              {COLORES_PELO.map((color, i) => (
-                <Pressable
-                  key={i}
-                  onPress={() => updateAvatar("colorPelo", i)}
-                  style={[
-                    estilos.circleColor,
-                    { backgroundColor: color },
-                    colorPelo === i && estilos.circleSelected,
-                  ]}
-                  accessible
-                  accessibilityRole="button"
-                  accessibilityLabel={`Color de pelo ${NOMBRES_PELO[i]}${colorPelo === i ? ", seleccionado" : ""}`}
-                  accessibilityHint="Pulsa para cambiar el color del pelo de tu avatar"
-                  accessibilityState={{ selected: colorPelo === i }}
-                />
-              ))}
-            </View>
-          </>
+          <SelectorEstilo
+            titulo="Barba"
+            opciones={BARBA_OPCIONES}
+            valorActual={avatar.beard}
+            onCambiar={cambiar("beard")}
+          />
         );
 
       case "camiseta":
         return (
           <>
-            <Text
-              style={[estilos.opcionTitulo, { fontSize: fs(16) }]}
-              accessibilityRole="header"
-            >
-              Camiseta
-            </Text>
-            <View style={estilos.gridImagenes} accessible={false}>
-              {CAMISETAS.map((camisetaOpts, i) => (
-                <Pressable
-                  key={i}
-                  onPress={() => updateAvatar("shirt", i)}
-                  style={[
-                    estilos.imgCard,
-                    shirt === i && estilos.imgCardSelected,
-                  ]}
-                  accessible
-                  accessibilityRole="button"
-                  accessibilityLabel={`Camiseta opción ${i + 1}${shirt === i ? ", seleccionada" : ""}`}
-                  accessibilityHint="Pulsa para usar esta camiseta en tu avatar"
-                  accessibilityState={{ selected: shirt === i }}
-                >
-                  <Image
-                    source={camisetaOpts[tonoPiel] ?? camisetaOpts[0]}
-                    style={estilos.imgCardImg}
-                    resizeMode="contain"
-                    accessibilityElementsHidden
-                    importantForAccessibility="no"
-                    accessibilityIgnoresInvertColors
-                  />
-                </Pressable>
-              ))}
+            <SelectorEstilo
+              titulo="Prenda"
+              opciones={CAMISETA_OPCIONES}
+              valorActual={avatar.clothes}
+              onCambiar={cambiar("clothes")}
+            />
+            <View style={{ marginTop: 20 }}>
+              <SelectorColor
+                titulo="Color"
+                colores={CAMISETA_COLORES}
+                valorActual={avatar.clothesColor}
+                onCambiar={cambiar("clothesColor")}
+              />
             </View>
           </>
         );
@@ -639,76 +340,67 @@ export default function Perfil() {
       default:
         return null;
     }
-  }, [
-    tabActivo,
-    tonoPiel,
-    cara,
-    colorPelo,
-    peloCorto,
-    peloLargo,
-    colorPeloSeguro,
-    shirt,
-    genero,
-    carasActuales,
-    updateAvatar,
-    fs,
-  ]);
-
-  const avatarProps: AvatarPreviewProps = {
-    tonoPiel,
-    shirt,
-    cara,
-    peloCorto,
-    peloLargo,
-    colorPeloSeguro,
-    genero,
   };
 
-  if (isTablet) {
-    return (
-      <View style={estilos.rootTablet}>
-        <View
-          style={estilos.leftPanel}
-          accessible
-          accessibilityLabel="Vista previa del avatar"
-        >
-          <View style={estilos.avatarBgTablet}>
-            <AvatarPreview {...avatarProps} size={220} />
-          </View>
-        </View>
-        <View style={estilos.rightPanel}>
-          <TabBar
-            tabActivo={tabActivo}
-            onTabPress={handleTabPress}
-            escala={escala}
-          />
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={estilos.opcionesScroll}
-            accessible={false}
-          >
-            {renderOpciones()}
-          </ScrollView>
-        </View>
-      </View>
-    );
-  }
+  const cerrar = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace("/");
+  };
+
+  const CloseBtn = (
+    <Pressable
+      onPress={cerrar}
+      style={estilos.closeBtn}
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel="Cerrar"
+    >
+      <MaterialCommunityIcons name="close" size={18} color="#fff" />
+    </Pressable>
+  );
+
+  const tipBox = (
+    <View
+      style={estilos.tipBox}
+      accessible
+      accessibilityLabel="Consejo: personaliza tu avatar según vayas ganando estrellas, es tuyo, hazlo a tu gusto"
+    >
+      <MaterialCommunityIcons
+        name="information-outline"
+        size={20}
+        color={Colors.purpleDk}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      />
+      <Text
+        style={estilos.tipText}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      >
+        Personaliza tu avatar según vayas ganando estrellas — es tuyo, hazlo a
+        tu gusto.
+      </Text>
+    </View>
+  );
 
   return (
     <View style={estilos.rootMobile}>
-      <View
-        style={estilos.avatarBgMobile}
-        accessible
-        accessibilityLabel="Vista previa del avatar"
+      <LinearGradient
+        colors={["#C9A9DB", Colors.purple]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0.4, y: 1 }}
+        style={[estilos.banner, { paddingTop: insets.top + 16 }]}
       >
-        <AvatarPreview {...avatarProps} size={180} />
-      </View>
+        <View style={estilos.bannerHeaderRow}>
+          <Text style={estilos.bannerTitle} accessibilityRole="header">
+            Tu perfil
+          </Text>
+          {CloseBtn}
+        </View>
+        <AvatarPreview avatar={avatar} size={220} />
+      </LinearGradient>
       <View style={estilos.bottomPanel}>
-        <TabBar
-          tabActivo={tabActivo}
-          onTabPress={handleTabPress}
-          escala={escala}
-        />
+        <TabBar tabActivo={tabActivo} onTabPress={handleTabPress} />
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={estilos.opcionesScroll}
@@ -716,6 +408,7 @@ export default function Perfil() {
           accessible={false}
         >
           {renderOpciones()}
+          {tipBox}
         </ScrollView>
       </View>
     </View>
@@ -725,49 +418,41 @@ export default function Perfil() {
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 
 const estilos = StyleSheet.create({
-  rootTablet: {
-    flex: 1,
-    flexDirection: "row",
-    backgroundColor: "#fff",
-    borderColor: "#EEE",
-    borderWidth: 2,
-    borderRadius: 14,
-    overflow: "hidden",
-    width: 700,
-    height: 500,
-    alignSelf: "center",
-    marginTop: 40,
-  },
-  leftPanel: {
-    width: 320,
-    backgroundColor: PURPLE,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarBgTablet: {
-    width: 280,
-    height: 320,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  rightPanel: { flex: 1, backgroundColor: "#fff" },
-
   rootMobile: { flex: 1, backgroundColor: "#fff" },
-  avatarBgMobile: {
+  banner: {
     width: "100%",
-    height: 500,
-    backgroundColor: PURPLE,
-    marginTop: -80,
-    paddingBottom: 20,
-    justifyContent: "center",
+    paddingHorizontal: 22,
+    paddingBottom: 16,
     alignItems: "center",
+    gap: 14,
+    borderBottomLeftRadius: 36,
+    borderBottomRightRadius: 36,
+  },
+  bannerHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+  },
+  bannerTitle: {
+    fontFamily: AppFonts.displayBold,
+    fontSize: 20,
+    color: "#fff",
+  },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   bottomPanel: { flex: 1, backgroundColor: "#fff" },
 
   tabBar: {
     flexDirection: "row",
     borderBottomWidth: 1.5,
-    borderBottomColor: "#EEE",
+    borderBottomColor: Colors.purpleLt,
     backgroundColor: "#fff",
   },
   tabBtn: {
@@ -776,11 +461,8 @@ const estilos = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 12,
     position: "relative",
-    opacity: 0.45,
     minHeight: 52,
   },
-  tabBtnActive: { opacity: 1 },
-  tabEmoji: { fontSize: 22 },
   tabActiveLine: {
     position: "absolute",
     bottom: 0,
@@ -788,17 +470,67 @@ const estilos = StyleSheet.create({
     right: 8,
     height: 3,
     borderRadius: 2,
-    backgroundColor: PURPLE,
+    backgroundColor: Colors.purple,
+  },
+
+  tipBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 12,
+    backgroundColor: Colors.purpleBg,
+    borderRadius: 18,
+    padding: 16,
+  },
+  tipText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: AppFonts.body,
+    color: Colors.purpleDk,
+    lineHeight: 18,
   },
 
   opcionesScroll: { padding: 20, paddingBottom: 40 },
   opcionTitulo: {
     fontSize: 16,
-    fontWeight: "700",
+    fontFamily: AppFonts.displayBold,
     color: "#333",
     marginBottom: 14,
   },
 
+  selectorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 20,
+  },
+  flechaBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.purple,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  valorPill: {
+    flex: 1,
+    maxWidth: 200,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: Colors.purple,
+    backgroundColor: Colors.purpleBg,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 48,
+  },
+  valorPillText: {
+    fontSize: 15,
+    fontFamily: AppFonts.bodyBold,
+    color: Colors.purpleDk,
+    textAlign: "center",
+  },
   gridColores: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   circleColor: {
     width: 52,
@@ -809,51 +541,10 @@ const estilos = StyleSheet.create({
   },
   circleSelected: {
     borderWidth: 4,
-    borderColor: PURPLE,
-    shadowColor: PURPLE,
+    borderColor: Colors.purple,
+    shadowColor: Colors.purple,
     shadowOpacity: 0.4,
     shadowRadius: 6,
     elevation: 4,
   },
-
-  gridImagenes: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  imgCard: {
-    width: 88,
-    height: 88,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: "#E5E5E5",
-    backgroundColor: "#FAFAFA",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 6,
-  },
-  imgCardSelected: {
-    borderColor: PURPLE,
-    borderWidth: 3,
-    backgroundColor: "#F0E8F8",
-    shadowColor: PURPLE,
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  imgCardImg: { width: 72, height: 72 },
-
-  generoBtn: {
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: "#E5E5E5",
-    backgroundColor: "#FAFAFA",
-    alignItems: "center",
-    marginBottom: 10,
-    minHeight: 44,
-  },
-  generoBtnActive: {
-    borderColor: PURPLE,
-    backgroundColor: "#F0E8F8",
-  },
-  generoBtnText: { fontSize: 16, fontWeight: "600", color: "#555" },
-  generoBtnTextActive: { color: "#7B5A9A" },
 });

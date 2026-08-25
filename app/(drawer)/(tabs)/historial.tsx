@@ -1,6 +1,6 @@
 import { useDBReady } from "@/context/Dbreadycontext";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
@@ -19,22 +19,25 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { SvgXml } from "react-native-svg";
 import ViewShot from "react-native-view-shot";
-import { StarRow } from "../../components/ui/StarRow";
-import { DIAS_CORTOS, DIAS_LARGOS } from "../../constants/diasSemana";
-import { Colors } from "../../constants/theme";
-import { useAjustesCtx } from "../../context/AjustesContext";
-import { useAvatar } from "../../context/AvatarContext";
-import { getTareasHistorial } from "../../database/database";
-import { useGamificacion } from "../../hooks/useGamificacion";
-import { Tarea } from "../../types/tarea";
-import { fechaAppDate, hoyAppStr } from "../../utils/fecha";
+import { StarRow } from "../../../components/ui/StarRow";
+import { DIAS_CORTOS, DIAS_LARGOS } from "../../../constants/diasSemana";
+import { AppFonts, Colors } from "../../../constants/theme";
+import { useAjustesCtx } from "../../../context/AjustesContext";
+import { useAvatar } from "../../../context/AvatarContext";
+import { getTareasHistorial } from "../../../database/database";
+import { useGamificacion } from "../../../hooks/useGamificacion";
+import { EstadoAvatar } from "../../../types/avatar";
+import { Tarea } from "../../../types/tarea";
+import { fechaAppDate, hoyAppStr } from "../../../utils/fecha";
 import {
   diasDeSemana,
   etiquetaSemana,
   lunesDe,
   toLocalDateStr,
-} from "../../utils/fechaFormato";
+} from "../../../utils/fechaFormato";
+import { generarAvatarSvg } from "../../../utils/avatarDicebear";
 
 const PURPLE = Colors.purple;
 const ORANGE = Colors.orange;
@@ -44,15 +47,6 @@ const GREEN = Colors.green;
 const RED = Colors.red;
 const GOLD = Colors.gold;
 
-const COLORES_PELO = [
-  "#1a1a1a",
-  "#3B1F0E",
-  "#8B4513",
-  "#DAA520",
-  "#E8C47A",
-  "#E8E8E8",
-];
-
 function fechaReferencia(t: Tarea): string {
   if (t.estado === "completada" || (t.completed && !t.estado)) {
     return t.fechaCompletada ?? t.fechaDia ?? "";
@@ -60,106 +54,22 @@ function fechaReferencia(t: Tarea): string {
   return t.fechaDia ?? t.fechaCompletada ?? "";
 }
 
-//Renderiza el avata
-function AvatarMini({ avatar, size = 120 }: { avatar: any; size?: number }) {
-  const { tonoPiel, cara, colorPelo, peloCorto, peloLargo, shirt } = avatar;
-  const si: 0 | 1 = tonoPiel === 1 ? 1 : 0;
-  const colorPeloStr = COLORES_PELO[colorPelo] ?? COLORES_PELO[0];
-  const caras = [
-    [
-      require("../../assets/images/avatar/cara1_claro.png"),
-      require("../../assets/images/avatar/cara2_claro.png"),
-      require("../../assets/images/avatar/cara3_claro.png"),
-    ],
-    [
-      require("../../assets/images/avatar/cara1_oscuro.png"),
-      require("../../assets/images/avatar/cara2_oscuro.png"),
-      require("../../assets/images/avatar/cara3_oscuro.png"),
-    ],
-  ];
-  const camisetas = [
-    [
-      require("../../assets/images/avatar/camiseta1_claro.png"),
-      require("../../assets/images/avatar/camiseta2_claro.png"),
-    ],
-    [
-      require("../../assets/images/avatar/camiseta1_oscuro.png"),
-      require("../../assets/images/avatar/camiseta2_oscuro.png"),
-    ],
-  ];
-  const peloCortoOpts = [
-    require("../../assets/images/avatar/pelo1.png"),
-    require("../../assets/images/avatar/pelo3.png"),
-  ];
-  const peloLargoOpts = [
-    require("../../assets/images/avatar/pelo5.png"),
-    require("../../assets/images/avatar/pelo6.png"),
-  ];
-
+//Renderiza el avatar
+function AvatarMini({
+  avatar,
+  size = 120,
+}: {
+  avatar: EstadoAvatar;
+  size?: number;
+}) {
+  const svg = useMemo(() => generarAvatarSvg(avatar, size), [avatar, size]);
   return (
     <View
-      style={{ width: size, height: size * 1.2, position: "relative" }}
+      style={{ width: size, height: size }}
       accessibilityElementsHidden
       importantForAccessibility="no"
     >
-      <Image
-        source={camisetas[si][shirt] ?? camisetas[0][0]}
-        style={{
-          position: "absolute",
-          top: size * 0.7,
-          left: -size * 0.12,
-          width: size * 1.3,
-          height: size * 1.3,
-          zIndex: 3,
-        }}
-        resizeMode="contain"
-        accessibilityIgnoresInvertColors
-      />
-      <Image
-        source={caras[si][cara] ?? caras[0][0]}
-        style={{
-          position: "absolute",
-          top: -size * 0.02,
-          left: 0,
-          width: size,
-          height: size,
-          zIndex: 1,
-        }}
-        resizeMode="contain"
-        accessibilityIgnoresInvertColors
-      />
-      {peloCorto >= 0 && peloCortoOpts[peloCorto] && (
-        <Image
-          source={peloCortoOpts[peloCorto]}
-          style={{
-            position: "absolute",
-            top: -size * 0.28,
-            left: size * -0.02,
-            width: size * 1.05,
-            height: size * 0.8,
-            zIndex: 4,
-            tintColor: colorPeloStr,
-          }}
-          resizeMode="contain"
-          accessibilityIgnoresInvertColors
-        />
-      )}
-      {peloCorto < 0 && peloLargo >= 0 && peloLargoOpts[peloLargo] && (
-        <Image
-          source={peloLargoOpts[peloLargo]}
-          style={{
-            position: "absolute",
-            top: -size * 0.27,
-            left: size * -0.1,
-            width: size * 1.2,
-            height: size * 1.2,
-            zIndex: 4,
-            tintColor: colorPeloStr,
-          }}
-          resizeMode="contain"
-          accessibilityIgnoresInvertColors
-        />
-      )}
+      <SvgXml xml={svg} width={size} height={size} />
     </View>
   );
 }
@@ -311,7 +221,6 @@ export default function Historial() {
   const { escala, colores } = useAjustesCtx();
   const ts = useMemo(
     () => ({
-      titulo: { fontSize: Math.round(30 * escala) },
       seccionTitulo: { fontSize: Math.round(11 * escala) },
       tareaTitle: { fontSize: Math.round(14 * escala) },
       tareaHora: { fontSize: Math.round(12 * escala) },
@@ -319,7 +228,6 @@ export default function Historial() {
     }),
     [escala],
   );
-  const router = useRouter();
   const gami = useGamificacion();
   const { avatar } = useAvatar();
   const shotRef = useRef<any>(null);
@@ -398,6 +306,81 @@ export default function Historial() {
     "es-ES",
     { weekday: "long", day: "numeric", month: "long" },
   );
+
+  const renderFila = (
+    item: Tarea,
+    tipo: "completada" | "cancelada" | "vencida",
+  ) => {
+    const completada = tipo === "completada";
+    const colorEstado =
+      tipo === "completada" ? GREEN : tipo === "cancelada" ? RED : ORANGE;
+    const etiquetaEstado = tipo === "cancelada" ? "Eliminada" : "Saltada";
+    const a11y = completada
+      ? `${item.title}, ${item.stars ?? 5} de 5 estrellas${item.hora && item.hora !== "Sin hora" ? `, hora ${item.hora}` : ""}`
+      : `${item.title}, ${etiquetaEstado.toLowerCase()}${item.hora && item.hora !== "Sin hora" ? `, hora ${item.hora}` : ""}`;
+
+    return (
+      <View
+        key={item.id}
+        style={[styles.listRow, { borderLeftColor: colorEstado }]}
+        accessible
+        accessibilityLabel={a11y}
+      >
+        {item.pictogramId && (
+          <Image
+            source={{
+              uri: `https://static.arasaac.org/pictograms/${item.pictogramId}/${item.pictogramId}_300.png`,
+            }}
+            style={styles.listPictogram}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+            accessibilityIgnoresInvertColors
+          />
+        )}
+        <View style={styles.listInfo}>
+          <Text
+            style={[
+              styles.listTitle,
+              ts.tareaTitle,
+              !completada && styles.listTitleTachado,
+            ]}
+            numberOfLines={2}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+          >
+            {item.title}
+          </Text>
+          {item.hora && item.hora !== "Sin hora" && (
+            <Text
+              style={[styles.listHora, ts.tareaHora]}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            >
+              {item.hora}
+            </Text>
+          )}
+        </View>
+        {completada ? (
+          <StarRow count={item.stars ?? 5} size={13} />
+        ) : (
+          <View
+            style={[
+              styles.listStatusBadge,
+              { backgroundColor: colorEstado + "18" },
+            ]}
+          >
+            <Text
+              style={[styles.listStatusText, { color: colorEstado }]}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            >
+              {etiquetaEstado}
+            </Text>
+          </View>
+        )}
+      </View>
+    );
+  };
 
   const buildTextoCompartir = () => {
     const completadas = tareasUltimaSemana.filter(
@@ -559,38 +542,22 @@ export default function Historial() {
         keyboardShouldPersistTaps="handled"
         accessible={false}
       >
-        <Text
-          style={[styles.titulo, ts.titulo, ts.titulo]}
-          accessibilityRole="header"
-        >
-          Historial
-        </Text>
-
-        {/* Botones compartir */}
-        <View style={styles.shareRow} accessible={false}>
-          <Pressable
-            onPress={() => router.replace("/")}
-            style={styles.btnInicio}
-            accessible
-            accessibilityRole="button"
-            accessibilityLabel="Ir a Inicio"
+      <View style={styles.topSection}>
+        {/* Título + compartir */}
+        <View style={styles.headerRow} accessible={false}>
+          <Text
+            style={styles.titulo}
+            accessibilityRole="header"
           >
-            <Ionicons
-              name="home-outline"
-              size={16}
-              color={PURPLE}
-              accessibilityElementsHidden
-              importantForAccessibility="no"
-            />
-            <Text style={styles.btnInicioTxt}>Inicio</Text>
-          </Pressable>
+            Historial
+          </Text>
 
           <View style={styles.shareBtnsRow} accessible={false}>
             <Pressable
               onPress={() => iniciarCompartir("whatsapp")}
               disabled={compartiendo}
               style={[
-                styles.shareBtn,
+                styles.iconBtn,
                 { backgroundColor: "#25D366" },
                 compartiendo && { opacity: 0.5 },
               ]}
@@ -601,46 +568,18 @@ export default function Historial() {
             >
               <Ionicons
                 name="logo-whatsapp"
-                size={16}
+                size={17}
                 color="#fff"
                 accessibilityElementsHidden
                 importantForAccessibility="no"
               />
-              <Text style={styles.shareBtnTxt} numberOfLines={1}>
-                WhatsApp
-              </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => iniciarCompartir("gmail")}
-              disabled={compartiendo}
-              style={[
-                styles.shareBtn,
-                { backgroundColor: "#EA4335" },
-                compartiendo && { opacity: 0.5 },
-              ]}
-              accessible
-              accessibilityRole="button"
-              accessibilityLabel="Compartir por Gmail"
-              accessibilityState={{ disabled: compartiendo }}
-            >
-              <Ionicons
-                name="mail-outline"
-                size={16}
-                color="#fff"
-                accessibilityElementsHidden
-                importantForAccessibility="no"
-              />
-              <Text style={styles.shareBtnTxt} numberOfLines={1}>
-                Gmail
-              </Text>
             </Pressable>
 
             <Pressable
               onPress={() => iniciarCompartir("nativo")}
               disabled={compartiendo}
               style={[
-                styles.shareBtn,
+                styles.iconBtn,
                 { backgroundColor: PURPLE },
                 compartiendo && { opacity: 0.5 },
               ]}
@@ -660,9 +599,6 @@ export default function Historial() {
                 accessibilityElementsHidden
                 importantForAccessibility="no"
               />
-              <Text style={styles.shareBtnTxt} numberOfLines={1}>
-                {compartiendo ? "..." : "Más"}
-              </Text>
             </Pressable>
           </View>
         </View>
@@ -787,8 +723,8 @@ export default function Historial() {
                 <Text
                   style={[
                     styles.dayBtnLbl,
-                    sel && { color: "#fff", fontWeight: "700" },
-                    esHoy && !sel && { color: PURPLE, fontWeight: "700" },
+                    sel && { color: "#fff" },
+                    esHoy && !sel && { color: PURPLE },
                   ]}
                   accessibilityElementsHidden
                   importantForAccessibility="no"
@@ -821,7 +757,9 @@ export default function Historial() {
             );
           })}
         </View>
+      </View>
 
+      <View style={styles.sheet}>
         <View style={styles.diaHeader}>
           <Text
             style={styles.diaNombre}
@@ -892,217 +830,37 @@ export default function Historial() {
             </Text>
           </View>
         ) : (
-          <View style={styles.columnasRow} accessible={false}>
-            {/* Columna realizadas */}
-            <View style={styles.columna}>
-              <View
-                style={[
-                  styles.columnaHeader,
-                  { backgroundColor: PURPLE_BG, borderColor: PURPLE },
-                ]}
-              >
+          <View style={styles.listaCol} accessible={false}>
+            {completadasDia.length > 0 && (
+              <>
                 <Text
-                  style={[styles.columnaHeaderText, { color: PURPLE }]}
+                  style={styles.listaSectionLabel}
                   accessibilityRole="header"
-                  accessibilityLabel={`Realizadas: ${completadasDia.length}`}
                 >
                   ✓ Realizadas
                 </Text>
-              </View>
-              {completadasDia.length === 0 ? (
-                <Text
-                  style={styles.colEmpty}
-                  accessibilityLabel="Ninguna tarea realizada"
-                >
-                  Ninguna
-                </Text>
-              ) : (
-                completadasDia.map((item) => (
-                  <View
-                    key={item.id}
-                    style={[styles.tareaCard, { borderLeftColor: GREEN }]}
-                    accessible
-                    accessibilityLabel={`${item.title}, ${item.stars ?? 5} de 5 estrellas${item.hora && item.hora !== "Sin hora" ? `, hora ${item.hora}` : ""}`}
-                  >
-                    {item.pictogramId && (
-                      <Image
-                        source={{
-                          uri: `https://static.arasaac.org/pictograms/${item.pictogramId}/${item.pictogramId}_300.png`,
-                        }}
-                        style={styles.pictogram}
-                        accessibilityElementsHidden
-                        importantForAccessibility="no"
-                        accessibilityIgnoresInvertColors
-                      />
-                    )}
-                    <Text
-                      style={[styles.tareaTitle, ts.tareaTitle, ts.tareaTitle]}
-                      numberOfLines={2}
-                      accessibilityElementsHidden
-                      importantForAccessibility="no"
-                    >
-                      {item.title}
-                    </Text>
-                    <StarRow count={item.stars ?? 5} size={12} />
-                    {item.hora && item.hora !== "Sin hora" && (
-                      <Text
-                        style={[styles.tareaHora, ts.tareaHora, ts.tareaHora]}
-                        accessibilityElementsHidden
-                        importantForAccessibility="no"
-                      >
-                        {item.hora}
-                      </Text>
-                    )}
-                  </View>
-                ))
-              )}
-            </View>
+                {completadasDia.map((item) => renderFila(item, "completada"))}
+              </>
+            )}
 
-            <View style={styles.columna}>
-              <View
-                style={[
-                  styles.columnaHeader,
-                  { backgroundColor: PURPLE_BG, borderColor: PURPLE },
-                ]}
-              >
+            {(canceladasDia.length > 0 || vencidasDia.length > 0) && (
+              <>
                 <Text
-                  style={[styles.columnaHeaderText, { color: PURPLE }]}
+                  style={[
+                    styles.listaSectionLabel,
+                    completadasDia.length > 0 && { marginTop: 6 },
+                  ]}
                   accessibilityRole="header"
-                  accessibilityLabel={`No realizadas: ${canceladasDia.length + vencidasDia.length}`}
                 >
                   ✕ No realizadas
                 </Text>
-              </View>
-
-              {canceladasDia.length === 0 && vencidasDia.length === 0 ? (
-                <Text
-                  style={styles.colEmpty}
-                  accessibilityLabel="Ninguna tarea sin realizar"
-                >
-                  Ninguna
-                </Text>
-              ) : (
-                <>
-                  {/* Eliminadas  */}
-                  {canceladasDia.map((item) => (
-                    <View
-                      key={item.id}
-                      style={[
-                        styles.tareaCard,
-                        { borderLeftColor: RED, opacity: 0.75 },
-                      ]}
-                      accessible
-                      accessibilityLabel={`${item.title}, eliminada${item.hora && item.hora !== "Sin hora" ? `, hora ${item.hora}` : ""}`}
-                    >
-                      {item.pictogramId && (
-                        <Image
-                          source={{
-                            uri: `https://static.arasaac.org/pictograms/${item.pictogramId}/${item.pictogramId}_300.png`,
-                          }}
-                          style={styles.pictogram}
-                          accessibilityElementsHidden
-                          importantForAccessibility="no"
-                          accessibilityIgnoresInvertColors
-                        />
-                      )}
-                      <Text
-                        style={[
-                          styles.tareaTitle,
-                          ts.tareaTitle,
-                          { textDecorationLine: "line-through", color: "#888" },
-                        ]}
-                        numberOfLines={2}
-                        accessibilityElementsHidden
-                        importantForAccessibility="no"
-                      >
-                        {item.title}
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: fs(10),
-                          color: RED,
-                          fontWeight: "600",
-                          marginTop: 2,
-                        }}
-                        accessibilityElementsHidden
-                        importantForAccessibility="no"
-                      >
-                        Eliminada
-                      </Text>
-                      {item.hora && item.hora !== "Sin hora" && (
-                        <Text
-                          style={[styles.tareaHora, ts.tareaHora, ts.tareaHora]}
-                          accessibilityElementsHidden
-                          importantForAccessibility="no"
-                        >
-                          {item.hora}
-                        </Text>
-                      )}
-                    </View>
-                  ))}
-
-                  {/* Sin hacer — se quedaron pendientes */}
-                  {vencidasDia.map((item) => (
-                    <View
-                      key={item.id}
-                      style={[
-                        styles.tareaCard,
-                        { borderLeftColor: ORANGE, opacity: 0.85 },
-                      ]}
-                      accessible
-                      accessibilityLabel={`${item.title}, saltada${item.hora && item.hora !== "Sin hora" ? `, hora ${item.hora}` : ""}`}
-                    >
-                      {item.pictogramId && (
-                        <Image
-                          source={{
-                            uri: `https://static.arasaac.org/pictograms/${item.pictogramId}/${item.pictogramId}_300.png`,
-                          }}
-                          style={styles.pictogram}
-                          accessibilityElementsHidden
-                          importantForAccessibility="no"
-                          accessibilityIgnoresInvertColors
-                        />
-                      )}
-                      <Text
-                        style={[
-                          styles.tareaTitle,
-                          ts.tareaTitle,
-                          { textDecorationLine: "line-through", color: "#888" },
-                        ]}
-                        numberOfLines={2}
-                        accessibilityElementsHidden
-                        importantForAccessibility="no"
-                      >
-                        {item.title}
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: fs(10),
-                          color: ORANGE,
-                          fontWeight: "600",
-                          marginTop: 2,
-                        }}
-                        accessibilityElementsHidden
-                        importantForAccessibility="no"
-                      >
-                        Saltada
-                      </Text>
-                      {item.hora && item.hora !== "Sin hora" && (
-                        <Text
-                          style={[styles.tareaHora, ts.tareaHora, ts.tareaHora]}
-                          accessibilityElementsHidden
-                          importantForAccessibility="no"
-                        >
-                          {item.hora}
-                        </Text>
-                      )}
-                    </View>
-                  ))}
-                </>
-              )}
-            </View>
+                {canceladasDia.map((item) => renderFila(item, "cancelada"))}
+                {vencidasDia.map((item) => renderFila(item, "vencida"))}
+              </>
+            )}
           </View>
         )}
+      </View>
       </ScrollView>
     </View>
   );
@@ -1114,9 +872,8 @@ const fs = (size: number) =>
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#FBF6F0",
     paddingTop: 20,
-    paddingHorizontal: 20,
   },
 
   modalCapturaOverlay: {
@@ -1133,73 +890,62 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
   },
-  capturaLoadingTxt: { color: "#fff", fontWeight: "700", fontSize: 14 },
-
-  btnInicio: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    backgroundColor: PURPLE + "18",
-    borderRadius: 20,
-    alignSelf: "flex-start",
-    minHeight: 40,
-  },
-  btnInicioTxt: { color: PURPLE, fontWeight: "600", fontSize: 13 },
-  titulo: {
-    fontSize: 30,
-    fontWeight: "800",
-    color: PURPLE,
-    marginBottom: 24,
-    textAlign: "center",
+  capturaLoadingTxt: {
+    color: "#fff",
+    fontFamily: AppFonts.bodyBold,
+    fontSize: 14,
   },
 
-  shareRow: {
+  topSection: {
+    paddingHorizontal: 20,
+  },
+  headerRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 16,
-    gap: 8,
   },
+  titulo: {
+    fontSize: 26,
+    fontFamily: AppFonts.displayBold,
+    color: "#3A3342",
+  },
+
   shareBtnsRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    flexShrink: 1,
+    gap: 8,
   },
-  shareBtn: {
-    flexDirection: "row",
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 22,
-    minHeight: 40,
-    flexShrink: 1,
-  },
-  shareBtnTxt: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 12,
-    flexShrink: 1,
+    justifyContent: "center",
   },
 
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f3f2f2",
-    borderRadius: 25,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#EEE",
     paddingHorizontal: 15,
     paddingVertical: 10,
     marginBottom: 20,
     minHeight: 44,
+    shadowColor: "#000",
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
 
   weekSelector: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: PURPLE_BG,
+    backgroundColor: "#fff",
     borderRadius: 16,
     paddingVertical: 10,
     paddingHorizontal: 6,
@@ -1210,8 +956,8 @@ const styles = StyleSheet.create({
   weekArrow: { padding: 6 },
   weekLabel: {
     fontSize: 16,
-    fontWeight: "700",
-    color: PURPLE,
+    fontFamily: AppFonts.displayBold,
+    color: Colors.purpleDk,
     textAlign: "center",
     flexShrink: 1,
   },
@@ -1220,13 +966,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#FAFAFA",
-    borderRadius: 14,
+    backgroundColor: "#fff",
+    borderRadius: 18,
     paddingVertical: 12,
     paddingHorizontal: 8,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: "#EEE",
+    borderWidth: 1.5,
+    borderColor: PURPLE_LT,
   },
   dayBtn: {
     flex: 1,
@@ -1237,10 +982,28 @@ const styles = StyleSheet.create({
     marginHorizontal: 2,
     minHeight: 50,
   },
-  dayBtnSel: { backgroundColor: PURPLE },
+  dayBtnSel: {
+    backgroundColor: PURPLE,
+    shadowColor: PURPLE,
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
   dayBtnHoy: { backgroundColor: PURPLE_LT },
-  dayBtnLbl: { fontSize: 11, color: "#AAA", fontWeight: "600" },
+  dayBtnLbl: { fontSize: 11, color: "#AAA", fontFamily: AppFonts.bodyBold },
   dot: { width: 5, height: 5, borderRadius: 3 },
+
+  sheet: {
+    flex: 1,
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    marginTop: 18,
+    paddingHorizontal: 20,
+    paddingTop: 22,
+    paddingBottom: 30,
+  },
 
   diaHeader: {
     flexDirection: "row",
@@ -1249,51 +1012,66 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   diaNombre: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#555",
+    fontSize: 15,
+    fontFamily: AppFonts.displayBold,
+    color: "#3A3342",
     flex: 1,
     textTransform: "capitalize",
     flexShrink: 1,
   },
   diaBadgesRow: { flexDirection: "row", gap: 6 },
   diaBadge: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
-  diaBadgeText: { fontSize: 12, fontWeight: "700" },
+  diaBadgeText: { fontSize: 12, fontFamily: AppFonts.bodyBold },
 
-  columnasRow: { flexDirection: "row", gap: 12 },
-  columna: { flex: 1 },
-  columnaHeader: {
-    borderRadius: 10,
-    borderWidth: 1.5,
-    paddingVertical: 7,
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  columnaHeaderText: { fontSize: 12, fontWeight: "700" },
-  colEmpty: { fontSize: 12, color: "#CCC", textAlign: "center", marginTop: 12 },
-
-  tareaCard: {
-    backgroundColor: "#FAFAFA",
-    borderRadius: 12,
-    padding: 10,
+  listaCol: { flexDirection: "column" },
+  listaSectionLabel: {
+    fontSize: 11,
+    color: "#8A8194",
+    fontFamily: AppFonts.bodyBold,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
     marginBottom: 8,
-    borderLeftWidth: 3,
   },
-  pictogram: { width: 36, height: 36, borderRadius: 6, marginBottom: 6 },
-  tareaTitle: {
-    fontSize: 12,
-    color: "#333",
-    fontWeight: "600",
-    marginBottom: 4,
+  listRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 10,
+    borderLeftWidth: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  listPictogram: { width: 36, height: 36, borderRadius: 8 },
+  listInfo: { flex: 1, gap: 3 },
+  listTitle: {
+    fontSize: 14,
+    color: "#3A3342",
+    fontFamily: AppFonts.displaySemibold,
     flexShrink: 1,
   },
-  tareaHora: { fontSize: 11, color: "#AAA", marginTop: 2 },
+  listTitleTachado: {
+    color: "#AAA",
+    textDecorationLine: "line-through",
+  },
+  listHora: { fontSize: 11, color: "#AAA", fontFamily: AppFonts.body },
+  listStatusBadge: {
+    borderRadius: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+  },
+  listStatusText: { fontSize: 10.5, fontFamily: AppFonts.bodyBold },
 
   emptyBox: { alignItems: "center", paddingVertical: 30 },
   emptyText: {
     fontSize: 16,
     color: "#AAA",
-    fontWeight: "600",
+    fontFamily: AppFonts.bodyBold,
     textAlign: "center",
   },
   emptySubText: { fontSize: 13, color: "#CCC", marginTop: 6 },

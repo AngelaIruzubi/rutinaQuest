@@ -1,6 +1,6 @@
-import { Colors } from "@/constants/theme";
+import { AppFonts, Colors } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { useRouter } from "expo-router";
 import React from "react";
 import {
   Pressable,
@@ -14,13 +14,21 @@ import { UMBRALES_MEDALLA } from "../../constants/medallas";
 import { useAjustesCtx } from "../../context/AjustesContext";
 
 type ColorPair = { bg: string; text: string };
+type BadgeVariant = "purple" | "green" | "orange" | "red" | "neutral";
 const C = {
-  bg: "#F5F4F0",
+  bg: "#FBF6F0",
   surface: "#FFFFFF",
   border: "rgba(0,0,0,0.08)",
   textPrimary: "#1A1A1A",
   textMuted: "#7A7A7A",
-  purple: { bg: "#EEEDFE", text: "#A77BBE" } as ColorPair,
+};
+
+const BADGE_COLORS: Record<BadgeVariant, ColorPair> = {
+  purple: { bg: "#F4F0F6", text: "#7B5A9A" },
+  green: { bg: "#EEF9E2", text: "#3B6D11" },
+  orange: { bg: "#FFF2EC", text: "#B8562F" },
+  red: { bg: "#FDEDED", text: "#C43D3D" },
+  neutral: { bg: "#F3F3F3", text: "#8A8194" },
 };
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -35,15 +43,27 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Badge({ label }: { label: string }) {
+function Badge({
+  label,
+  variant = "purple",
+}: {
+  label: string;
+  variant?: BadgeVariant;
+}) {
   const { escala } = useAjustesCtx();
+  const cfg = BADGE_COLORS[variant];
   return (
     <View
-      style={estilos.badge}
+      style={[estilos.badge, { backgroundColor: cfg.bg }]}
       accessibilityElementsHidden
       importantForAccessibility="no"
     >
-      <Text style={[estilos.badgeText, { fontSize: Math.round(12 * escala) }]}>
+      <Text
+        style={[
+          estilos.badgeText,
+          { fontSize: Math.round(12 * escala), color: cfg.text },
+        ]}
+      >
         {label}
       </Text>
     </View>
@@ -53,11 +73,18 @@ function Badge({ label }: { label: string }) {
 type RuleRowProps = {
   title: string;
   badge: string;
+  badgeVariant?: BadgeVariant;
   last?: boolean;
   subtitle?: string;
 };
 
-function RuleRow({ title, badge, subtitle, last = false }: RuleRowProps) {
+function RuleRow({
+  title,
+  badge,
+  badgeVariant = "purple",
+  subtitle,
+  last = false,
+}: RuleRowProps) {
   const { escala } = useAjustesCtx();
 
   const a11yLabel = subtitle
@@ -88,7 +115,7 @@ function RuleRow({ title, badge, subtitle, last = false }: RuleRowProps) {
           </Text>
         )}
       </View>
-      <Badge label={badge} />
+      <Badge label={badge} variant={badgeVariant} />
     </View>
   );
 }
@@ -153,7 +180,7 @@ function MedalCard({
 }
 
 export default function NormasJuego() {
-  const { escala, colores } = useAjustesCtx();
+  const router = useRouter();
   return (
     <SafeAreaView style={estilos.safe}>
       <ScrollView
@@ -163,33 +190,25 @@ export default function NormasJuego() {
         accessible={false}
       >
         {/* Cabecera */}
-        <Text
-          style={[estilos.headerTitle, { fontSize: Math.round(30 * escala) }]}
-          accessibilityRole="header"
-        >
-          Normas del juego
-        </Text>
+        <View style={estilos.headerRow}>
+          <Pressable
+            onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))}
+            style={estilos.backBtn}
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel="Volver"
+          >
+            <Ionicons name="arrow-back" size={20} color={Colors.purpleDk} />
+          </Pressable>
+          <Text style={estilos.headerTitle} accessibilityRole="header">
+            Normas del juego
+          </Text>
+        </View>
 
-        <Pressable
-          onPress={() => router.replace("/")}
-          style={estilos.btnInicio}
-          accessible
-          accessibilityRole="button"
-          accessibilityLabel="Ir a Inicio"
-        >
-          <Ionicons
-            name="home-outline"
-            size={16}
-            color={Colors.purple}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-          <Text style={estilos.btnInicioTxt}>Inicio</Text>
-        </Pressable>
         {/* ── Programar tareas ── */}
         <SectionTitle>Programar tareas</SectionTitle>
         <Card>
-          <RuleRow title="Tarea puntual" badge="Home/Calendario" />
+          <RuleRow title="Tarea puntual" badge="Inicio / Calendario" />
           <RuleRow
             title="Tarea repetitiva diaria o semanal"
             badge="Calendario"
@@ -203,8 +222,14 @@ export default function NormasJuego() {
           <RuleRow
             title="Tarea completada a tiempo o sin hora"
             badge="+5 estrellas"
+            badgeVariant="green"
           />
-          <RuleRow title="Tarea completada tarde" badge="+3 estrellas" last />
+          <RuleRow
+            title="Tarea completada tarde"
+            badge="+3 estrellas"
+            badgeVariant="orange"
+            last
+          />
         </Card>
 
         {/* ── Penalizaciones ── */}
@@ -214,6 +239,7 @@ export default function NormasJuego() {
             title="Tareas sin completar"
             subtitle="Se hizo algo, pero quedaron pendientes"
             badge="Menos 10 estrellas"
+            badgeVariant="red"
             last
           />
         </Card>
@@ -225,11 +251,13 @@ export default function NormasJuego() {
             title="Racha activa"
             subtitle="Completas tareas días consecutivos"
             badge="Más 1 por día"
+            badgeVariant="orange"
           />
           <RuleRow
             title="Racha rota"
             subtitle="Saltas un día sin completar nada"
             badge="Vuelve a 0"
+            badgeVariant="neutral"
             last
           />
         </Card>
@@ -262,22 +290,34 @@ const estilos = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
   scroll: { flex: 1 },
   container: {
-    backgroundColor: "#fff",
     paddingTop: 20,
     paddingHorizontal: 20,
   },
 
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 20,
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: "#F4F0F6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   headerTitle: {
-    fontSize: 30,
-    fontWeight: "800",
-    color: C.purple.text,
-    textAlign: "center",
-    marginBottom: 24,
+    fontSize: 26,
+    fontFamily: AppFonts.displayBold,
+    color: "#3A3342",
+    flexShrink: 1,
   },
 
   sectionTitle: {
     fontSize: 11,
-    fontWeight: "600",
+    fontFamily: AppFonts.bodyBold,
     color: C.textMuted,
     letterSpacing: 0.8,
     textTransform: "uppercase",
@@ -288,24 +328,11 @@ const estilos = StyleSheet.create({
 
   card: {
     backgroundColor: C.surface,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 0.5,
     borderColor: C.border,
     overflow: "hidden",
   },
-  btnInicio: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    backgroundColor: Colors.purple + "18",
-    borderRadius: 20,
-    alignSelf: "flex-start",
-    marginBottom: 20,
-    minHeight: 44,
-  },
-  btnInicioTxt: { color: Colors.purple, fontWeight: "600", fontSize: 13 },
 
   row: {
     flexDirection: "row",
@@ -321,21 +348,33 @@ const estilos = StyleSheet.create({
   rowContent: { flex: 1 },
   rowTitle: {
     fontSize: 14,
-    fontWeight: "500",
+    fontFamily: AppFonts.bodyBold,
     color: C.textPrimary,
     marginBottom: 1,
   },
-  rowSubtitle: { fontSize: 12, color: C.textMuted, lineHeight: 16 },
+  rowSubtitle: {
+    fontSize: 12,
+    color: C.textMuted,
+    fontFamily: AppFonts.body,
+    lineHeight: 16,
+  },
 
-  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  badgeText: { fontSize: 12, fontWeight: "600" },
+  badge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  badgeText: {
+    fontSize: 12,
+    fontFamily: AppFonts.bodyBold,
+  },
 
   medalGrid: { flexDirection: "row", gap: 8, width: "100%" },
   medalCard: {
     flex: 1,
     minWidth: 80,
     backgroundColor: C.surface,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 0.5,
     borderColor: C.border,
     paddingVertical: 16,
@@ -345,9 +384,9 @@ const estilos = StyleSheet.create({
   medalIcon: { fontSize: 26, marginBottom: 6 },
   medalName: {
     fontSize: 13,
-    fontWeight: "600",
+    fontFamily: AppFonts.bodyBold,
     color: C.textPrimary,
     marginBottom: 2,
   },
-  medalReq: { fontSize: 12, color: C.textMuted },
+  medalReq: { fontSize: 12, color: C.textMuted, fontFamily: AppFonts.body },
 });

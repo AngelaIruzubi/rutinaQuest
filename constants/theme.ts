@@ -38,6 +38,19 @@ export const Colors = {
 
 export type ColorKey = keyof Omit<typeof Colors, 'light' | 'dark'>;
 
+// ─── Tipografía de marca (Baloo 2 + Atkinson Hyperlegible) ─────────────────────
+// Cargadas en app/(drawer)/_layout.tsx con useFonts. Atkinson Hyperlegible está
+// diseñada específicamente para accesibilidad/baja visión — encaja con el resto
+// de cuidado de accesibilidad que ya tiene la app (objetivos táctiles de 44px,
+// alto contraste, escala de texto ajustable).
+export const AppFonts = {
+  displaySemibold: 'Baloo2_600SemiBold',
+  displayBold: 'Baloo2_700Bold',
+  displayExtraBold: 'Baloo2_800ExtraBold',
+  body: 'AtkinsonHyperlegible_400Regular',
+  bodyBold: 'AtkinsonHyperlegible_700Bold',
+} as const;
+
 // ─── Tipografía ───────────────────────────────────────────────────────────────
 
 export const Fonts = Platform.select({
