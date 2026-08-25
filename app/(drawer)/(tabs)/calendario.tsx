@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Haptics from "expo-haptics";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   AccessibilityInfo,
@@ -16,10 +16,13 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { DuracionPicker } from "../../../components/ui/DuracionPicker";
+import { SelectorDiasSemana } from "../../../components/ui/SelectorDiasSemana";
 import { DIAS_SEMANA, MESES } from "../../../constants/diasSemana";
 import { AppFonts, Colors } from "../../../constants/theme";
 import { useAjustesCtx } from "../../../context/AjustesContext";
 import { useDBReady } from "../../../context/Dbreadycontext";
+import { useTemporizadorTarea } from "../../../context/TemporizadorContext";
 import {
   deleteTarea,
   getFechasConTareas,
@@ -197,6 +200,8 @@ function ModalNuevaTarea({
   const [repeticion, setRepeticion] = useState<
     "ninguna" | "diaria" | "semanal"
   >("ninguna");
+  const [diasSemana, setDiasSemana] = useState<number[]>([new Date().getDay()]);
+  const [duracionSeg, setDuracionSeg] = useState<number | null>(null);
 
   const PURPLE = "#A77BBE";
   const PURPLE_LT = "#E5D9EE";
@@ -236,6 +241,8 @@ function ModalNuevaTarea({
     setPictogramas([]);
     setShowPicker(false);
     setRepeticion("ninguna");
+    setDiasSemana([new Date().getDay()]);
+    setDuracionSeg(null);
     onClose();
   };
 
@@ -247,6 +254,8 @@ function ModalNuevaTarea({
       hora: hora ?? "Sin hora",
       pictogramId: pictogramId ?? null,
       repeticion,
+      diasSemana: repeticion === "semanal" ? diasSemana : null,
+      duracionSeg,
     });
     setTitulo("");
     setHora(null);
@@ -254,6 +263,8 @@ function ModalNuevaTarea({
     setPictogramas([]);
     setShowPicker(false);
     setRepeticion("ninguna");
+    setDiasSemana([new Date().getDay()]);
+    setDuracionSeg(null);
     onClose();
     AccessibilityInfo.announceForAccessibility(
       `Tarea ${titulo} añadida para el ${fecha}`,
@@ -578,13 +589,19 @@ function ModalNuevaTarea({
                     }
                     accessibilityState={{ selected: repeticion === opcion }}
                   >
-                    <Text style={{ fontSize: 18 }}>
-                      {opcion === "ninguna"
-                        ? "1"
-                        : opcion === "diaria"
-                          ? "📅"
-                          : "📆"}
-                    </Text>
+                    <Ionicons
+                      name={
+                        opcion === "ninguna"
+                          ? "checkmark-circle-outline"
+                          : opcion === "diaria"
+                            ? "repeat-outline"
+                            : "calendar-outline"
+                      }
+                      size={22}
+                      color={repeticion === opcion ? PURPLE : "#999"}
+                      accessibilityElementsHidden
+                      importantForAccessibility="no"
+                    />
                     <Text
                       style={{
                         fontSize: fs(11),
@@ -601,6 +618,22 @@ function ModalNuevaTarea({
                     </Text>
                   </Pressable>
                 ))}
+              </View>
+
+              {/* ── Días de la semana (solo si repite semanalmente) ── */}
+              {repeticion === "semanal" && (
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={s.modalInputLabel}>¿Qué días?</Text>
+                  <SelectorDiasSemana
+                    diasSemana={diasSemana}
+                    onChange={setDiasSemana}
+                  />
+                </View>
+              )}
+
+              {/* ── Duración con temporizador ── */}
+              <View style={{ marginBottom: 16 }}>
+                <DuracionPicker valorSeg={duracionSeg} onChange={setDuracionSeg} />
               </View>
 
               {/* ── Botón guardar ── */}
@@ -644,6 +677,8 @@ function ModalNuevaTarea({
 export default function Calendario() {
   const { escala, colores } = useAjustesCtx();
   const { mostrarConfirm, confirmModal } = useConfirm();
+  const router = useRouter();
+  const { activo: timerActivo, iniciarParaTarea } = useTemporizadorTarea();
   const ahora = ahoraApp();
   const [anyo, setAnyo] = useState(ahora.getFullYear());
   const [mes, setMes] = useState(ahora.getMonth());
@@ -734,6 +769,26 @@ export default function Calendario() {
     );
     setTareasDia(pendientes);
     await actualizarFechasConTareas();
+  };
+
+  const abrirTemporizadorTarea = async (tarea: any) => {
+    if (timerActivo?.tareaId === tarea.id) {
+      router.push("/temporizador");
+      return;
+    }
+    if (timerActivo && timerActivo.estado !== "finished") {
+      const continuar = await mostrarConfirm(
+        "Ya tienes un temporizador en marcha",
+        `Tienes un temporizador en marcha para "${timerActivo.tareaTitulo}". ¿Quieres sustituirlo por el de "${tarea.title}"?`,
+        [
+          { texto: "Cancelar", valor: false },
+          { texto: "Sustituir", valor: true },
+        ],
+      );
+      if (!continuar) return;
+    }
+    iniciarParaTarea(tarea);
+    router.push("/temporizador");
   };
 
   const eliminar = async (id: string, titulo: string) => {
@@ -931,6 +986,24 @@ export default function Calendario() {
                           </Text>
                         )}
                       </View>
+                      {t.duracionSeg && !t.tiempoCumplido && !t.virtual && (
+                        <Pressable
+                          onPress={() => abrirTemporizadorTarea(t)}
+                          style={s.btnTemporizador}
+                          accessible
+                          accessibilityRole="button"
+                          accessibilityLabel={`Iniciar temporizador de ${Math.round(t.duracionSeg / 60)} minutos para ${t.title}`}
+                          accessibilityHint="Abre el temporizador. La tarea no se podrá marcar como realizada hasta que termine"
+                        >
+                          <Ionicons
+                            name="play"
+                            size={19}
+                            color="#fff"
+                            accessibilityElementsHidden
+                            importantForAccessibility="no"
+                          />
+                        </Pressable>
+                      )}
                       {esFuturo && !t.virtual && (
                         <Pressable
                           onPress={() => eliminar(t.id, t.title)}
@@ -1156,6 +1229,14 @@ const s = StyleSheet.create({
     marginTop: 2,
   },
   btnEliminar: { padding: 10 },
+  btnTemporizador: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#A77BBE",
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
   overlay: {
     flex: 1,

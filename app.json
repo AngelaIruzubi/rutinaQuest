@@ -25,6 +25,10 @@
       "permissions": ["POST_NOTIFICATIONS", "RECEIVE_BOOT_COMPLETED", "VIBRATE"],
       "allowBackup": false
     },
+    "androidStatusBar": {
+      "backgroundColor": "#FBF6F0",
+      "barStyle": "dark-content"
+    },
     "splash": {
       "image": "./assets/images/icono.png",
       "resizeMode": "contain",

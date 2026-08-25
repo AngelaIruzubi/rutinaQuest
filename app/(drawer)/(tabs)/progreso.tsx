@@ -686,29 +686,6 @@ export default function Progreso() {
               <SemanaRacha racha={gami.racha} />
             </View>
 
-            {gami.racha === 0 && (
-              <View
-                style={s.rachaVaciaBox}
-                accessible
-                accessibilityLabel="Sin racha activa. Completa una tarea hoy para empezar tu racha"
-              >
-                <Text
-                  style={s.rachaVaciaEmoji}
-                  accessibilityElementsHidden
-                  importantForAccessibility="no"
-                >
-                  💤
-                </Text>
-                <Text
-                  style={s.rachaVaciaText}
-                  accessibilityElementsHidden
-                  importantForAccessibility="no"
-                >
-                  Completa una tarea hoy{"\n"}para empezar tu racha
-                </Text>
-              </View>
-            )}
-
             {nextMedal && (
               <View
                 style={s.teaserBox}
@@ -1088,22 +1065,6 @@ const s = StyleSheet.create({
     fontFamily: AppFonts.bodyBold,
   },
 
-  rachaVaciaBox: {
-    alignItems: "center",
-    paddingVertical: 24,
-    gap: 8,
-    backgroundColor: "#F8F8F8",
-    borderRadius: 16,
-    marginTop: 12,
-  },
-  rachaVaciaEmoji: { fontSize: 36 },
-  rachaVaciaText: {
-    fontSize: 14,
-    color: "#AAA",
-    fontFamily: AppFonts.bodyBold,
-    textAlign: "center",
-    lineHeight: 22,
-  },
 
   // Medallas
   medalsCol: { flexDirection: "column", gap: 12, marginBottom: 18 },

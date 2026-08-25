@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AccessibilityInfo,
   Animated,
@@ -1046,6 +1046,23 @@ export function PerezosoNotif({
   const esMedalla = TIPOS_MEDALLA.has(type);
   const esBajada = TIPOS_BAJA_MEDALLA.has(type);
 
+  // El <Modal> nativo se cierra de golpe en cuanto "visible" pasa a false,
+  // sin esperar a la animación de salida que ya dispara el efecto de más
+  // abajo — por eso, al encadenar dos notificaciones seguidas, la primera
+  // desaparecía de un corte en vez de con su transición. Este estado retrasa
+  // el desmontaje real hasta que esa animación de salida haya terminado (las
+  // variantes de medalla/bajada tardan más, hasta 300ms).
+  const [modalVisible, setModalVisible] = useState(show);
+  useEffect(() => {
+    if (show) {
+      setModalVisible(true);
+      return;
+    }
+    const espera = reduceMotion ? 0 : esMedalla || esBajada ? 320 : 240;
+    const t = setTimeout(() => setModalVisible(false), espera);
+    return () => clearTimeout(t);
+  }, [show]);
+
   // Animaciones para notificación normal
   const slideAnim = useRef(new Animated.Value(80)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
@@ -1113,7 +1130,7 @@ export function PerezosoNotif({
 
   return (
     <Modal
-      visible={show}
+      visible={modalVisible}
       transparent
       animationType="none"
       statusBarTranslucent

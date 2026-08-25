@@ -1,5 +1,5 @@
 import * as Haptics from "expo-haptics";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AccessibilityInfo,
   Animated,
@@ -41,6 +41,21 @@ export function RachaNotif({ show, racha, onClose }: RachaNotifProps) {
 
   // --- Counter ---
   const count = useRef(new Animated.Value(Math.max(0, racha - 1))).current;
+
+  // El <Modal> nativo se cierra de golpe en cuanto "visible" pasa a false,
+  // sin esperar a la animación de salida de más abajo — este estado retrasa
+  // el desmontaje real hasta que esa animación (opacidad + escala, ~200ms)
+  // haya terminado, para que la transición se vea en vez de cortarse.
+  const [modalVisible, setModalVisible] = useState(show);
+  useEffect(() => {
+    if (show) {
+      setModalVisible(true);
+      return;
+    }
+    const espera = reduceMotion ? 0 : 220;
+    const t = setTimeout(() => setModalVisible(false), espera);
+    return () => clearTimeout(t);
+  }, [show]);
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -246,7 +261,7 @@ export function RachaNotif({ show, racha, onClose }: RachaNotifProps) {
 
   return (
     <Modal
-      visible={show}
+      visible={modalVisible}
       transparent
       animationType="none"
       statusBarTranslucent

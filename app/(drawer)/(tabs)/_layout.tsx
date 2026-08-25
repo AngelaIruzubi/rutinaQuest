@@ -22,6 +22,7 @@ export default function TabsLayout() {
           paddingBottom: 18,
         },
         tabBarItemStyle: { minHeight: 44 },
+        sceneStyle: { backgroundColor: "#FBF6F0" },
       }}
     >
       <Tabs.Screen

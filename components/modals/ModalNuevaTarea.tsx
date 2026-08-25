@@ -15,6 +15,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { DuracionPicker } from '../../components/ui/DuracionPicker';
 import { AppFonts, Colors } from '../../constants/theme';
 import { useAjustesCtx } from '../../context/AjustesContext';
 import { buscarPictogramas } from '../../services/arasaac';
@@ -34,11 +36,13 @@ interface ModalNuevaTareaProps {
 export function ModalNuevaTarea({ visible, onCerrar, onGuardar }: ModalNuevaTareaProps) {
   const { escala } = useAjustesCtx();
   const fs = (n: number) => Math.round(n * escala);
+  const insets = useSafeAreaInsets();
   const [titulo,      setTitulo]      = useState('');
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [pictogramas, setPictogramas] = useState<number[]>([]);
   const [pictogramId, setPictogramId] = useState<number | null>(null);
   const [repeticion,  setRepeticion]  = useState<'ninguna' | 'diaria' | 'semanal'>('ninguna');
+  const [duracionSeg, setDuracionSeg] = useState<number | null>(null);
   const [showPicker,  setShowPicker]  = useState(false);
   const [tempTime]                    = useState(fechaAppDate());
 
@@ -77,6 +81,7 @@ const buscarPictogramasDebounced = async (texto: string) => {
     setPictogramId(null);
     setPictogramas([]);
     setRepeticion('ninguna');
+    setDuracionSeg(null);
     setShowPicker(false);
     onCerrar();
   };
@@ -91,6 +96,7 @@ const buscarPictogramasDebounced = async (texto: string) => {
       completed:   false,
       stars:       0,
       repeticion,
+      duracionSeg,
     };
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onGuardar(newTask);
@@ -106,29 +112,34 @@ const buscarPictogramasDebounced = async (texto: string) => {
       onRequestClose={cerrar}
       accessibilityViewIsModal
     >
-      <View style={s.overlay}>
+      <View style={[s.overlay, { paddingTop: insets.top + 20 }]}>
         <View style={s.modalBox}>
           <LinearGradient
-            colors={['#C9A9DB', Colors.purple]}
+            colors={['#F7F2FA', '#EFE6F4']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={s.header}
           >
-            <Text style={[s.headerTitle, { fontSize: fs(19) }]} accessibilityRole="header">
-              Nueva tarea
-            </Text>
-            <Pressable
-              onPress={cerrar}
-              accessible
-              accessibilityRole="button"
-              accessibilityLabel="Cerrar"
-              style={s.closeBtn}
-            >
-              <Ionicons name="close" size={20} color="#fff" />
-            </Pressable>
+            <View style={s.headerRow}>
+              <View style={s.headerIcon}>
+                <Ionicons name="add-circle" size={22} color={Colors.purple} />
+              </View>
+              <Text style={[s.headerTitle, { fontSize: fs(21) }]} accessibilityRole="header">
+                Nueva tarea
+              </Text>
+              <Pressable
+                onPress={cerrar}
+                accessible
+                accessibilityRole="button"
+                accessibilityLabel="Cerrar"
+                style={s.closeBtn}
+              >
+                <Ionicons name="close" size={20} color={Colors.purpleDk} />
+              </Pressable>
+            </View>
           </LinearGradient>
 
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.body}>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[s.body, { paddingBottom: 20 + insets.bottom }]}>
 
             {/* Título */}
             <View style={s.inputRow}>
@@ -137,7 +148,7 @@ const buscarPictogramasDebounced = async (texto: string) => {
                 placeholderTextColor="#B9AFC4"
                 value={titulo}
                 onChangeText={buscarImagen}
-                style={{ flex: 1, paddingVertical: 12, fontSize: fs(16), fontFamily: AppFonts.body, color: '#3A3140' }}
+                style={{ flex: 1, paddingVertical: 14, fontSize: fs(17), fontFamily: AppFonts.body, color: '#3A3140' }}
                 accessibilityLabel="Título de la tarea"
                 accessibilityHint="Escribe el nombre de la tarea. Se buscarán pictogramas automáticamente"
                 returnKeyType="done"
@@ -205,7 +216,7 @@ const buscarPictogramasDebounced = async (texto: string) => {
 
             {/* Selector de pictogramas */}
             {pictogramas.length > 0 && (
-              <View style={{ marginTop: 18 }}>
+              <View style={{ marginTop: 20 }}>
                 <Text style={s.pictoLabel}>Elige un pictograma</Text>
                 <ScrollView
                   horizontal
@@ -246,6 +257,11 @@ const buscarPictogramasDebounced = async (texto: string) => {
               </View>
             )}
 
+            {/* Duración con temporizador */}
+            <View style={{ marginTop: 20 }}>
+              <DuracionPicker valorSeg={duracionSeg} onChange={setDuracionSeg} />
+            </View>
+
             {/* Botón guardar */}
             <Pressable
               onPress={guardar}
@@ -261,7 +277,7 @@ const buscarPictogramasDebounced = async (texto: string) => {
                 end={{ x: 1, y: 0 }}
                 style={s.btnPrimary}
               >
-                <Ionicons name="checkmark-circle" size={20} color="#fff" accessibilityElementsHidden importantForAccessibility="no" />
+                <Ionicons name="checkmark-circle" size={22} color="#fff" accessibilityElementsHidden importantForAccessibility="no" />
                 <Text style={[s.btnPrimaryText, { fontSize: fs(18) }]}>Añadir tarea</Text>
               </LinearGradient>
             </Pressable>
@@ -276,42 +292,61 @@ const buscarPictogramasDebounced = async (texto: string) => {
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  overlay:    { flex: 1, backgroundColor: 'rgba(46,32,58,0.4)', justifyContent: 'center', alignItems: 'center' },
-  modalBox:   { backgroundColor: '#fff', borderRadius: 28, width: '90%', maxHeight: '90%', overflow: 'hidden' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 18,
-    paddingHorizontal: 20,
+  overlay:  { flex: 1, backgroundColor: 'rgba(46,32,58,0.45)', justifyContent: 'flex-start', alignItems: 'center' },
+  modalBox: {
+    backgroundColor: '#fff',
+    borderRadius: 26,
+    width: '90%',
+    maxHeight: '85%',
+    overflow: 'hidden',
+    shadowColor: '#2E203A',
+    shadowOpacity: 0.28,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 12,
   },
-  headerTitle: { fontFamily: AppFonts.displayBold, color: '#fff' },
-  closeBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(255,255,255,0.22)',
+  header: {
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#EDE3F2',
+  },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  headerIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  body: { padding: 20, paddingTop: 18 },
+  headerTitle: { flex: 1, fontFamily: AppFonts.displayExtraBold, color: '#5F4479' },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  body: { padding: 20, paddingTop: 20 },
 
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    borderWidth: 1.5,
-    borderColor: Colors.purpleLt,
-    borderRadius: 16,
-    paddingHorizontal: 14,
+    borderRadius: 18,
+    paddingHorizontal: 16,
     paddingRight: 8,
     backgroundColor: '#FBF9FC',
-    minHeight: 48,
+    borderWidth: 1.5,
+    borderColor: Colors.purpleLt,
+    minHeight: 54,
   },
   iconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 13,
     backgroundColor: Colors.purpleBg,
     alignItems: 'center',
     justifyContent: 'center',
@@ -322,9 +357,9 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     alignSelf: 'center',
-    marginTop: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
+    marginTop: 12,
+    paddingVertical: 7,
+    paddingHorizontal: 16,
     borderRadius: 12,
   },
   timePillActivo: { backgroundColor: Colors.purpleBg },
@@ -336,12 +371,12 @@ const s = StyleSheet.create({
     color: Colors.purpleDk,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
-    marginBottom: 10,
+    marginBottom: 12,
   },
   pictoOpcion: {
     width: 78,
     height: 78,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 2,
     borderColor: '#EDEAF1',
     backgroundColor: '#fff',
@@ -355,10 +390,11 @@ const s = StyleSheet.create({
     backgroundColor: Colors.purpleBg,
     shadowColor: Colors.purple,
     shadowOpacity: 0.35,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 5,
   },
-  pictoImg:        { width: 64, height: 64, borderRadius: 10 },
+  pictoImg:        { width: 68, height: 68, borderRadius: 12 },
   pictoNinguno:    { gap: 2 },
   pictoNingunoTxt: { fontSize: 10, color: '#CCC', fontFamily: AppFonts.bodyBold },
 
@@ -367,10 +403,15 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 16,
-    borderRadius: 18,
-    marginTop: 22,
+    paddingVertical: 18,
+    borderRadius: 999,
+    marginTop: 24,
     minHeight: 44,
+    shadowColor: Colors.purple,
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
   },
   btnPrimaryText: { color: '#fff', fontFamily: AppFonts.displayBold },
 });

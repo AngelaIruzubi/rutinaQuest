@@ -77,21 +77,21 @@ function AvatarMini({
 function TarjetaCompartir({
   avatar,
   gami,
-  tareasUltimaSemana,
+  tareas,
+  etiquetaPeriodo,
 }: {
   avatar: any;
   gami: any;
-  tareasUltimaSemana: any[];
+  tareas: any[];
+  etiquetaPeriodo: string;
 }) {
   const medallaEmoji = gami.medalla
     ? ({ bronce: "🥉", plata: "🥈", oro: "🥇" } as any)[gami.medalla]
     : null;
-  const completadas = tareasUltimaSemana.filter(
+  const completadas = tareas.filter(
     (t) => t.estado === "completada" || (t.completada === 1 && !t.estado),
   );
-  const canceladas = tareasUltimaSemana.filter(
-    (t) => t.estado === "cancelada" || t.estado === "vencida",
-  );
+  const noRealizadas = tareas.filter((t) => t.estado === "vencida");
 
   return (
     <View
@@ -116,14 +116,18 @@ function TarjetaCompartir({
             </Text>
           )}
           <View style={tc.statsDivider} />
-          <Text style={tc.statLine}>✅ {completadas.length} esta semana</Text>
-          <Text style={tc.statLine}>❌ {canceladas.length} canceladas</Text>
+          <Text style={tc.statLine}>
+            ✅ {completadas.length} {etiquetaPeriodo}
+          </Text>
+          <Text style={tc.statLine}>❌ {noRealizadas.length} no realizadas</Text>
         </View>
       </View>
-      {tareasUltimaSemana.length > 0 && (
+      {tareas.length > 0 && (
         <View style={tc.tareasSection}>
-          <Text style={tc.tareasSectionTitle}>Esta semana</Text>
-          {tareasUltimaSemana.slice(0, 10).map((t, i) => {
+          <Text style={tc.tareasSectionTitle}>
+            {etiquetaPeriodo.charAt(0).toUpperCase() + etiquetaPeriodo.slice(1)}
+          </Text>
+          {tareas.slice(0, 10).map((t, i) => {
             const ok =
               t.estado === "completada" || (t.completada === 1 && !t.estado);
             return (
@@ -237,12 +241,21 @@ export default function Historial() {
   const [historial, setHistorial] = useState<Tarea[]>([]);
   const [compartiendo, setCompartiendo] = useState(false);
   const [modalCaptura, setModalCaptura] = useState(false);
+  const [modalPeriodo, setModalPeriodo] = useState(false);
   const [destinoPend, setDestinoPend] = useState<
     "whatsapp" | "gmail" | "nativo" | null
   >(null);
+  const [destinoElegido, setDestinoElegido] = useState<
+    "whatsapp" | "nativo" | null
+  >(null);
+  const [tareasCompartir, setTareasCompartir] = useState<Tarea[]>([]);
+  const [etiquetaCompartir, setEtiquetaCompartir] = useState("");
   const [semanaActual, setSemanaActual] = useState(() =>
     lunesDe(fechaAppDate()),
   );
+  const [filtroEstado, setFiltroEstado] = useState<
+    "todas" | "completada" | "vencida"
+  >("todas");
 
   const hoy = hoyAppStr();
   const [diaSeleccionado, setDiaSeleccionado] = useState(hoy);
@@ -291,16 +304,52 @@ export default function Historial() {
     dias.includes(fechaReferencia(t)),
   );
 
-  const tareasDelDia = historial.filter(
-    (t) =>
-      fechaReferencia(t) === diaSeleccionado &&
-      t.title.toLowerCase().includes(search.toLowerCase()),
-  );
-  const completadasDia = tareasDelDia.filter(
+  // Para compartir se puede elegir entre el día, la semana o el mes en vez
+  // de estar siempre atado a la semana que se está viendo.
+  const tareasDelPeriodo = (periodo: "dia" | "semana" | "mes"): Tarea[] => {
+    if (periodo === "dia") {
+      return historial.filter((t) => fechaReferencia(t) === diaSeleccionado);
+    }
+    if (periodo === "semana") return tareasUltimaSemana;
+    const prefijoMes = diaSeleccionado.slice(0, 7); // "YYYY-MM"
+    return historial.filter((t) => fechaReferencia(t).startsWith(prefijoMes));
+  };
+
+  const etiquetaDelPeriodo = (periodo: "dia" | "semana" | "mes"): string => {
+    if (periodo === "dia") return diaSeleccionado === hoy ? "hoy" : nombreDia;
+    if (periodo === "semana") return "esta semana";
+    return new Date(diaSeleccionado + "T12:00:00").toLocaleDateString(
+      "es-ES",
+      { month: "long", year: "numeric" },
+    );
+  };
+
+  // Con el buscador activo, se busca en todo el historial (no solo en el día
+  // seleccionado); sin búsqueda, se mantiene el comportamiento por día.
+  const busquedaActiva = search.trim().length > 0;
+  const tareasBase = busquedaActiva
+    ? historial
+        .filter((t) => t.title.toLowerCase().includes(search.trim().toLowerCase()))
+        .sort((a, b) => fechaReferencia(b).localeCompare(fechaReferencia(a)))
+    : historial.filter((t) => fechaReferencia(t) === diaSeleccionado);
+
+  const completadasBase = tareasBase.filter(
     (t) => t.estado === "completada" || (t.completed && !t.estado),
   );
-  const canceladasDia = tareasDelDia.filter((t) => t.estado === "cancelada");
-  const vencidasDia = tareasDelDia.filter((t) => t.estado === "vencida");
+  const vencidasBase = tareasBase.filter((t) => t.estado === "vencida");
+
+  // Los recuadros ✓/✕ funcionan como filtro: tocar uno muestra solo esa
+  // categoría, y volver a tocarlo lo quita.
+  const mostrarCompletadas = filtroEstado !== "vencida";
+  const mostrarVencidas = filtroEstado !== "completada";
+  const totalVisible =
+    (mostrarCompletadas ? completadasBase.length : 0) +
+    (mostrarVencidas ? vencidasBase.length : 0);
+
+  const alternarFiltroCompletadas = () =>
+    setFiltroEstado((prev) => (prev === "completada" ? "todas" : "completada"));
+  const alternarFiltroVencidas = () =>
+    setFiltroEstado((prev) => (prev === "vencida" ? "todas" : "vencida"));
 
   const nombreDia = new Date(diaSeleccionado + "T12:00:00").toLocaleDateString(
     "es-ES",
@@ -309,15 +358,21 @@ export default function Historial() {
 
   const renderFila = (
     item: Tarea,
-    tipo: "completada" | "cancelada" | "vencida",
+    tipo: "completada" | "vencida",
+    mostrarFecha = false,
   ) => {
     const completada = tipo === "completada";
-    const colorEstado =
-      tipo === "completada" ? GREEN : tipo === "cancelada" ? RED : ORANGE;
-    const etiquetaEstado = tipo === "cancelada" ? "Eliminada" : "Saltada";
+    const colorEstado = completada ? GREEN : ORANGE;
+    const etiquetaEstado = "Saltada";
+    const fechaLabel = mostrarFecha
+      ? new Date(fechaReferencia(item) + "T12:00:00").toLocaleDateString(
+          "es-ES",
+          { day: "numeric", month: "short" },
+        )
+      : null;
     const a11y = completada
-      ? `${item.title}, ${item.stars ?? 5} de 5 estrellas${item.hora && item.hora !== "Sin hora" ? `, hora ${item.hora}` : ""}`
-      : `${item.title}, ${etiquetaEstado.toLowerCase()}${item.hora && item.hora !== "Sin hora" ? `, hora ${item.hora}` : ""}`;
+      ? `${item.title}, ${item.stars ?? 5} de 5 estrellas${item.hora && item.hora !== "Sin hora" ? `, hora ${item.hora}` : ""}${fechaLabel ? `, ${fechaLabel}` : ""}`
+      : `${item.title}, ${etiquetaEstado.toLowerCase()}${item.hora && item.hora !== "Sin hora" ? `, hora ${item.hora}` : ""}${fechaLabel ? `, ${fechaLabel}` : ""}`;
 
     return (
       <View
@@ -326,7 +381,7 @@ export default function Historial() {
         accessible
         accessibilityLabel={a11y}
       >
-        {item.pictogramId && (
+        {item.pictogramId ? (
           <Image
             source={{
               uri: `https://static.arasaac.org/pictograms/${item.pictogramId}/${item.pictogramId}_300.png`,
@@ -336,6 +391,18 @@ export default function Historial() {
             importantForAccessibility="no"
             accessibilityIgnoresInvertColors
           />
+        ) : (
+          <View
+            style={styles.listPictogramPlaceholder}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+          >
+            <Ionicons
+              name={completada ? "checkmark-circle-outline" : "close-circle-outline"}
+              size={20}
+              color={colorEstado}
+            />
+          </View>
         )}
         <View style={styles.listInfo}>
           <Text
@@ -350,13 +417,15 @@ export default function Historial() {
           >
             {item.title}
           </Text>
-          {item.hora && item.hora !== "Sin hora" && (
+          {(fechaLabel || (item.hora && item.hora !== "Sin hora")) && (
             <Text
               style={[styles.listHora, ts.tareaHora]}
               accessibilityElementsHidden
               importantForAccessibility="no"
             >
-              {item.hora}
+              {[fechaLabel, item.hora !== "Sin hora" ? item.hora : null]
+                .filter(Boolean)
+                .join(" · ")}
             </Text>
           )}
         </View>
@@ -382,13 +451,11 @@ export default function Historial() {
     );
   };
 
-  const buildTextoCompartir = () => {
-    const completadas = tareasUltimaSemana.filter(
+  const buildTextoCompartir = (tareas: Tarea[], etiqueta: string) => {
+    const completadas = tareas.filter(
       (t) => t.estado === "completada" || (t.completed && !t.estado),
     );
-    const canceladas = tareasUltimaSemana.filter(
-      (t) => t.estado === "cancelada" || t.estado === "vencida",
-    );
+    const noRealizadas = tareas.filter((t) => t.estado === "vencida");
     const medallaEmoji = gami.medalla
       ? ({ bronce: "🥉", plata: "🥈", oro: "🥇" } as any)[gami.medalla]
       : "";
@@ -399,11 +466,11 @@ export default function Historial() {
       `🔥 ${gami.racha} días de racha`,
       medallaEmoji ? `${medallaEmoji} Medalla de ${gami.medalla}` : "",
       "",
-      `✅ ${completadas.length} completadas esta semana`,
-      `❌ ${canceladas.length} canceladas`,
+      `✅ ${completadas.length} completadas ${etiqueta}`,
+      `❌ ${noRealizadas.length} no realizadas`,
       "",
-      "📋 Tareas de la semana:",
-      ...tareasUltimaSemana.slice(0, 10).map((t) => {
+      `📋 Tareas de ${etiqueta}:`,
+      ...tareas.slice(0, 10).map((t) => {
         const ok = t.estado === "completada" || (t.completed && !t.estado);
         return `${ok ? "✅" : "❌"} ${t.title}`;
       }),
@@ -414,16 +481,32 @@ export default function Historial() {
       .join("\n");
   };
 
-  const iniciarCompartir = (destino: "whatsapp" | "gmail" | "nativo") => {
-    if (historial.length === 0) {
-      Alert.alert(
-        "Sin historial",
-        "Aún no tienes tareas completadas para exportar.",
-      );
+  const elegirDestino = (destino: "whatsapp" | "nativo") => {
+    setDestinoElegido(destino);
+    setModalPeriodo(true);
+  };
+
+  const elegirPeriodo = (periodo: "dia" | "semana" | "mes") => {
+    setModalPeriodo(false);
+    if (!destinoElegido) return;
+    const tareas = tareasDelPeriodo(periodo);
+    const etiqueta = etiquetaDelPeriodo(periodo);
+    setTareasCompartir(tareas);
+    setEtiquetaCompartir(etiqueta);
+    iniciarCompartir(destinoElegido, tareas, etiqueta);
+  };
+
+  const iniciarCompartir = (
+    destino: "whatsapp" | "gmail" | "nativo",
+    tareas: Tarea[],
+    etiqueta: string,
+  ) => {
+    if (tareas.length === 0) {
+      Alert.alert("Sin tareas", `No tienes tareas registradas ${etiqueta}.`);
       return;
     }
 
-    const texto = buildTextoCompartir();
+    const texto = buildTextoCompartir(tareas, etiqueta);
 
     if (Platform.OS === "web") {
       if (destino === "whatsapp") {
@@ -490,7 +573,7 @@ export default function Historial() {
         setDestinoPend(null);
         await new Promise((r) => setTimeout(r, 100));
         await Share.share({
-          message: buildTextoCompartir(),
+          message: buildTextoCompartir(tareasCompartir, etiquetaCompartir),
           title: "Mi historial de RutinaQuest",
         });
       }
@@ -525,7 +608,8 @@ export default function Historial() {
             <TarjetaCompartir
               avatar={avatar}
               gami={gami}
-              tareasUltimaSemana={tareasUltimaSemana}
+              tareas={tareasCompartir}
+              etiquetaPeriodo={etiquetaCompartir}
             />
           </ViewShot>
           {compartiendo && (
@@ -534,6 +618,61 @@ export default function Historial() {
             </View>
           )}
         </View>
+      </Modal>
+
+      <Modal
+        visible={modalPeriodo}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalPeriodo(false)}
+        accessibilityViewIsModal
+      >
+        <Pressable
+          style={styles.periodoOverlay}
+          onPress={() => setModalPeriodo(false)}
+          accessible={false}
+        >
+          <Pressable
+            style={styles.periodoCard}
+            onPress={(e) => e.stopPropagation()}
+            accessible={false}
+          >
+            <Text style={styles.periodoTitulo} accessibilityRole="header">
+              ¿Qué quieres compartir?
+            </Text>
+            {(
+              [
+                {
+                  id: "dia" as const,
+                  icono: "today-outline" as const,
+                  texto: diaSeleccionado === hoy ? "Hoy" : "Día seleccionado",
+                },
+                {
+                  id: "semana" as const,
+                  icono: "calendar-outline" as const,
+                  texto: "Esta semana",
+                },
+                {
+                  id: "mes" as const,
+                  icono: "calendar-number-outline" as const,
+                  texto: "Este mes",
+                },
+              ]
+            ).map((op) => (
+              <Pressable
+                key={op.id}
+                onPress={() => elegirPeriodo(op.id)}
+                style={styles.periodoOpcion}
+                accessible
+                accessibilityRole="button"
+                accessibilityLabel={op.texto}
+              >
+                <Ionicons name={op.icono} size={20} color={PURPLE} />
+                <Text style={styles.periodoOpcionTxt}>{op.texto}</Text>
+              </Pressable>
+            ))}
+          </Pressable>
+        </Pressable>
       </Modal>
 
       <ScrollView
@@ -554,7 +693,7 @@ export default function Historial() {
 
           <View style={styles.shareBtnsRow} accessible={false}>
             <Pressable
-              onPress={() => iniciarCompartir("whatsapp")}
+              onPress={() => elegirDestino("whatsapp")}
               disabled={compartiendo}
               style={[
                 styles.iconBtn,
@@ -576,7 +715,7 @@ export default function Historial() {
             </Pressable>
 
             <Pressable
-              onPress={() => iniciarCompartir("nativo")}
+              onPress={() => elegirDestino("nativo")}
               disabled={compartiendo}
               style={[
                 styles.iconBtn,
@@ -610,25 +749,34 @@ export default function Historial() {
           accessibilityRole="search"
           accessibilityLabel="Buscar tarea en historial"
         >
+          <Ionicons
+            name="search"
+            size={18}
+            color="#C7C0CE"
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+          />
           <TextInput
             placeholder="Buscar tarea..."
             value={search}
             onChangeText={setSearch}
-            style={{ flex: 1, fontSize: 15 }}
+            style={{
+              flex: 1,
+              fontSize: 15,
+              fontFamily: AppFonts.body,
+              color: "#3A3342",
+            }}
             accessibilityLabel="Campo de búsqueda"
-            accessibilityHint="Filtra las tareas del historial por nombre"
+            accessibilityHint="Busca una tarea en todo el historial, no solo en el día seleccionado"
             returnKeyType="search"
             clearButtonMode="while-editing"
           />
-          <Ionicons
-            name="search"
-            size={18}
-            color="#999"
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
         </View>
 
+        {/* Con búsqueda activa se buscan resultados en todo el historial, así
+            que el selector de semana y la tira de días no aplican. */}
+        {!busquedaActiva && (
+        <>
         {/* Selector semana */}
         <View style={styles.weekSelector} accessible={false}>
           <Pressable
@@ -692,9 +840,7 @@ export default function Historial() {
                 (t.estado === "completada" || (t.completed && !t.estado)),
             ).length;
             const nX = historial.filter(
-              (t) =>
-                fechaReferencia(t) === fecha &&
-                (t.estado === "cancelada" || t.estado === "vencida"),
+              (t) => fechaReferencia(t) === fecha && t.estado === "vencida",
             ).length;
 
             const partes = [DIAS_LARGOS[idx]];
@@ -757,27 +903,37 @@ export default function Historial() {
             );
           })}
         </View>
+        </>
+        )}
       </View>
 
       <View style={styles.sheet}>
         <View style={styles.diaHeader}>
           <Text
             style={styles.diaNombre}
+            numberOfLines={1}
             accessibilityLabel={
-              diaSeleccionado === hoy ? `Hoy, ${nombreDia}` : nombreDia
+              busquedaActiva
+                ? `Resultados para ${search.trim()}`
+                : diaSeleccionado === hoy
+                  ? `Hoy, ${nombreDia}`
+                  : nombreDia
             }
           >
-            {diaSeleccionado === hoy
-              ? `Hoy · ${nombreDia}`
-              : nombreDia.charAt(0).toUpperCase() + nombreDia.slice(1)}
+            {busquedaActiva
+              ? `Resultados de "${search.trim()}"`
+              : diaSeleccionado === hoy
+                ? `Hoy · ${nombreDia}`
+                : nombreDia.charAt(0).toUpperCase() + nombreDia.slice(1)}
           </Text>
-          {tareasDelDia.length > 0 && (
+          {tareasBase.length > 0 && (
             <View
               style={styles.diaBadgesRow}
               accessible
-              accessibilityLabel={`${completadasDia.length} realizadas, ${canceladasDia.length + vencidasDia.length} no realizadas`}
+              accessibilityLabel={`${completadasBase.length} realizadas, ${vencidasBase.length} saltadas. Toca un recuadro para filtrar`}
             >
-              <View
+              <Pressable
+                onPress={alternarFiltroCompletadas}
                 style={[
                   styles.diaBadge,
                   {
@@ -785,17 +941,27 @@ export default function Historial() {
                     borderColor: PURPLE,
                     borderWidth: 1,
                   },
+                  filtroEstado === "completada" && styles.diaBadgeActiva,
                 ]}
+                accessible
+                accessibilityRole="button"
+                accessibilityLabel={`Ver solo realizadas, ${completadasBase.length}`}
+                accessibilityState={{ selected: filtroEstado === "completada" }}
               >
                 <Text
-                  style={[styles.diaBadgeText, { color: PURPLE }]}
+                  style={[
+                    styles.diaBadgeText,
+                    { color: PURPLE },
+                    filtroEstado === "completada" && styles.diaBadgeTextActiva,
+                  ]}
                   accessibilityElementsHidden
                   importantForAccessibility="no"
                 >
-                  ✓ {completadasDia.length}
+                  ✓ {completadasBase.length}
                 </Text>
-              </View>
-              <View
+              </Pressable>
+              <Pressable
+                onPress={alternarFiltroVencidas}
                 style={[
                   styles.diaBadge,
                   {
@@ -803,35 +969,60 @@ export default function Historial() {
                     borderColor: PURPLE,
                     borderWidth: 1,
                   },
+                  filtroEstado === "vencida" && styles.diaBadgeActiva,
                 ]}
+                accessible
+                accessibilityRole="button"
+                accessibilityLabel={`Ver solo saltadas, ${vencidasBase.length}`}
+                accessibilityState={{ selected: filtroEstado === "vencida" }}
               >
                 <Text
-                  style={[styles.diaBadgeText, { color: PURPLE }]}
+                  style={[
+                    styles.diaBadgeText,
+                    { color: PURPLE },
+                    filtroEstado === "vencida" && styles.diaBadgeTextActiva,
+                  ]}
                   accessibilityElementsHidden
                   importantForAccessibility="no"
                 >
-                  ✕ {canceladasDia.length + vencidasDia.length}
+                  ✕ {vencidasBase.length}
                 </Text>
-              </View>
+              </Pressable>
             </View>
           )}
         </View>
 
-        {tareasDelDia.length === 0 ? (
+        {totalVisible === 0 ? (
           <View
             style={styles.emptyBox}
             accessible
             accessibilityLiveRegion="polite"
-            accessibilityLabel="Sin tareas este día. Pulsa otro día para ver su historial"
+            accessibilityLabel={
+              busquedaActiva
+                ? `Sin resultados para ${search.trim()}`
+                : tareasBase.length > 0
+                  ? "Ninguna tarea coincide con el filtro"
+                  : "Sin tareas este día. Pulsa otro día para ver su historial"
+            }
           >
-            <Text style={styles.emptyText}>Sin tareas este día</Text>
+            <Text style={styles.emptyText}>
+              {busquedaActiva
+                ? `Sin resultados para "${search.trim()}"`
+                : tareasBase.length > 0
+                  ? "Nada con este filtro"
+                  : "Sin tareas este día"}
+            </Text>
             <Text style={styles.emptySubText}>
-              Pulsa otro día para ver su historial
+              {busquedaActiva
+                ? "Prueba con otra palabra"
+                : tareasBase.length > 0
+                  ? "Quita el filtro para ver todas las tareas"
+                  : "Pulsa otro día para ver su historial"}
             </Text>
           </View>
         ) : (
           <View style={styles.listaCol} accessible={false}>
-            {completadasDia.length > 0 && (
+            {mostrarCompletadas && completadasBase.length > 0 && (
               <>
                 <Text
                   style={styles.listaSectionLabel}
@@ -839,23 +1030,27 @@ export default function Historial() {
                 >
                   ✓ Realizadas
                 </Text>
-                {completadasDia.map((item) => renderFila(item, "completada"))}
+                {completadasBase.map((item) =>
+                  renderFila(item, "completada", busquedaActiva),
+                )}
               </>
             )}
 
-            {(canceladasDia.length > 0 || vencidasDia.length > 0) && (
+            {mostrarVencidas && vencidasBase.length > 0 && (
               <>
                 <Text
                   style={[
                     styles.listaSectionLabel,
-                    completadasDia.length > 0 && { marginTop: 6 },
+                    mostrarCompletadas &&
+                      completadasBase.length > 0 && { marginTop: 6 },
                   ]}
                   accessibilityRole="header"
                 >
                   ✕ No realizadas
                 </Text>
-                {canceladasDia.map((item) => renderFila(item, "cancelada"))}
-                {vencidasDia.map((item) => renderFila(item, "vencida"))}
+                {vencidasBase.map((item) =>
+                  renderFila(item, "vencida", busquedaActiva),
+                )}
               </>
             )}
           </View>
@@ -896,6 +1091,43 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 
+  periodoOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(46,32,58,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 32,
+  },
+  periodoCard: {
+    backgroundColor: "#fff",
+    borderRadius: 24,
+    padding: 20,
+    width: "100%",
+    maxWidth: 340,
+    gap: 10,
+  },
+  periodoTitulo: {
+    fontSize: 17,
+    fontFamily: AppFonts.displayBold,
+    color: "#3A3342",
+    marginBottom: 6,
+  },
+  periodoOpcion: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: PURPLE_BG,
+    minHeight: 44,
+  },
+  periodoOpcionTxt: {
+    fontSize: 15,
+    fontFamily: AppFonts.bodyBold,
+    color: Colors.purpleDk,
+  },
+
   topSection: {
     paddingHorizontal: 20,
   },
@@ -927,19 +1159,15 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 10,
     backgroundColor: "#fff",
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#EEE",
-    paddingHorizontal: 15,
-    paddingVertical: 10,
+    borderColor: "#ECE4F0",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     marginBottom: 20,
     minHeight: 44,
-    shadowColor: "#000",
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
   },
 
   weekSelector: {
@@ -995,14 +1223,20 @@ const styles = StyleSheet.create({
   dot: { width: 5, height: 5, borderRadius: 3 },
 
   sheet: {
-    flex: 1,
+    minHeight: 200,
     backgroundColor: "#fff",
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
+    borderRadius: 24,
     marginTop: 18,
+    marginHorizontal: 20,
+    marginBottom: 20,
     paddingHorizontal: 20,
     paddingTop: 22,
     paddingBottom: 30,
+    shadowColor: "#3A3342",
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: -4 },
+    elevation: 3,
   },
 
   diaHeader: {
@@ -1020,8 +1254,16 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   diaBadgesRow: { flexDirection: "row", gap: 6 },
-  diaBadge: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
+  diaBadge: {
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    minHeight: 28,
+    justifyContent: "center",
+  },
+  diaBadgeActiva: { backgroundColor: PURPLE },
   diaBadgeText: { fontSize: 12, fontFamily: AppFonts.bodyBold },
+  diaBadgeTextActiva: { color: "#fff" },
 
   listaCol: { flexDirection: "column" },
   listaSectionLabel: {
@@ -1048,6 +1290,14 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   listPictogram: { width: 36, height: 36, borderRadius: 8 },
+  listPictogramPlaceholder: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: PURPLE_BG,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   listInfo: { flex: 1, gap: 3 },
   listTitle: {
     fontSize: 14,

@@ -41,6 +41,7 @@ import {
   limpiarTareasViejas,
   updateTareaBaseCompleta,
   updateTareaCompletada,
+  updateTareaDuracion,
   updateTareaHora,
   updateTareaNotifId,
   updateTareaTituloPicto,
@@ -48,6 +49,7 @@ import {
 
 import { PEREZOSO_IMAGENES } from "../../../constants/notiConfig";
 import { useAjustesCtx } from "../../../context/AjustesContext";
+import { useTemporizadorTarea } from "../../../context/TemporizadorContext";
 import { useGamificacion } from "../../../hooks/useGamificacion";
 
 import { ModalEditarTarea } from "../../../components/modals/ModalEditarTarea";
@@ -65,7 +67,7 @@ import {
 import { detectarMedalla } from "../../../utils/gamificacion";
 
 if (__DEV__) {
-  setFechaSimulada("2027-08-21");
+  setFechaSimulada("2027-08-24");
   setHoraSimulada(12, 0);
 }
 const SONIDOS: Record<string, any> = {
@@ -138,6 +140,31 @@ export default function Home() {
   const [selectedTask, setSelectedTask] = useState<Tarea | null>(null);
   const { mostrarConfirm, confirmModal } = useConfirm();
   const { tasks, setTasks, cargarTareas } = useTareasHoy();
+  const {
+    activo: timerActivo,
+    iniciarParaTarea,
+    resetear: resetearTemporizador,
+  } = useTemporizadorTarea();
+
+  const abrirTemporizadorTarea = async (tarea: Tarea) => {
+    if (timerActivo?.tareaId === tarea.id) {
+      router.push("/temporizador");
+      return;
+    }
+    if (timerActivo && timerActivo.estado !== "finished") {
+      const continuar = await mostrarConfirm(
+        "Ya tienes un temporizador en marcha",
+        `Tienes un temporizador en marcha para "${timerActivo.tareaTitulo}". ¿Quieres sustituirlo por el de "${tarea.title}"?`,
+        [
+          { texto: "Cancelar", valor: false },
+          { texto: "Sustituir", valor: true },
+        ],
+      );
+      if (!continuar) return;
+    }
+    iniciarParaTarea(tarea);
+    router.push("/temporizador");
+  };
 
   // Sin esto, expo-av usa el modo de audio por defecto: en iOS no suena
   // nada si el móvil está en silencio, y en general el volumen de "media"
@@ -504,6 +531,7 @@ export default function Home() {
     const pts = tieneHora ? (enTiempo ? 5 : 3) : 5;
 
     await updateTareaCompletada(task.id, true, pts);
+    if (timerActivo?.tareaId === task.id) resetearTemporizador();
     if (ajustes.vibracion && Platform.OS !== "web")
       Vibration.vibrate(enTiempo ? [0, 80, 60, 120] : [0, 60]);
     if (Platform.OS !== "web") {
@@ -543,27 +571,35 @@ export default function Home() {
 
     const todasCompletadas = pendingAntes.length === 0 && totalDeHoy > 0;
     const medalla = detectarMedalla(prevTotal, newTotal);
+    // Si esta era la última tarea pendiente, no tiene sentido enseñar antes
+    // el aviso de +3/+5 estrellas para luego encadenar el de "todo
+    // completado" — se enseña directamente ese (salvo que además se haya
+    // conseguido una medalla, que sí merece su propio aviso primero).
     const primerTipo = medalla
       ? medalla
-      : !tieneHora
-        ? "sinHora"
-        : enTiempo
-          ? "ontime"
-          : "late";
+      : todasCompletadas
+        ? "goalmet"
+        : !tieneHora
+          ? "sinHora"
+          : enTiempo
+            ? "ontime"
+            : "late";
 
     disparaNotif(primerTipo);
 
     // Cada siguiente notificación espera lo que realmente dura la anterior
-    // (+ un pequeño respiro) en vez de un número fijo — si no, con tareas
-    // que duran menos (2.2s) la siguiente notif se disparaba de más tarde
-    // de la cuenta y con las que duran más (4.5s) se disparaba mientras la
-    // anterior aún estaba en pantalla (el sonido de la racha sonaba a la
-    // vez que se veía la notificación de "todo completado").
-    let delay = duracionNotif(primerTipo) + 300;
+    // más un margen que cubre su animación de salida (antes de este margen,
+    // con tareas que duran menos la siguiente notif se disparaba tarde, y
+    // con las que duran más se disparaba mientras la anterior aún estaba en
+    // pantalla — el sonido de la racha sonaba a la vez que se veía la
+    // notificación de "todo completado"). El margen es mayor que la propia
+    // animación de salida (hasta 320ms en las variantes de medalla) para
+    // que nunca se lleguen a solapar dos notificaciones en pantalla.
+    let delay = duracionNotif(primerTipo) + 350;
 
-    if (todasCompletadas) {
+    if (todasCompletadas && medalla) {
       setTimeout(() => disparaNotif("goalmet"), delay);
-      delay += duracionNotif("goalmet") + 300;
+      delay += duracionNotif("goalmet") + 350;
     }
 
     if (debeMostrarRacha) {
@@ -1010,6 +1046,32 @@ export default function Home() {
                         {item.hora}
                       </Text>
                     )}
+                    {item.duracionSeg ? (
+                      item.tiempoCumplido ? (
+                        <View
+                          style={styles.tiempoListoBadge}
+                          accessibilityElementsHidden
+                          importantForAccessibility="no"
+                        >
+                          <Ionicons
+                            name="checkmark-circle"
+                            size={17}
+                            color={Colors.green}
+                          />
+                        </View>
+                      ) : (
+                        <Pressable
+                          onPress={() => abrirTemporizadorTarea(item)}
+                          style={styles.btnTemporizador}
+                          accessible
+                          accessibilityRole="button"
+                          accessibilityLabel={`Iniciar temporizador de ${Math.round((item.duracionSeg ?? 0) / 60)} minutos para ${item.title}`}
+                          accessibilityHint="Abre el temporizador. La tarea no se podrá marcar como realizada hasta que termine"
+                        >
+                          <Ionicons name="play" size={19} color="#fff" />
+                        </Pressable>
+                      )
+                    ) : null}
                   </View>
                 </View>
               </Pressable>
@@ -1072,6 +1134,10 @@ export default function Home() {
         onCompletar={handleTareaCompletada}
         onEditar={handleAbrirEdicion}
         onEliminar={handleDeleteTask}
+        onIniciarTemporizador={(tarea) => {
+          setTaskModalVisible(false);
+          abrirTemporizadorTarea(tarea);
+        }}
       />
 
       {/* ── MODAL: EDITAR TAREA ── */}
@@ -1079,7 +1145,7 @@ export default function Home() {
         visible={editModalVisible}
         tarea={selectedTask}
         onCerrar={() => setEditModalVisible(false)}
-        onGuardar={async (titulo, pictogramId, hora) => {
+        onGuardar={async (titulo, pictogramId, hora, duracionSeg) => {
           if (!selectedTask) return;
           const horaFinal = hora ?? "Sin hora";
           const esInstanciaRepetitiva =
@@ -1113,6 +1179,7 @@ export default function Home() {
                   pictogramId,
                 );
                 await updateTareaHora(selectedTask.id, horaFinal);
+                await updateTareaDuracion(selectedTask.id, duracionSeg);
                 const notifIdEsta = await programarNotif5MinAntes(
                   selectedTask.fechaDia,
                   horaFinal,
@@ -1128,6 +1195,8 @@ export default function Home() {
                           title: titulo,
                           pictogramId,
                           hora: horaFinal,
+                          duracionSeg,
+                          tiempoCumplido: false,
                           notifId: notifIdEsta,
                         }
                       : t,
@@ -1142,6 +1211,7 @@ export default function Home() {
                   titulo,
                   pictogramId,
                   horaFinal,
+                  duracionSeg,
                 );
                 const notifIdTodas = await programarNotif5MinAntes(
                   selectedTask.fechaDia,
@@ -1158,6 +1228,8 @@ export default function Home() {
                           title: titulo,
                           pictogramId,
                           hora: horaFinal,
+                          duracionSeg,
+                          tiempoCumplido: false,
                           notifId:
                             t.id === selectedTask.id ? notifIdTodas : t.notifId,
                         }
@@ -1167,13 +1239,21 @@ export default function Home() {
               }
               setSelectedTask((prev) =>
                 prev
-                  ? { ...prev, title: titulo, pictogramId, hora: horaFinal }
+                  ? {
+                      ...prev,
+                      title: titulo,
+                      pictogramId,
+                      hora: horaFinal,
+                      duracionSeg,
+                      tiempoCumplido: false,
+                    }
                   : prev,
               );
             }, 300);
           } else {
             await updateTareaTituloPicto(selectedTask.id, titulo, pictogramId);
             await updateTareaHora(selectedTask.id, horaFinal);
+            await updateTareaDuracion(selectedTask.id, duracionSeg);
             const notifIdSimple = await programarNotif5MinAntes(
               selectedTask.fechaDia,
               horaFinal,
@@ -1189,6 +1269,8 @@ export default function Home() {
                       title: titulo,
                       pictogramId,
                       hora: horaFinal,
+                      duracionSeg,
+                      tiempoCumplido: false,
                       notifId: notifIdSimple,
                     }
                   : t,
@@ -1196,7 +1278,14 @@ export default function Home() {
             );
             setSelectedTask((prev) =>
               prev
-                ? { ...prev, title: titulo, pictogramId, hora: horaFinal }
+                ? {
+                    ...prev,
+                    title: titulo,
+                    pictogramId,
+                    hora: horaFinal,
+                    duracionSeg,
+                    tiempoCumplido: false,
+                  }
                 : prev,
             );
             setEditModalVisible(false);
@@ -1336,6 +1425,22 @@ const styles = StyleSheet.create({
   taskTime: {
     fontFamily: AppFonts.displayBold,
     color: "#8A8194",
+  },
+  btnTemporizador: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: PURPLE,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tiempoListoBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "#EAF3DE",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   fab: {

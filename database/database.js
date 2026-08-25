@@ -122,11 +122,14 @@ async function guardarTareas(tareas) {
 }
 
 async function getTareasHistorialImpl() {
+  // Las canceladas (eliminadas a mano) no se muestran en el historial: si el
+  // usuario borró la tarea es porque se equivocó al apuntarla, no porque no
+  // la haya hecho — a diferencia de las vencidas, que sí reflejan una tarea
+  // real que no se completó a tiempo.
   return (await getTareasImpl())
     .filter(
       (t) =>
         t.estado === "completada" ||
-        t.estado === "cancelada" ||
         t.estado === "vencida" ||
         t.completed === 1,
     )
@@ -153,14 +156,31 @@ async function insertTareaImpl(tarea, fechaDiaParam) {
     fechaDia,
     estado: "pendiente",
     repeticion: tarea.repeticion ?? "ninguna",
+    diasSemana: tarea.diasSemana ?? null,
     tareaBaseId: tarea.tareaBaseId ?? null,
     notifId: null,
+    duracionSeg: tarea.duracionSeg ?? null,
+    tiempoCumplido: false,
   };
   const tareas = await getTareasImpl();
   await guardarTareas([...tareas, nueva]);
 }
 export function insertTarea(tarea, fechaDiaParam) {
   return encolar(() => insertTareaImpl(tarea, fechaDiaParam));
+}
+
+// Una tarea "semanal" repite en los días de la semana guardados en
+// diasSemana (0 = domingo … 6 = sábado, igual que Date#getDay). Las tareas
+// creadas antes de poder elegir varios días no tienen diasSemana guardado,
+// así que por compatibilidad se quedan repitiendo el mismo día en que se
+// crearon.
+function coincideDiaSemanal(base, diaSemana) {
+  if (Array.isArray(base.diasSemana) && base.diasSemana.length > 0) {
+    return base.diasSemana.includes(diaSemana);
+  }
+  const [by, bm, bd] = (base.fechaDia ?? "").split("-").map(Number);
+  if (!by) return false;
+  return diaSemana === new Date(by, bm - 1, bd).getDay();
 }
 
 function generarInstanciasRepetitivas(todas, hoy) {
@@ -181,10 +201,8 @@ function generarInstanciasRepetitivas(todas, hoy) {
     );
     if (yaExiste) continue;
     if (base.fechaDia && base.fechaDia > hoy) continue;
-    if (base.repeticion === "semanal") {
-      const [by, bm, bd] = (base.fechaDia ?? hoy).split("-").map(Number);
-      if (diaSemana !== new Date(by, bm - 1, bd).getDay()) continue;
-    }
+    if (base.repeticion === "semanal" && !coincideDiaSemanal(base, diaSemana))
+      continue;
     nuevas.push({
       id: `${hoy}_rep_${base.id}_${Math.random().toString(36).slice(2, 6)}`,
       title: base.title,
@@ -197,6 +215,8 @@ function generarInstanciasRepetitivas(todas, hoy) {
       completed: 0,
       repeticion: "ninguna",
       tareaBaseId: base.id,
+      duracionSeg: base.duracionSeg ?? null,
+      tiempoCumplido: false,
     });
   }
   return nuevas;
@@ -271,10 +291,8 @@ function calcularVirtualesParaFecha(todas, fecha, hoy) {
 
     let coincide = base.repeticion === "diaria";
     if (base.repeticion === "semanal") {
-      const [by, bm, bd] = (base.fechaDia ?? hoy).split("-").map(Number);
-      const diaSemanaBase = new Date(by, bm - 1, bd).getDay();
       const [fy, fm, fd] = fecha.split("-").map(Number);
-      coincide = new Date(fy, fm - 1, fd).getDay() === diaSemanaBase;
+      coincide = coincideDiaSemanal(base, new Date(fy, fm - 1, fd).getDay());
     }
     if (!coincide) continue;
 
@@ -290,6 +308,8 @@ function calcularVirtualesParaFecha(todas, fecha, hoy) {
       estado: "pendiente",
       repeticion: "ninguna",
       tareaBaseId: base.id,
+      duracionSeg: base.duracionSeg ?? null,
+      tiempoCumplido: false,
       virtual: true,
     });
   }
@@ -313,8 +333,6 @@ function proyectarOcurrenciasFuturas(todas, hoy) {
   const proyectadas = [];
   for (const base of bases) {
     const inicio = base.fechaDia && base.fechaDia > hoy ? base.fechaDia : hoy;
-    const [by, bm, bd] = (base.fechaDia ?? hoy).split("-").map(Number);
-    const diaSemanaBase = new Date(by, bm - 1, bd).getDay();
 
     for (let i = 0; i <= HORIZONTE_PROYECCION_DIAS; i++) {
       const fecha = sumarDias(inicio, i);
@@ -325,7 +343,7 @@ function proyectarOcurrenciasFuturas(todas, hoy) {
         proyectadas.push(fecha);
       } else if (base.repeticion === "semanal") {
         const [fy, fm, fd] = fecha.split("-").map(Number);
-        if (new Date(fy, fm - 1, fd).getDay() === diaSemanaBase) {
+        if (coincideDiaSemanal(base, new Date(fy, fm - 1, fd).getDay())) {
           proyectadas.push(fecha);
         }
       }
@@ -383,6 +401,30 @@ export function updateTareaCompletada(id, completed, stars = 5) {
   return encolar(() => updateTareaCompletadaImpl(id, completed, stars));
 }
 
+async function updateTareaTiempoCumplidoImpl(id, cumplido) {
+  const tareas = (await getTareasImpl()).map((t) =>
+    t.id === id ? { ...t, tiempoCumplido: cumplido } : t,
+  );
+  await guardarTareas(tareas);
+}
+export function updateTareaTiempoCumplido(id, cumplido) {
+  return encolar(() => updateTareaTiempoCumplidoImpl(id, cumplido));
+}
+
+async function updateTareaDuracionImpl(id, duracionSeg) {
+  // Cambiar la duración invalida cualquier temporizador ya cumplido con la
+  // duración anterior, así que se reinicia tiempoCumplido.
+  const tareas = (await getTareasImpl()).map((t) =>
+    t.id === id
+      ? { ...t, duracionSeg: duracionSeg ?? null, tiempoCumplido: false }
+      : t,
+  );
+  await guardarTareas(tareas);
+}
+export function updateTareaDuracion(id, duracionSeg) {
+  return encolar(() => updateTareaDuracionImpl(id, duracionSeg));
+}
+
 async function cancelarTareaImpl(id) {
   const hoy = hoyAppStr();
   const tareas = (await getTareasImpl()).map((t) =>
@@ -428,7 +470,13 @@ export function updateTareaTituloPicto(id, titulo, pictogramId) {
   return encolar(() => updateTareaTituloPictoImpl(id, titulo, pictogramId));
 }
 
-async function updateTareaBaseCompletaImpl(baseId, titulo, pictogramId, hora) {
+async function updateTareaBaseCompletaImpl(
+  baseId,
+  titulo,
+  pictogramId,
+  hora,
+  duracionSeg,
+) {
   const tareas = (await getTareasImpl()).map((t) => {
     if (
       t.id === baseId ||
@@ -439,15 +487,23 @@ async function updateTareaBaseCompletaImpl(baseId, titulo, pictogramId, hora) {
         title: titulo,
         pictogramId: pictogramId ?? null,
         hora: hora ?? "Sin hora",
+        duracionSeg: duracionSeg ?? null,
+        tiempoCumplido: false,
       };
     }
     return t;
   });
   await guardarTareas(tareas);
 }
-export function updateTareaBaseCompleta(baseId, titulo, pictogramId, hora) {
+export function updateTareaBaseCompleta(
+  baseId,
+  titulo,
+  pictogramId,
+  hora,
+  duracionSeg,
+) {
   return encolar(() =>
-    updateTareaBaseCompletaImpl(baseId, titulo, pictogramId, hora),
+    updateTareaBaseCompletaImpl(baseId, titulo, pictogramId, hora, duracionSeg),
   );
 }
 

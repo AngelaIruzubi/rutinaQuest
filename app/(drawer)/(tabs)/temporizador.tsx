@@ -1,11 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AppState,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   SafeAreaView,
@@ -19,6 +21,7 @@ import {
 import Svg, { Circle } from 'react-native-svg';
 import { AppFonts, Colors } from '../../../constants/theme';
 import { useAjustesCtx } from '../../../context/AjustesContext';
+import { useTemporizadorTarea } from '../../../context/TemporizadorContext';
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -62,6 +65,85 @@ const formatTime = (totalSeg: number): string => {
 
 const configToSeg = (c: ConfigTiempo): number =>
   c.horas * 3600 + c.minutos * 60 + c.segundos;
+
+// ── Arrastrar el anillo para ajustar el tiempo, tipo ruleta ─────────────────
+// A diferencia de un selector normal, esto es un ajuste RELATIVO: mientras
+// arrastras (incluso con el temporizador en marcha) cada vuelta completa
+// suma o resta un minuto respecto al valor actual, en vez de saltar a una
+// posición absoluta — así se puede afinar el tiempo dentro del propio
+// minuto sin tener que parar la cuenta atrás.
+const SEG_POR_VUELTA = 60;
+
+function useArrastreAnillo(
+  activo: boolean,
+  onDelta: (deltaSeg: number) => void,
+  onSoltar?: () => void,
+  onAgarrar?: () => void,
+) {
+  const ref = useRef<View>(null);
+  const centro = useRef({ x: 0, y: 0 });
+  const anguloAnterior = useRef(0);
+  const acumulado = useRef(0);
+  const activoRef = useRef(activo);
+  const onDeltaRef = useRef(onDelta);
+  const onSoltarRef = useRef(onSoltar);
+  const onAgarrarRef = useRef(onAgarrar);
+  useEffect(() => {
+    activoRef.current = activo;
+    onDeltaRef.current = onDelta;
+    onSoltarRef.current = onSoltar;
+    onAgarrarRef.current = onAgarrar;
+  });
+
+  const calcularAngulo = (pageX: number, pageY: number) =>
+    Math.atan2(pageY - centro.current.y, pageX - centro.current.x);
+
+  const responder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => activoRef.current,
+      onMoveShouldSetPanResponder: () => activoRef.current,
+      // El ScrollView que envuelve el reloj puede quedarse con el gesto a
+      // nivel nativo en cuanto detecta el más mínimo movimiento vertical —
+      // pedirlo en fase de "capture" ayuda, pero no basta del todo (sobre
+      // todo en iOS), así que además se desactiva el scroll del todo
+      // mientras se toca el anillo (ver onAgarrar/onSoltar más abajo).
+      onStartShouldSetPanResponderCapture: () => activoRef.current,
+      onMoveShouldSetPanResponderCapture: () => activoRef.current,
+      onPanResponderGrant: (evt) => {
+        if (!activoRef.current) return;
+        onAgarrarRef.current?.();
+        acumulado.current = 0;
+        const { pageX, pageY } = evt.nativeEvent;
+        ref.current?.measureInWindow((x, y, w, h) => {
+          centro.current = { x: x + w / 2, y: y + h / 2 };
+          anguloAnterior.current = calcularAngulo(pageX, pageY);
+        });
+      },
+      onPanResponderMove: (evt) => {
+        if (!activoRef.current) return;
+        const { pageX, pageY } = evt.nativeEvent;
+        const actual = calcularAngulo(pageX, pageY);
+        let delta = actual - anguloAnterior.current;
+        // Evita un salto grande cuando el dedo cruza el límite -180°/180°
+        // (la parte de abajo del círculo).
+        if (delta > Math.PI) delta -= Math.PI * 2;
+        if (delta < -Math.PI) delta += Math.PI * 2;
+        anguloAnterior.current = actual;
+
+        acumulado.current += (delta / (Math.PI * 2)) * SEG_POR_VUELTA;
+        const entero = Math.trunc(acumulado.current);
+        if (entero !== 0) {
+          acumulado.current -= entero;
+          onDeltaRef.current(entero);
+        }
+      },
+      onPanResponderRelease: () => onSoltarRef.current?.(),
+      onPanResponderTerminate: () => onSoltarRef.current?.(),
+    }),
+  ).current;
+
+  return { ref, panHandlers: responder.panHandlers };
+}
 
 // ── Selector de número ───────────────────────────────────────────────────────
 
@@ -115,22 +197,54 @@ type ProgressRingProps = {
 function ProgressRing({ size, strokeWidth, progreso, color, bgColor }: ProgressRingProps) {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const dashoffset = circumference * (1 - Math.max(0, Math.min(1, progreso)));
+  const progresoClamp = Math.max(0, Math.min(1, progreso));
+  const dashoffset = circumference * (1 - progresoClamp);
+
+  // Bola en el extremo del arco — sin ella, arrastrar "a ciegas" (sin ver
+  // qué punto exacto se está moviendo) es lo que hacía que el gesto se
+  // sintiera a trompicones. Se calcula en coordenadas normales de pantalla
+  // (0 = arriba, avanza en sentido horario), que es justo cómo se ve ya el
+  // anillo gracias al rotate:-90deg del Svg.
+  const anguloBola = progresoClamp * Math.PI * 2;
+  const bolaSize = strokeWidth + 14;
+  const bolaX = size / 2 + radius * Math.sin(anguloBola) - bolaSize / 2;
+  const bolaY = size / 2 - radius * Math.cos(anguloBola) - bolaSize / 2;
 
   return (
-    <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
-      <Circle
-        cx={size / 2} cy={size / 2} r={radius}
-        stroke={bgColor} strokeWidth={strokeWidth} fill="none"
+    <View style={{ width: size, height: size }}>
+      <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
+        <Circle
+          cx={size / 2} cy={size / 2} r={radius}
+          stroke={bgColor} strokeWidth={strokeWidth} fill="none"
+        />
+        <Circle
+          cx={size / 2} cy={size / 2} r={radius}
+          stroke={color} strokeWidth={strokeWidth} fill="none"
+          strokeDasharray={`${circumference} ${circumference}`}
+          strokeDashoffset={dashoffset}
+          strokeLinecap="round"
+        />
+      </Svg>
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: bolaX,
+          top: bolaY,
+          width: bolaSize,
+          height: bolaSize,
+          borderRadius: bolaSize / 2,
+          backgroundColor: color,
+          borderWidth: 3,
+          borderColor: '#fff',
+          shadowColor: '#000',
+          shadowOpacity: 0.25,
+          shadowRadius: 4,
+          shadowOffset: { width: 0, height: 2 },
+          elevation: 4,
+        }}
       />
-      <Circle
-        cx={size / 2} cy={size / 2} r={radius}
-        stroke={color} strokeWidth={strokeWidth} fill="none"
-        strokeDasharray={`${circumference} ${circumference}`}
-        strokeDashoffset={dashoffset}
-        strokeLinecap="round"
-      />
-    </Svg>
+    </View>
   );
 }
 
@@ -238,6 +352,16 @@ const modal = StyleSheet.create({
 const CONFIG_DEFAULT: ConfigTiempo = { horas: 0, minutos: 25, segundos: 0 };
 
 export default function Temporizador() {
+  const router = useRouter();
+  const {
+    activo: tareaTimer,
+    tiempoActualSeg: tareaTiempoActual,
+    pausar: pausarTarea,
+    reanudar: reanudarTarea,
+    resetear: resetearTarea,
+    ajustarSeg: ajustarTareaSeg,
+    confirmarAjuste: confirmarAjusteTarea,
+  } = useTemporizadorTarea();
   const { escala, colores } = useAjustesCtx();
   const ts = useMemo(() => ({
     title: { fontSize: Math.round(30 * escala) },
@@ -249,6 +373,10 @@ export default function Temporizador() {
   const [config,       setConfig]      = useState<ConfigTiempo>(CONFIG_DEFAULT);
   const [tiempoActual, setTiempoActual]= useState<number>(configToSeg(CONFIG_DEFAULT));
   const [modalVisible, setModalVisible]= useState<boolean>(false);
+  // Mientras se toca el anillo se desactiva el scroll de la pantalla del
+  // todo — de lo contrario, el ScrollView puede quedarse con el gesto a
+  // nivel nativo (sobre todo en iOS) y el arrastre deja de notarse.
+  const [scrollHabilitado, setScrollHabilitado] = useState(true);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Marca de tiempo absoluta (reloj del sistema), no un contador de "ticks":
@@ -262,6 +390,61 @@ export default function Temporizador() {
   const progreso = modo === 'countdown' && totalSeg > 0
     ? tiempoActual / totalSeg
     : 0;
+
+  // Arrastrar el anillo ajusta el tiempo relativo (± segundos), incluso con
+  // el temporizador en marcha — solo no tiene sentido cuando ya ha terminado.
+  // Nunca puede superar el tiempo configurado (ni bajar de 0): si no, la
+  // barra de progreso se pasaba de 100% (p.ej. 137%) al arrastrar de más.
+  const ajustarLibre = (deltaSeg: number) => {
+    setTiempoActual((prev) => {
+      const nuevo = Math.max(0, Math.min(totalSeg, prev + deltaSeg));
+      const deltaReal = nuevo - prev;
+      if (estado === 'running' && finAbsolutoRef.current != null) {
+        finAbsolutoRef.current += deltaReal * 1000;
+      }
+      return nuevo;
+    });
+  };
+  const confirmarAjusteLibre = async () => {
+    if (estado !== 'running' || finAbsolutoRef.current == null) return;
+    if (Platform.OS === 'web') return;
+    if (notifIdRef.current) {
+      try {
+        await Notifications.cancelScheduledNotificationAsync(notifIdRef.current);
+      } catch {}
+    }
+    try {
+      notifIdRef.current = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '⏰ ¡Tiempo cumplido!',
+          body: 'Tu temporizador ha terminado',
+          sound: true,
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: new Date(finAbsolutoRef.current),
+        },
+      });
+    } catch {}
+  };
+  const arrastreLibre = useArrastreAnillo(
+    modo === 'countdown' && estado !== 'finished',
+    ajustarLibre,
+    () => {
+      confirmarAjusteLibre();
+      setScrollHabilitado(true);
+    },
+    () => setScrollHabilitado(false),
+  );
+  const arrastreTarea = useArrastreAnillo(
+    tareaTimer != null && tareaTimer.estado !== 'finished',
+    ajustarTareaSeg,
+    () => {
+      confirmarAjusteTarea();
+      setScrollHabilitado(true);
+    },
+    () => setScrollHabilitado(false),
+  );
 
   const cancelarNotifPendiente = useCallback(async () => {
     if (notifIdRef.current && Platform.OS !== 'web') {
@@ -371,9 +554,113 @@ export default function Temporizador() {
     estado === 'running'  ? Colors.purple :
     C.textPrimary;
 
+  // ── Temporizador vinculado a una tarea (desde el botón ▶ de la lista) ─────
+  // Vive en un contexto global (no en este componente) para que siga
+  // corriendo aunque el usuario salga de esta pantalla o minimice la app.
+  if (tareaTimer) {
+    const progresoTarea =
+      tareaTimer.duracionTotalSeg > 0
+        ? tareaTiempoActual / tareaTimer.duracionTotalSeg
+        : 0;
+    const terminado = tareaTimer.estado === 'finished';
+
+    return (
+      <SafeAreaView style={estilos.safe}>
+        <ScrollView
+          contentContainerStyle={estilos.container}
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={scrollHabilitado}
+        >
+
+          <View style={estilos.tareaHeaderRow}>
+            <Ionicons name="checkmark-circle-outline" size={18} color={Colors.purpleDk} />
+            <Text style={estilos.tareaHeaderTxt} numberOfLines={2}>{tareaTimer.tareaTitulo}</Text>
+          </View>
+
+          <View
+            ref={arrastreTarea.ref}
+            style={estilos.clockWrap}
+            {...arrastreTarea.panHandlers}
+          >
+            <View style={estilos.ringOuter}>
+              <ProgressRing
+                size={220}
+                strokeWidth={9}
+                progreso={progresoTarea}
+                color={terminado ? C.green.solid : Colors.purple}
+                bgColor={C.border}
+              />
+            </View>
+            <View style={estilos.clockContent}>
+              <Text allowFontScaling={false} style={[estilos.timeText, { color: terminado ? C.green.solid : C.textPrimary }]}>
+                {formatTime(tareaTiempoActual)}
+              </Text>
+              <Text allowFontScaling={false} style={estilos.estadoLabel}>
+                {terminado ? '¡Tiempo!' : tareaTimer.estado === 'running' ? 'En curso' : 'Pausado'}
+              </Text>
+            </View>
+          </View>
+          {!terminado && (
+            <Text style={[estilos.arrastreHint, { fontSize: fs(13) }]} allowFontScaling={false}>
+              Puedes tocar y mover el círculo para cambiar el tiempo
+            </Text>
+          )}
+
+          {terminado ? (
+            <View style={{ width: '100%', alignItems: 'center', gap: 14 }}>
+              <Text style={estilos.tareaFinTxt} allowFontScaling={false}>
+                Ya puedes volver y marcar la tarea como realizada.
+              </Text>
+              <Pressable style={estilos.btnVolver} onPress={() => router.back()}>
+                <Text allowFontScaling={false} style={estilos.btnVolverTxt}>Volver a mis tareas</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={estilos.controls}>
+              <TouchableOpacity style={estilos.btnSecondary} onPress={resetearTarea}>
+                <Ionicons name="close" size={22} color={C.textMuted} />
+              </TouchableOpacity>
+
+              {tareaTimer.estado === 'running' ? (
+                <Pressable style={estilos.btnPrimaryWrap} onPress={pausarTarea}>
+                  <LinearGradient
+                    colors={['#C9A9DB', Colors.purple]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0.5, y: 1 }}
+                    style={estilos.btnPrimary}
+                  >
+                    <Ionicons name="pause" size={30} color={Colors.white} />
+                  </LinearGradient>
+                </Pressable>
+              ) : (
+                <Pressable style={estilos.btnPrimaryWrap} onPress={reanudarTarea}>
+                  <LinearGradient
+                    colors={['#C9A9DB', Colors.purple]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0.5, y: 1 }}
+                    style={estilos.btnPrimary}
+                  >
+                    <Ionicons name="play" size={30} color={Colors.white} />
+                  </LinearGradient>
+                </Pressable>
+              )}
+
+              <View style={estilos.btnSecondaryPlaceholder} />
+            </View>
+          )}
+
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={estilos.safe}>
-      <ScrollView contentContainerStyle={estilos.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={estilos.container}
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={scrollHabilitado}
+      >
 
         <Text style={estilos.title}>Temporizador</Text>
 
@@ -393,7 +680,11 @@ export default function Temporizador() {
         </View>
 
         {/* Reloj central */}
-        <View style={estilos.clockWrap}>
+        <View
+          ref={arrastreLibre.ref}
+          style={estilos.clockWrap}
+          {...arrastreLibre.panHandlers}
+        >
           {modo === 'countdown' && (
             <View style={estilos.ringOuter}>
               <ProgressRing
@@ -417,6 +708,11 @@ export default function Temporizador() {
             </Text>
           </View>
         </View>
+        {modo === 'countdown' && estado !== 'finished' && (
+          <Text style={[estilos.arrastreHint, { fontSize: fs(13) }]} allowFontScaling={false}>
+            Puedes tocar y mover el círculo para cambiar el tiempo
+          </Text>
+        )}
 
         {/* Barra de progreso lineal */}
         {modo === 'countdown' && totalSeg > 0 && (
@@ -523,6 +819,22 @@ const estilos = StyleSheet.create({
     marginBottom: 20,
   },
 
+  // Temporizador vinculado a una tarea
+  tareaHeaderRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    alignSelf: 'stretch',
+    backgroundColor: C.surface, borderWidth: 0.5, borderColor: C.border,
+    borderRadius: 16, paddingVertical: 12, paddingHorizontal: 16,
+    marginBottom: 28,
+  },
+  tareaHeaderTxt: { flex: 1, fontSize: 16, fontFamily: AppFonts.displayBold, color: '#3A3342' },
+  tareaFinTxt: { fontSize: 14, fontFamily: AppFonts.body, color: C.textMuted, textAlign: 'center' },
+  btnVolver: {
+    backgroundColor: Colors.purpleDk, borderRadius: 14,
+    paddingVertical: 14, paddingHorizontal: 28,
+  },
+  btnVolverTxt: { fontSize: 15, fontFamily: AppFonts.bodyBold, color: Colors.white },
+
   // Selector modo
   modoWrap: {
     flexDirection: 'row', backgroundColor: C.surface,
@@ -538,6 +850,14 @@ const estilos = StyleSheet.create({
   clockWrap: { width: 240, height: 240, alignItems: 'center', justifyContent: 'center', marginBottom: 28 },
   ringOuter: { position: 'absolute', width: 240, height: 240, borderRadius: 120, alignItems: 'center', justifyContent: 'center' },
   clockContent:  { alignItems: 'center' },
+  arrastreHint: {
+    fontSize: 13,
+    fontFamily: AppFonts.body,
+    color: C.textHint,
+    textAlign: 'center',
+    marginTop: -18,
+    marginBottom: 22,
+  },
   timeText:      { fontSize: 52, fontFamily: AppFonts.displaySemibold, letterSpacing: 1, fontVariant: ['tabular-nums'] },
   estadoLabel:   { fontSize: 13, color: Colors.purpleDk, fontFamily: AppFonts.bodyBold, marginTop: 6, letterSpacing: 0.4 },
 

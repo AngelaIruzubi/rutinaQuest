@@ -10,9 +10,11 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Sentry from "@sentry/react-native";
 import { useFonts } from "expo-font";
+import * as NavigationBar from "expo-navigation-bar";
 import * as Notifications from "expo-notifications";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { Platform } from "react-native";
 import { Bienvenida } from "../../components/Bienvenida";
@@ -20,6 +22,7 @@ import { Colors } from "../../constants/theme";
 import { AjustesProvider } from "../../context/AjustesContext";
 import { AvatarProvider } from "../../context/AvatarContext";
 import { DBReadyContext } from "../../context/Dbreadycontext";
+import { TemporizadorProvider } from "../../context/TemporizadorContext";
 import { initDB } from "../../database/database";
 
 const CLAVE_BIENVENIDA_VISTA = "rutinaquest_bienvenida_vista";
@@ -69,6 +72,12 @@ export default function Layout() {
     setMostrarBienvenida(false);
   };
 
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    NavigationBar.setBackgroundColorAsync("#FBF6F0").catch(() => {});
+    NavigationBar.setButtonStyleAsync("dark").catch(() => {});
+  }, []);
+
   // initDB() ya no hace nada real (los datos se guardan con AsyncStorage,
   // sin migraciones que ejecutar), pero se mantiene la señal dbReady porque
   // varias pantallas todavía la usan para saber cuándo pueden cargar datos.
@@ -113,27 +122,36 @@ export default function Layout() {
   if ((!fontsLoaded && !fontError) || mostrarBienvenida === null) return null;
 
   if (mostrarBienvenida) {
-    return <Bienvenida onEmpezar={handleEmpezar} />;
+    return (
+      <>
+        <StatusBar style="dark" backgroundColor="#FBF6F0" />
+        <Bienvenida onEmpezar={handleEmpezar} />
+      </>
+    );
   }
 
   return (
     <DBReadyContext.Provider value={dbReady}>
       <AjustesProvider>
         <AvatarProvider>
-          <Stack
-            screenOptions={{
-              headerStyle: {
-                backgroundColor: "#FBF6F0",
-              },
-              headerTintColor: Colors.purpleDk,
-              headerTitle: () => null,
-              headerShadowVisible: false,
-            }}
-          >
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="perfil" options={{ headerShown: false }} />
-            <Stack.Screen name="normas" options={{ headerShown: false }} />
-          </Stack>
+          <TemporizadorProvider>
+            <StatusBar style="dark" backgroundColor="#FBF6F0" />
+            <Stack
+              screenOptions={{
+                headerStyle: {
+                  backgroundColor: "#FBF6F0",
+                },
+                headerTintColor: Colors.purpleDk,
+                headerTitle: () => null,
+                headerShadowVisible: false,
+                contentStyle: { backgroundColor: "#FBF6F0" },
+              }}
+            >
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="perfil" options={{ headerShown: false }} />
+              <Stack.Screen name="normas" options={{ headerShown: false }} />
+            </Stack>
+          </TemporizadorProvider>
         </AvatarProvider>
       </AjustesProvider>
     </DBReadyContext.Provider>
