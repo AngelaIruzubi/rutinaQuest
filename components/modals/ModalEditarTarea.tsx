@@ -13,12 +13,15 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DuracionPicker } from '../../components/ui/DuracionPicker';
+import { SelectorDiasSemana } from '../../components/ui/SelectorDiasSemana';
 import { AppFonts, Colors } from '../../constants/theme';
 import { useAjustesCtx } from '../../context/AjustesContext';
+import { useBuscarPictogramasDebounced } from '../../hooks/useBuscarPictogramasDebounced';
 import { buscarPictogramas } from '../../services/arasaac';
 import { Tarea } from '../../types/tarea';
 import { fechaAppDate } from '../../utils/fecha';
@@ -26,11 +29,20 @@ import { parseTiempoLim } from '../../utils/tiempo';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
+type Repeticion = 'ninguna' | 'diaria' | 'semanal';
+
 interface ModalEditarTareaProps {
   visible:   boolean;
   tarea:     Tarea | null;
   onCerrar:  () => void;
-  onGuardar: (titulo: string, pictogramId: number | null, hora: string, duracionSeg: number | null) => void;
+  onGuardar: (
+    titulo: string,
+    pictogramId: number | null,
+    hora: string,
+    duracionSeg: number | null,
+    repeticion: Repeticion,
+    diasSemana: number[] | null,
+  ) => void;
 }
 
 // ─── Componente ───────────────────────────────────────────────────────────────
@@ -39,6 +51,7 @@ export function ModalEditarTarea({ visible, tarea, onCerrar, onGuardar }: ModalE
   const { escala } = useAjustesCtx();
   const fs = (n: number) => Math.round(n * escala);
   const insets = useSafeAreaInsets();
+  const { height: alturaVentana } = useWindowDimensions();
   const [editTitulo,      setEditTitulo]      = useState('');
   const [editPictogramas, setEditPictogramas] = useState<number[]>([]);
   const [editPictogramId, setEditPictogramId] = useState<number | null>(null);
@@ -46,6 +59,9 @@ export function ModalEditarTarea({ visible, tarea, onCerrar, onGuardar }: ModalE
   const [editDuracionSeg, setEditDuracionSeg] = useState<number | null>(null);
   const [showEditPicker,  setShowEditPicker]  = useState(false);
   const [editTempTime,    setEditTempTime]    = useState(fechaAppDate());
+  const [editRepeticion,  setEditRepeticion]  = useState<Repeticion>('ninguna');
+  const [editDiasSemana,  setEditDiasSemana]  = useState<number[]>([]);
+  const { buscar: buscarPictosDebounced } = useBuscarPictogramasDebounced();
 
   // Inicializar estado cuando se abre el modal con una tarea
   useEffect(() => {
@@ -57,6 +73,13 @@ export function ModalEditarTarea({ visible, tarea, onCerrar, onGuardar }: ModalE
     const dl = parseTiempoLim(tarea.hora);
     setEditTempTime(dl ?? fechaAppDate());
     setShowEditPicker(false);
+    setEditRepeticion(tarea.repeticion ?? 'ninguna');
+    if (tarea.diasSemana && tarea.diasSemana.length > 0) {
+      setEditDiasSemana(tarea.diasSemana);
+    } else {
+      const [fy, fm, fd] = (tarea.fechaDia ?? '').split('-').map(Number);
+      setEditDiasSemana([fy && fm && fd ? new Date(fy, fm - 1, fd).getDay() : new Date().getDay()]);
+    }
     if (tarea.title.trim().length >= 2) {
       buscarPictogramas(tarea.title, 6).then(ids => setEditPictogramas(ids));
     } else {
@@ -64,11 +87,20 @@ export function ModalEditarTarea({ visible, tarea, onCerrar, onGuardar }: ModalE
     }
   }, [visible, tarea?.id]);
 
+  const faltaDia = editRepeticion === 'semanal' && editDiasSemana.length === 0;
+
   const guardar = () => {
-    if (!editTitulo.trim()) return;
+    if (!editTitulo.trim() || faltaDia) return;
     const horaFinal = editHora ?? 'Sin hora';
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onGuardar(editTitulo.trim(), editPictogramId, horaFinal, editDuracionSeg);
+    onGuardar(
+      editTitulo.trim(),
+      editPictogramId,
+      horaFinal,
+      editDuracionSeg,
+      editRepeticion,
+      editRepeticion === 'semanal' ? editDiasSemana : null,
+    );
     AccessibilityInfo.announceForAccessibility(`Tarea actualizada: ${editTitulo}`);
   };
 
@@ -81,7 +113,7 @@ export function ModalEditarTarea({ visible, tarea, onCerrar, onGuardar }: ModalE
       accessibilityViewIsModal
     >
       <View style={[s.overlay, { paddingTop: insets.top + 20 }]} accessible={false}>
-        <View style={s.modalBox} accessible={false} importantForAccessibility="yes">
+        <View style={[s.modalBox, { maxHeight: alturaVentana * 0.85 }]} accessible={false} importantForAccessibility="yes">
           <LinearGradient
             colors={['#F7F2FA', '#EFE6F4']}
             start={{ x: 0, y: 0 }}
@@ -107,18 +139,15 @@ export function ModalEditarTarea({ visible, tarea, onCerrar, onGuardar }: ModalE
             </View>
           </LinearGradient>
 
-          <ScrollView keyboardShouldPersistTaps="handled" accessible={false} contentContainerStyle={[s.body, { paddingBottom: 20 + insets.bottom }]}>
+          <ScrollView style={{ flexShrink: 1, minHeight: 0 }} keyboardShouldPersistTaps="handled" accessible={false} contentContainerStyle={[s.body, { paddingBottom: 20 + insets.bottom }]}>
 
             {/* Título */}
             <View style={s.inputRow} accessible={false}>
               <TextInput
                 value={editTitulo}
-                onChangeText={async (texto) => {
+                onChangeText={(texto) => {
                   setEditTitulo(texto);
-                  if (texto.trim().length >= 2) {
-                    const ids = await buscarPictogramas(texto, 6);
-                    setEditPictogramas(ids);
-                  }
+                  buscarPictosDebounced(texto, (ids) => setEditPictogramas(ids));
                 }}
                 style={{ flex: 1, paddingVertical: 14, fontSize: fs(17), fontFamily: AppFonts.body, color: '#3A3140' }}
                 accessibilityLabel="Título de la tarea"
@@ -241,6 +270,63 @@ export function ModalEditarTarea({ visible, tarea, onCerrar, onGuardar }: ModalE
               </>
             )}
 
+            {/* Repetición */}
+            <Text style={[s.pictoLabel, { marginTop: 20 }]}>¿Se repite?</Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }} accessible={false}>
+              {(['ninguna', 'diaria', 'semanal'] as const).map((opcion) => (
+                <Pressable
+                  key={opcion}
+                  onPress={() => setEditRepeticion(opcion)}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 10,
+                    borderRadius: 12,
+                    alignItems: 'center',
+                    borderWidth: 2,
+                    borderColor: editRepeticion === opcion ? Colors.purple : '#E5E5E5',
+                    backgroundColor: editRepeticion === opcion ? Colors.purpleBg : '#fff',
+                  }}
+                  accessible
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    opcion === 'ninguna' ? 'Una vez' : opcion === 'diaria' ? 'Cada día' : 'Cada semana'
+                  }
+                  accessibilityState={{ selected: editRepeticion === opcion }}
+                >
+                  <Ionicons
+                    name={
+                      opcion === 'ninguna'
+                        ? 'checkmark-circle-outline'
+                        : opcion === 'diaria'
+                          ? 'repeat-outline'
+                          : 'calendar-outline'
+                    }
+                    size={22}
+                    color={editRepeticion === opcion ? Colors.purple : '#999'}
+                    accessibilityElementsHidden
+                    importantForAccessibility="no"
+                  />
+                  <Text
+                    style={{
+                      fontSize: fs(11),
+                      fontWeight: '600',
+                      color: editRepeticion === opcion ? Colors.purple : '#999',
+                      marginTop: 2,
+                    }}
+                  >
+                    {opcion === 'ninguna' ? 'Una vez' : opcion === 'diaria' ? 'Cada día' : 'Semanal'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {editRepeticion === 'semanal' && (
+              <View style={{ marginBottom: 16 }}>
+                <Text style={s.pictoLabel}>¿Qué días?</Text>
+                <SelectorDiasSemana diasSemana={editDiasSemana} onChange={setEditDiasSemana} />
+              </View>
+            )}
+
             {/* Duración con temporizador */}
             <View style={{ marginTop: 20 }}>
               <DuracionPicker valorSeg={editDuracionSeg} onChange={setEditDuracionSeg} />
@@ -249,11 +335,17 @@ export function ModalEditarTarea({ visible, tarea, onCerrar, onGuardar }: ModalE
             {/* Botón guardar */}
             <Pressable
               onPress={guardar}
-              disabled={!editTitulo.trim()}
+              disabled={!editTitulo.trim() || faltaDia}
               accessible
               accessibilityRole="button"
-              accessibilityLabel={editTitulo.trim() ? `Guardar cambios en ${editTitulo}` : 'Escribe un título primero'}
-              style={({ pressed }) => [{ opacity: !editTitulo.trim() ? 0.4 : pressed ? 0.9 : 1 }]}
+              accessibilityLabel={
+                !editTitulo.trim()
+                  ? 'Escribe un título primero'
+                  : faltaDia
+                    ? 'Marca al menos un día de la semana'
+                    : `Guardar cambios en ${editTitulo}`
+              }
+              style={({ pressed }) => [{ opacity: !editTitulo.trim() || faltaDia ? 0.4 : pressed ? 0.9 : 1 }]}
             >
               <LinearGradient
                 colors={['#C9A9DB', Colors.purple]}
@@ -283,7 +375,6 @@ const s = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 26,
     width: '90%',
-    maxHeight: '85%',
     overflow: 'hidden',
     shadowColor: '#2E203A',
     shadowOpacity: 0.28,

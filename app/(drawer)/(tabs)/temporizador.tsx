@@ -592,7 +592,13 @@ export default function Temporizador() {
               />
             </View>
             <View style={estilos.clockContent}>
-              <Text allowFontScaling={false} style={[estilos.timeText, { color: terminado ? C.green.solid : C.textPrimary }]}>
+              <Text
+                allowFontScaling={false}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.5}
+                style={[estilos.timeText, { color: terminado ? C.green.solid : C.textPrimary }]}
+              >
                 {formatTime(tareaTiempoActual)}
               </Text>
               <Text allowFontScaling={false} style={estilos.estadoLabel}>
@@ -697,7 +703,13 @@ export default function Temporizador() {
             </View>
           )}
           <View style={estilos.clockContent}>
-            <Text allowFontScaling={false} style={[estilos.timeText, { color: colorDisplay }]}>
+            <Text
+              allowFontScaling={false}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.5}
+              style={[estilos.timeText, { color: colorDisplay }]}
+            >
               {formatTime(tiempoActual)}
             </Text>
             <Text allowFontScaling={false} style={estilos.estadoLabel}>
@@ -858,7 +870,7 @@ const estilos = StyleSheet.create({
     marginTop: -18,
     marginBottom: 22,
   },
-  timeText:      { fontSize: 52, fontFamily: AppFonts.displaySemibold, letterSpacing: 1, fontVariant: ['tabular-nums'] },
+  timeText:      { fontSize: 52, maxWidth: 190, textAlign: 'center', fontFamily: AppFonts.displaySemibold, letterSpacing: 1, fontVariant: ['tabular-nums'] },
   estadoLabel:   { fontSize: 13, color: Colors.purpleDk, fontFamily: AppFonts.bodyBold, marginTop: 6, letterSpacing: 0.4 },
 
   // Barra progreso

@@ -46,7 +46,7 @@ Notifications.setNotificationHandler({
   }),
 });
 
-export default function Layout() {
+function Layout() {
   const [fontsLoaded, fontError] = useFonts({
     Baloo2_600SemiBold,
     Baloo2_700Bold,
@@ -157,3 +157,9 @@ export default function Layout() {
     </DBReadyContext.Provider>
   );
 }
+
+// Sentry.wrap añade el árbol de la app dentro de un error boundary y activa
+// el contexto extra (breadcrumbs de navegación/toques) que ayuda a que los
+// reportes de fallos nativos lleguen con más información — sin esto, un
+// fallo al renderizar podía cerrar la app sin dejar mucho rastro en Sentry.
+export default Sentry.wrap(Layout);

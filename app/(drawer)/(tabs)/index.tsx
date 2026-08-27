@@ -20,10 +20,10 @@ import { minutosRestantes, parseTiempoLim } from "../../../utils/tiempo";
 
 import {
   AccessibilityInfo,
+  FlatList,
   Image,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -42,6 +42,7 @@ import {
   updateTareaBaseCompleta,
   updateTareaCompletada,
   updateTareaDuracion,
+  updateTareaFrecuencia,
   updateTareaHora,
   updateTareaNotifId,
   updateTareaTituloPicto,
@@ -146,8 +147,27 @@ export default function Home() {
     resetear: resetearTemporizador,
   } = useTemporizadorTarea();
 
+  // El temporizador de una tarea vive en un contexto global y se completa en
+  // segundo plano (aunque no estés mirando esta pantalla). Antes solo se
+  // recargaban las tareas al volver a Inicio por foco de pantalla, y en
+  // algunos casos ese refresco no llegaba a tiempo — esto engancha la
+  // recarga directamente al evento real de "el temporizador ha terminado",
+  // así funciona sin importar cómo se vuelva a Inicio.
+  useEffect(() => {
+    if (timerActivo?.estado !== "finished") return;
+    cargarTareas();
+    setSelectedTask((prev) =>
+      prev && prev.id === timerActivo.tareaId
+        ? { ...prev, tiempoCumplido: true }
+        : prev,
+    );
+  }, [timerActivo?.estado, timerActivo?.tareaId, cargarTareas]);
+
   const abrirTemporizadorTarea = async (tarea: Tarea) => {
-    if (timerActivo?.tareaId === tarea.id) {
+    // Si el temporizador de esta misma tarea ya terminó, no hay que
+    // reabrirlo tal cual (se quedaría pillado mostrando "Volver a mis
+    // tareas" para siempre) — hay que arrancarlo de nuevo desde cero.
+    if (timerActivo && timerActivo.tareaId === tarea.id && timerActivo.estado !== "finished") {
       router.push("/temporizador");
       return;
     }
@@ -183,6 +203,14 @@ export default function Home() {
   useEffect(() => {
     if (Platform.OS === "web") return;
     (async () => {
+      // El permiso y el canal de Android deben quedar listos ANTES de
+      // programar nada: si se programa mientras el permiso todavía no se
+      // ha concedido (p. ej. justo al abrir la app por primera vez, en
+      // paralelo con el diálogo de permiso del layout raíz), la llamada
+      // falla en silencio y la notificación de ese día nunca llega.
+      await pedirPermisosNotificaciones();
+      await configurarCanalAndroid();
+
       const ahora = new Date();
       const hoy = hoyAppStr();
       await Notifications.cancelAllScheduledNotificationsAsync();
@@ -220,14 +248,15 @@ export default function Home() {
       }
 
       const tareasDia = (await getTareasPorFecha(hoy)) as any[];
-      for (const t of tareasDia) {
-        if (t.completed || !t.hora || t.hora === "Sin hora") continue;
-        const [hh, mm] = t.hora.split(":").map(Number);
-        if (isNaN(hh) || isNaN(mm)) continue;
-        const trigger5min = new Date();
-        trigger5min.setHours(hh, mm - 5, 0, 0);
-        if (trigger5min > ahora) {
-          await Notifications.scheduleNotificationAsync({
+      await Promise.all(
+        tareasDia.map((t) => {
+          if (t.completed || !t.hora || t.hora === "Sin hora") return null;
+          const [hh, mm] = t.hora.split(":").map(Number);
+          if (isNaN(hh) || isNaN(mm)) return null;
+          const trigger5min = new Date();
+          trigger5min.setHours(hh, mm - 5, 0, 0);
+          if (trigger5min <= ahora) return null;
+          return Notifications.scheduleNotificationAsync({
             content: {
               title: "⏰ ¡Quedan 5 minutos!",
               body: `La tarea "${t.title}" vence pronto`,
@@ -238,8 +267,8 @@ export default function Home() {
               date: trigger5min,
             },
           }).catch(() => {});
-        }
-      }
+        }),
+      );
     })();
   }, []);
   const [notifType, setNotifType] = useState("ontime");
@@ -369,14 +398,15 @@ export default function Home() {
             }
 
             // 5 min antes de cada tarea con hora
-            for (const t of tareasHoy as any[]) {
-              if (t.completed || !t.hora || t.hora === "Sin hora") continue;
-              const [hh, mm] = t.hora.split(":").map(Number);
-              if (isNaN(hh) || isNaN(mm)) continue;
-              const trigger5min = new Date();
-              trigger5min.setHours(hh, mm - 5, 0, 0);
-              if (trigger5min > ahora) {
-                await Notifications.scheduleNotificationAsync({
+            await Promise.all(
+              (tareasHoy as any[]).map((t) => {
+                if (t.completed || !t.hora || t.hora === "Sin hora") return null;
+                const [hh, mm] = t.hora.split(":").map(Number);
+                if (isNaN(hh) || isNaN(mm)) return null;
+                const trigger5min = new Date();
+                trigger5min.setHours(hh, mm - 5, 0, 0);
+                if (trigger5min <= ahora) return null;
+                return Notifications.scheduleNotificationAsync({
                   content: {
                     title: "⏰ ¡Quedan 5 minutos!",
                     body: `La tarea "${t.title}" vence pronto`,
@@ -386,9 +416,9 @@ export default function Home() {
                     type: Notifications.SchedulableTriggerInputTypes.DATE,
                     date: trigger5min,
                   },
-                });
-              }
-            }
+                }).catch(() => {});
+              }),
+            );
           }
 
           if (vencidasAyer > 0 && !gami.penalizacionAplicada) {
@@ -415,10 +445,14 @@ export default function Home() {
         // programa como notificación precisa del sistema al crear/editar
         // cada tarea (ver programarNotif5MinAntes), en vez de este chequeo
         // periódico que podía llegar tarde (solo se repetía cada 5 min).
+        //
+        // Aquí se exige "hora === X" pero NO "minutos === 0": con un
+        // intervalo de 5 minutos, exigir el minuto exacto haría que este
+        // chequeo casi nunca coincidiera (dependía de en qué minuto exacto
+        // arrancó la app). El flag notifEnviadasHoy ya evita que se repita.
 
         if (
           hora === 12 &&
-          minutos === 0 &&
           gami.tareasCompletasHoy === 0 &&
           pending.length > 0 &&
           !notifEnviadasHoy.current.has("mitadDia")
@@ -432,7 +466,6 @@ export default function Home() {
 
         if (
           hora === 21 &&
-          minutos === 0 &&
           pending.length > 0 &&
           !notifEnviadasHoy.current.has("finDia")
         ) {
@@ -734,134 +767,136 @@ export default function Home() {
         onClose={() => setShowRachaNotif(false)}
       />
 
-      <ScrollView
+      <FlatList
+        data={pendingTasks}
+        keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
         keyboardShouldPersistTaps="handled"
         accessible={false}
-      >
-        {/* ── Cabecera ── */}
-        <View
-          style={{ paddingTop: 24, paddingBottom: 18, gap: 16 }}
-          accessible={false}
-        >
-          <View style={styles.headerRow} accessible={false}>
-            <View
-              accessible
-              accessibilityRole="header"
-              accessibilityLabel={`Mis Tareas. ${formattedToday}`}
-            >
-              <Text
-                style={[styles.title, { fontSize: fs(26) }]}
-                accessibilityElementsHidden
-                importantForAccessibility="no"
+        ListHeaderComponent={
+          <View
+            style={{ paddingTop: 24, paddingBottom: 18, gap: 16 }}
+            accessible={false}
+          >
+            {/* ── Cabecera ── */}
+            <View style={styles.headerRow} accessible={false}>
+              <View
+                accessible
+                accessibilityRole="header"
+                accessibilityLabel={`Mis Tareas. ${formattedToday}`}
               >
-                Mis Tareas
-              </Text>
-              <Text
-                style={[styles.dateText, { fontSize: fs(15) }]}
-                accessibilityElementsHidden
-                importantForAccessibility="no"
-              >
-                {formattedToday}
-              </Text>
-            </View>
-
-            <Pressable
-              onPress={() => router.push("/perfil")}
-              accessible
-              accessibilityRole="button"
-              accessibilityLabel="Mi perfil"
-              accessibilityHint="Abre la pantalla de personalización del avatar"
-            >
-              <LinearGradient
-                colors={["#C9A9DB", Colors.purple]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0.4, y: 1 }}
-                style={styles.profileBtn}
-              >
-                <Ionicons
-                  name="person-circle-outline"
-                  size={24}
-                  color="#fff"
+                <Text
+                  style={[styles.title, { fontSize: fs(26) }]}
                   accessibilityElementsHidden
                   importantForAccessibility="no"
-                />
-              </LinearGradient>
-            </Pressable>
-          </View>
-
-          {/* ── Estadísticas rápidas ── */}
-          <View
-            style={{ flexDirection: "row", gap: 10 }}
-            accessible
-            accessibilityLabel={`${gami.estrellas} estrellas. Racha de ${gami.racha} ${gami.racha === 1 ? "día" : "días"}`}
-          >
-            <View style={styles.statPill}>
-              <View
-                style={[styles.statIconWrap, { backgroundColor: "#FFF6DB" }]}
-              >
-                <Ionicons name="star" size={16} color="#E8B500" />
+                >
+                  Mis Tareas
+                </Text>
+                <Text
+                  style={[styles.dateText, { fontSize: fs(15) }]}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no"
+                >
+                  {formattedToday}
+                </Text>
               </View>
-              <View>
-                <Text style={[styles.statValue, { fontSize: fs(16) }]}>
-                  {gami.estrellas}
-                </Text>
-                <Text style={[styles.statLabel, { fontSize: fs(11) }]}>
-                  estrellas
-                </Text>
+
+              <Pressable
+                onPress={() => router.push("/perfil")}
+                accessible
+                accessibilityRole="button"
+                accessibilityLabel="Mi perfil"
+                accessibilityHint="Abre la pantalla de personalización del avatar"
+              >
+                <LinearGradient
+                  colors={["#C9A9DB", Colors.purple]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0.4, y: 1 }}
+                  style={styles.profileBtn}
+                >
+                  <Ionicons
+                    name="person-circle-outline"
+                    size={24}
+                    color="#fff"
+                    accessibilityElementsHidden
+                    importantForAccessibility="no"
+                  />
+                </LinearGradient>
+              </Pressable>
+            </View>
+
+            {/* ── Estadísticas rápidas ── */}
+            <View
+              style={{ flexDirection: "row", gap: 10 }}
+              accessible
+              accessibilityLabel={`${gami.estrellas} estrellas. Racha de ${gami.racha} ${gami.racha === 1 ? "día" : "días"}`}
+            >
+              <View style={styles.statPill}>
+                <View
+                  style={[styles.statIconWrap, { backgroundColor: "#FFF6DB" }]}
+                >
+                  <Ionicons name="star" size={16} color="#E8B500" />
+                </View>
+                <View>
+                  <Text style={[styles.statValue, { fontSize: fs(16) }]}>
+                    {gami.estrellas}
+                  </Text>
+                  <Text style={[styles.statLabel, { fontSize: fs(11) }]}>
+                    estrellas
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.statPill}>
+                <View
+                  style={[styles.statIconWrap, { backgroundColor: "#FFF2EC" }]}
+                >
+                  <Text style={{ fontSize: 14 }}>🔥</Text>
+                </View>
+                <View>
+                  <Text style={[styles.statValue, { fontSize: fs(16) }]}>
+                    {gami.racha} {gami.racha === 1 ? "día" : "días"}
+                  </Text>
+                  <Text style={[styles.statLabel, { fontSize: fs(11) }]}>
+                    de racha
+                  </Text>
+                </View>
               </View>
             </View>
-            <View style={styles.statPill}>
-              <View
-                style={[styles.statIconWrap, { backgroundColor: "#FFF2EC" }]}
-              >
-                <Text style={{ fontSize: 14 }}>🔥</Text>
-              </View>
-              <View>
-                <Text style={[styles.statValue, { fontSize: fs(16) }]}>
-                  {gami.racha} {gami.racha === 1 ? "día" : "días"}
-                </Text>
-                <Text style={[styles.statLabel, { fontSize: fs(11) }]}>
-                  de racha
-                </Text>
-              </View>
-            </View>
-          </View>
 
-          <View
-            style={styles.searchBar}
-            accessibilityLabel="Buscar tarea"
-            accessibilityHint="Escribe para filtrar las tareas de hoy"
-            accessibilityRole="search"
-          >
-            <Ionicons
-              name="search"
-              size={18}
-              color="#C7C0CE"
-              accessibilityElementsHidden
-              importantForAccessibility="no"
-            />
-            <TextInput
-              placeholder="Buscar tarea..."
-              value={search}
-              onChangeText={setSearch}
-              style={{
-                flex: 1,
-                fontSize: fs(15),
-                fontFamily: AppFonts.body,
-                color: "#3A3342",
-              }}
-              returnKeyType="search"
+            <View
+              style={styles.searchBar}
               accessibilityLabel="Buscar tarea"
               accessibilityHint="Escribe para filtrar las tareas de hoy"
               accessibilityRole="search"
-              clearButtonMode="while-editing"
-            />
+            >
+              <Ionicons
+                name="search"
+                size={18}
+                color="#C7C0CE"
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+              />
+              <TextInput
+                placeholder="Buscar tarea..."
+                value={search}
+                onChangeText={setSearch}
+                style={{
+                  flex: 1,
+                  fontSize: fs(15),
+                  fontFamily: AppFonts.body,
+                  color: "#3A3342",
+                }}
+                returnKeyType="search"
+                accessibilityLabel="Buscar tarea"
+                accessibilityHint="Escribe para filtrar las tareas de hoy"
+                accessibilityRole="search"
+                clearButtonMode="while-editing"
+              />
+            </View>
           </View>
-        </View>
-
-        {pendingTasks.length === 0 ? (
+        }
+        ListEmptyComponent={
           <View
             style={styles.emptyBox}
             accessible
@@ -905,180 +940,178 @@ export default function Home() {
               </>
             )}
           </View>
-        ) : (
-          pendingTasks.map((item) => {
-            const mins = minutosRestantes(item.hora);
-            const vencida = mins !== null && mins < 0;
-            const urgente = mins !== null && mins >= 0 && mins <= 10;
-            const horaLabel =
-              item.hora && item.hora !== "Sin hora"
-                ? `, hora ${item.hora}`
-                : "";
-            const estLabel = vencida
-              ? ", fuera de hora"
-              : urgente
-                ? `, quedan ${mins} minutos`
-                : "";
+        }
+        renderItem={({ item }) => {
+          const mins = minutosRestantes(item.hora, item.duracionSeg);
+          const vencida = mins !== null && mins < 0;
+          const urgente = mins !== null && mins >= 0 && mins <= 10;
+          const horaLabel =
+            item.hora && item.hora !== "Sin hora"
+              ? `, hora ${item.hora}`
+              : "";
+          const estLabel = vencida
+            ? ", fuera de hora"
+            : urgente
+              ? `, quedan ${mins} minutos`
+              : "";
 
-            return (
-              <Pressable
-                key={item.id}
-                onPress={() => {
-                  setSelectedTask(item);
-                  setTaskModalVisible(true);
-                }}
-                accessible
-                accessibilityRole="button"
-                accessibilityLabel={`${item.title}${horaLabel}${estLabel}`}
-                accessibilityHint="Pulsa para ver el detalle de la tarea"
-                style={({ pressed }) => [
-                  { opacity: pressed && !reduceMotion ? 0.75 : 1 },
+          return (
+            <Pressable
+              onPress={() => {
+                setSelectedTask(item);
+                setTaskModalVisible(true);
+              }}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel={`${item.title}${horaLabel}${estLabel}`}
+              accessibilityHint="Pulsa para ver el detalle de la tarea"
+              style={({ pressed }) => [
+                { opacity: pressed && !reduceMotion ? 0.75 : 1 },
+              ]}
+            >
+              <View
+                style={[
+                  styles.taskRow,
+                  vencida && styles.taskRowLate,
+                  urgente && styles.taskRowUrgent,
                 ]}
               >
                 <View
-                  style={[
-                    styles.taskRow,
-                    vencida && styles.taskRowLate,
-                    urgente && styles.taskRowUrgent,
-                  ]}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    flex: 1,
+                  }}
                 >
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      flex: 1,
-                    }}
-                  >
-                    {item.pictogramId ? (
-                      <Image
-                        source={{
-                          uri: `https://static.arasaac.org/pictograms/${item.pictogramId}/${item.pictogramId}_300.png`,
-                        }}
-                        style={styles.pictogram}
-                        accessibilityLabel={`Pictograma de ${item.title}`}
-                        accessibilityIgnoresInvertColors
+                  {item.pictogramId ? (
+                    <Image
+                      source={{
+                        uri: `https://static.arasaac.org/pictograms/${item.pictogramId}/${item.pictogramId}_300.png`,
+                      }}
+                      style={styles.pictogram}
+                      accessibilityLabel={`Pictograma de ${item.title}`}
+                      accessibilityIgnoresInvertColors
+                    />
+                  ) : (
+                    <View
+                      style={[
+                        styles.pictogramPlaceholder,
+                        vencida && { backgroundColor: "#FCEBEB" },
+                        urgente && !vencida && { backgroundColor: "#FFF2EC" },
+                      ]}
+                      accessibilityElementsHidden
+                      importantForAccessibility="no"
+                    >
+                      <Ionicons
+                        name={
+                          vencida
+                            ? "alert-circle-outline"
+                            : urgente
+                              ? "time-outline"
+                              : "checkmark-circle-outline"
+                        }
+                        size={22}
+                        color={vencida ? RED : urgente ? ORANGE : PURPLE}
                       />
-                    ) : (
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[styles.taskTitle, { fontSize: fs(16) }]}
+                      numberOfLines={1}
+                    >
+                      {item.title}
+                    </Text>
+                    {item.repeticion && item.repeticion !== "ninguna" && (
+                      <Text
+                        style={{
+                          fontSize: fs(11),
+                          fontFamily: AppFonts.bodyBold,
+                          color: PURPLE,
+                        }}
+                      >
+                        {item.repeticion === "diaria"
+                          ? "📅 Diaria"
+                          : "📆 Semanal"}
+                      </Text>
+                    )}
+                    {urgente && !vencida && (
+                      <Text
+                        style={{
+                          fontSize: fs(11.5),
+                          fontFamily: AppFonts.bodyBold,
+                          color: ORANGE,
+                        }}
+                      >
+                        ¡Quedan {mins} min!
+                      </Text>
+                    )}
+                    {vencida && (
+                      <Text
+                        style={{
+                          fontSize: fs(11.5),
+                          fontFamily: AppFonts.bodyBold,
+                          color: RED,
+                        }}
+                      >
+                        ⚠ Fuera de hora
+                      </Text>
+                    )}
+                  </View>
+                </View>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  {item.hora && item.hora !== "Sin hora" && (
+                    <Text
+                      style={[
+                        styles.taskTime,
+                        { fontSize: fs(13.5) },
+                        vencida && { color: RED },
+                        urgente && !vencida && { color: ORANGE },
+                      ]}
+                      accessibilityElementsHidden
+                      importantForAccessibility="no"
+                    >
+                      {item.hora}
+                    </Text>
+                  )}
+                  {item.duracionSeg ? (
+                    item.tiempoCumplido ? (
                       <View
-                        style={[
-                          styles.pictogramPlaceholder,
-                          vencida && { backgroundColor: "#FCEBEB" },
-                          urgente && !vencida && { backgroundColor: "#FFF2EC" },
-                        ]}
+                        style={styles.tiempoListoBadge}
                         accessibilityElementsHidden
                         importantForAccessibility="no"
                       >
                         <Ionicons
-                          name={
-                            vencida
-                              ? "alert-circle-outline"
-                              : urgente
-                                ? "time-outline"
-                                : "checkmark-circle-outline"
-                          }
-                          size={22}
-                          color={vencida ? RED : urgente ? ORANGE : PURPLE}
+                          name="checkmark-circle"
+                          size={17}
+                          color={Colors.green}
                         />
                       </View>
-                    )}
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={[styles.taskTitle, { fontSize: fs(16) }]}
-                        numberOfLines={1}
+                    ) : (
+                      <Pressable
+                        onPress={() => abrirTemporizadorTarea(item)}
+                        style={styles.btnTemporizador}
+                        accessible
+                        accessibilityRole="button"
+                        accessibilityLabel={`Iniciar temporizador de ${Math.round((item.duracionSeg ?? 0) / 60)} minutos para ${item.title}`}
+                        accessibilityHint="Abre el temporizador. La tarea no se podrá marcar como realizada hasta que termine"
                       >
-                        {item.title}
-                      </Text>
-                      {item.repeticion && item.repeticion !== "ninguna" && (
-                        <Text
-                          style={{
-                            fontSize: fs(11),
-                            fontFamily: AppFonts.bodyBold,
-                            color: PURPLE,
-                          }}
-                        >
-                          {item.repeticion === "diaria"
-                            ? "📅 Diaria"
-                            : "📆 Semanal"}
-                        </Text>
-                      )}
-                      {urgente && !vencida && (
-                        <Text
-                          style={{
-                            fontSize: fs(11.5),
-                            fontFamily: AppFonts.bodyBold,
-                            color: ORANGE,
-                          }}
-                        >
-                          ¡Quedan {mins} min!
-                        </Text>
-                      )}
-                      {vencida && (
-                        <Text
-                          style={{
-                            fontSize: fs(11.5),
-                            fontFamily: AppFonts.bodyBold,
-                            color: RED,
-                          }}
-                        >
-                          ⚠ Fuera de hora
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 8,
-                    }}
-                  >
-                    {item.hora && item.hora !== "Sin hora" && (
-                      <Text
-                        style={[
-                          styles.taskTime,
-                          { fontSize: fs(13.5) },
-                          vencida && { color: RED },
-                          urgente && !vencida && { color: ORANGE },
-                        ]}
-                        accessibilityElementsHidden
-                        importantForAccessibility="no"
-                      >
-                        {item.hora}
-                      </Text>
-                    )}
-                    {item.duracionSeg ? (
-                      item.tiempoCumplido ? (
-                        <View
-                          style={styles.tiempoListoBadge}
-                          accessibilityElementsHidden
-                          importantForAccessibility="no"
-                        >
-                          <Ionicons
-                            name="checkmark-circle"
-                            size={17}
-                            color={Colors.green}
-                          />
-                        </View>
-                      ) : (
-                        <Pressable
-                          onPress={() => abrirTemporizadorTarea(item)}
-                          style={styles.btnTemporizador}
-                          accessible
-                          accessibilityRole="button"
-                          accessibilityLabel={`Iniciar temporizador de ${Math.round((item.duracionSeg ?? 0) / 60)} minutos para ${item.title}`}
-                          accessibilityHint="Abre el temporizador. La tarea no se podrá marcar como realizada hasta que termine"
-                        >
-                          <Ionicons name="play" size={19} color="#fff" />
-                        </Pressable>
-                      )
-                    ) : null}
-                  </View>
+                        <Ionicons name="play" size={19} color="#fff" />
+                      </Pressable>
+                    )
+                  ) : null}
                 </View>
-              </Pressable>
-            );
-          })
-        )}
-      </ScrollView>
+              </View>
+            </Pressable>
+          );
+        }}
+      />
 
       {/* ── FAB ── */}
       <Pressable
@@ -1145,7 +1178,7 @@ export default function Home() {
         visible={editModalVisible}
         tarea={selectedTask}
         onCerrar={() => setEditModalVisible(false)}
-        onGuardar={async (titulo, pictogramId, hora, duracionSeg) => {
+        onGuardar={async (titulo, pictogramId, hora, duracionSeg, repeticion, diasSemana) => {
           if (!selectedTask) return;
           const horaFinal = hora ?? "Sin hora";
           const esInstanciaRepetitiva =
@@ -1154,6 +1187,23 @@ export default function Home() {
             selectedTask.repeticion &&
             selectedTask.repeticion !== "ninguna" &&
             !esInstanciaRepetitiva;
+          const cambioFrecuencia =
+            repeticion !== (selectedTask.repeticion ?? "ninguna") ||
+            (repeticion === "semanal" &&
+              JSON.stringify(diasSemana ?? []) !==
+                JSON.stringify(selectedTask.diasSemana ?? []));
+          // Cambiar la duración invalida el temporizador ya cumplido con la
+          // duración anterior (ver updateTareaDuracion), pero el temporizador
+          // "en vivo" del contexto global no se entera solo — si sigue
+          // apuntando a esta tarea como terminada, la tarea aparecía como ya
+          // lista para repetir con el anillo en verde aunque se hubiera
+          // reiniciado. Al tocar la duración, se limpia también ese estado.
+          if (
+            duracionSeg !== (selectedTask.duracionSeg ?? null) &&
+            timerActivo?.tareaId === selectedTask.id
+          ) {
+            resetearTemporizador();
+          }
 
           if (esInstanciaRepetitiva || esTareaBase) {
             setEditModalVisible(false);
@@ -1237,6 +1287,12 @@ export default function Home() {
                   ),
                 );
               }
+              if (cambioFrecuencia) {
+                const baseId = esInstanciaRepetitiva
+                  ? selectedTask.tareaBaseId
+                  : selectedTask.id;
+                await updateTareaFrecuencia(baseId!, repeticion, diasSemana);
+              }
               setSelectedTask((prev) =>
                 prev
                   ? {
@@ -1254,6 +1310,9 @@ export default function Home() {
             await updateTareaTituloPicto(selectedTask.id, titulo, pictogramId);
             await updateTareaHora(selectedTask.id, horaFinal);
             await updateTareaDuracion(selectedTask.id, duracionSeg);
+            if (cambioFrecuencia) {
+              await updateTareaFrecuencia(selectedTask.id, repeticion, diasSemana);
+            }
             const notifIdSimple = await programarNotif5MinAntes(
               selectedTask.fechaDia,
               horaFinal,

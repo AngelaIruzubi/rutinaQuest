@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppFonts, Colors } from '../../constants/theme';
 import { useAjustesCtx } from '../../context/AjustesContext';
+import { useTemporizadorTarea } from '../../context/TemporizadorContext';
 import { Tarea } from '../../types/tarea';
 import { StarRow } from '../ui/StarRow';
 
@@ -28,7 +29,17 @@ export function ModalDetalleTarea({
   const { escala } = useAjustesCtx();
   const fs = (n: number) => Math.round(n * escala);
   const insets = useSafeAreaInsets();
-  const tiempoBloqueado = !!tarea?.duracionSeg && !tarea?.tiempoCumplido;
+  const { height: alturaVentana } = useWindowDimensions();
+  // El campo tarea.tiempoCumplido viene de la lista de tareas cargada de la
+  // base de datos, que puede tardar en refrescarse. El temporizador en sí
+  // vive en un contexto global independiente de esa recarga, así que se
+  // consulta también en directo aquí para no depender de que la lista se
+  // haya actualizado a tiempo.
+  const { activo: timerActivo } = useTemporizadorTarea();
+  const temporizadorTerminadoEnVivo =
+    !!tarea && timerActivo?.tareaId === tarea.id && timerActivo.estado === 'finished';
+  const tiempoBloqueado =
+    !!tarea?.duracionSeg && !tarea?.tiempoCumplido && !temporizadorTerminadoEnVivo;
   return (
     <Modal
       visible={visible}
@@ -39,7 +50,7 @@ export function ModalDetalleTarea({
     >
       <Pressable style={[s.overlay, { paddingTop: insets.top + 20 }]} onPress={onCerrar} accessible={false}>
         <Pressable
-          style={[s.modalBox, { maxHeight: '80%' }]}
+          style={[s.modalBox, { maxHeight: alturaVentana * 0.8 }]}
           onPress={e => e.stopPropagation()}
           accessible={false}
           importantForAccessibility="yes"
@@ -67,6 +78,7 @@ export function ModalDetalleTarea({
           </LinearGradient>
 
           <ScrollView
+            style={{ flexShrink: 1, minHeight: 0 }}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={[s.body, { paddingBottom: 22 + insets.bottom }]}
             keyboardShouldPersistTaps="handled"

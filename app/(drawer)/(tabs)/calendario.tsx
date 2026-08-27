@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Haptics from "expo-haptics";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   AccessibilityInfo,
   Image,
@@ -14,8 +14,10 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
+import { ModalEditarTarea } from "../../../components/modals/ModalEditarTarea";
 import { DuracionPicker } from "../../../components/ui/DuracionPicker";
 import { SelectorDiasSemana } from "../../../components/ui/SelectorDiasSemana";
 import { DIAS_SEMANA, MESES } from "../../../constants/diasSemana";
@@ -28,10 +30,15 @@ import {
   getFechasConTareas,
   getTareasPorFecha,
   insertTarea,
+  updateTareaBaseCompleta,
+  updateTareaDuracion,
+  updateTareaFrecuencia,
+  updateTareaHora,
   updateTareaNotifId,
+  updateTareaTituloPicto,
 } from "../../../database/database";
+import { useBuscarPictogramasDebounced } from "../../../hooks/useBuscarPictogramasDebounced";
 import { useConfirm } from "../../../hooks/useConfirm";
-import { buscarPictogramas } from "../../../services/arasaac";
 import { ahoraApp, ahoraAppMs, hoyAppStr } from "../../../utils/fecha";
 import {
   cancelarNotifTarea,
@@ -191,37 +198,40 @@ function ModalNuevaTarea({
 }) {
   const { escala } = useAjustesCtx();
   const fs = (n: number) => Math.round(n * escala);
+  const { height: alturaVentana } = useWindowDimensions();
   const [titulo, setTitulo] = useState("");
   const [hora, setHora] = useState<string | null>(null);
-  const [pictogramas, setPictogramas] = useState<number[]>([]);
+  const { pictogramas, setPictogramas, buscar: buscarPictosDebounced } =
+    useBuscarPictogramasDebounced();
   const [pictogramId, setPictogramId] = useState<number | null>(null);
   const [showPicker, setShowPicker] = useState(false);
   const [tempTime, setTempTime] = useState(new Date());
   const [repeticion, setRepeticion] = useState<
     "ninguna" | "diaria" | "semanal"
   >("ninguna");
-  const [diasSemana, setDiasSemana] = useState<number[]>([new Date().getDay()]);
+  const [diasSemana, setDiasSemana] = useState<number[]>([]);
   const [duracionSeg, setDuracionSeg] = useState<number | null>(null);
 
   const PURPLE = "#A77BBE";
   const PURPLE_LT = "#E5D9EE";
   const PURPLE_BG = "#F4F0F6";
 
-  const buscar = async (texto: string) => {
+  // Al abrir el formulario, se premarca el día de la semana del día que se
+  // ha tocado en el calendario (no el día real de hoy) — si estás añadiendo
+  // una tarea semanal para un jueves futuro, debe marcarse jueves, no hoy.
+  useEffect(() => {
+    if (!visible) return;
+    const [fy, fm, fd] = fecha.split("-").map(Number);
+    const diaSemana =
+      fy && fm && fd ? new Date(fy, fm - 1, fd).getDay() : new Date().getDay();
+    setDiasSemana([diaSemana]);
+  }, [visible, fecha]);
+
+  const buscar = (texto: string) => {
     setTitulo(texto);
-    if (texto.trim().length < 2) {
-      setPictogramas([]);
-      setPictogramId(null);
-      return;
-    }
-    const ids = await buscarPictogramas(texto, 6);
-    if (ids.length > 0) {
-      setPictogramas(ids);
-      setPictogramId(ids[0]);
-    } else {
-      setPictogramas([]);
-      setPictogramId(null);
-    }
+    buscarPictosDebounced(texto, (ids) => {
+      setPictogramId(ids.length > 0 ? ids[0] : null);
+    });
   };
 
   const handleTimeChange = (event: any, date?: Date) => {
@@ -241,13 +251,13 @@ function ModalNuevaTarea({
     setPictogramas([]);
     setShowPicker(false);
     setRepeticion("ninguna");
-    setDiasSemana([new Date().getDay()]);
     setDuracionSeg(null);
     onClose();
   };
 
   const guardar = () => {
     if (!titulo.trim()) return;
+    if (repeticion === "semanal" && diasSemana.length === 0) return;
     onGuardar({
       id: `${fecha}_${ahoraAppMs()}_${Math.random().toString(36).slice(2, 8)}`,
       title: titulo.trim(),
@@ -263,7 +273,6 @@ function ModalNuevaTarea({
     setPictogramas([]);
     setShowPicker(false);
     setRepeticion("ninguna");
-    setDiasSemana([new Date().getDay()]);
     setDuracionSeg(null);
     onClose();
     AccessibilityInfo.announceForAccessibility(
@@ -290,12 +299,13 @@ function ModalNuevaTarea({
           importantForAccessibility="no"
         >
           <Pressable
-            style={s.modalBox}
+            style={[s.modalBox, { maxHeight: alturaVentana * 0.88 }]}
             onPress={(e) => e.stopPropagation()}
             accessible={false}
             importantForAccessibility="yes"
           >
             <ScrollView
+              style={{ flexShrink: 1, minHeight: 0 }}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
               bounces={false}
@@ -637,35 +647,43 @@ function ModalNuevaTarea({
               </View>
 
               {/* ── Botón guardar ── */}
-              <Pressable
-                onPress={guardar}
-                style={[s.btnGuardar, !titulo.trim() && s.btnGuardarDisabled]}
-                accessible
-                accessibilityRole="button"
-                accessibilityLabel={
-                  titulo.trim()
-                    ? `Añadir tarea ${titulo}`
-                    : "Añadir tarea. Escribe un título primero"
-                }
-                accessibilityHint={
-                  titulo.trim() ? "Guarda la tarea y cierra el formulario" : ""
-                }
-              >
-                <Ionicons
-                  name="checkmark"
-                  size={20}
-                  color="#fff"
-                  accessibilityElementsHidden
-                  importantForAccessibility="no"
-                />
-                <Text
-                  style={s.btnGuardarTxt}
-                  accessibilityElementsHidden
-                  importantForAccessibility="no"
-                >
-                  Añadir tarea
-                </Text>
-              </Pressable>
+              {(() => {
+                const faltaDia = repeticion === "semanal" && diasSemana.length === 0;
+                const puedeGuardar = !!titulo.trim() && !faltaDia;
+                return (
+                  <Pressable
+                    onPress={guardar}
+                    style={[s.btnGuardar, !puedeGuardar && s.btnGuardarDisabled]}
+                    accessible
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      !titulo.trim()
+                        ? "Añadir tarea. Escribe un título primero"
+                        : faltaDia
+                          ? "Añadir tarea. Marca al menos un día de la semana"
+                          : `Añadir tarea ${titulo}`
+                    }
+                    accessibilityHint={
+                      puedeGuardar ? "Guarda la tarea y cierra el formulario" : ""
+                    }
+                  >
+                    <Ionicons
+                      name="checkmark"
+                      size={20}
+                      color="#fff"
+                      accessibilityElementsHidden
+                      importantForAccessibility="no"
+                    />
+                    <Text
+                      style={s.btnGuardarTxt}
+                      accessibilityElementsHidden
+                      importantForAccessibility="no"
+                    >
+                      Añadir tarea
+                    </Text>
+                  </Pressable>
+                );
+              })()}
             </ScrollView>
           </Pressable>
         </Pressable>
@@ -678,7 +696,11 @@ export default function Calendario() {
   const { escala, colores } = useAjustesCtx();
   const { mostrarConfirm, confirmModal } = useConfirm();
   const router = useRouter();
-  const { activo: timerActivo, iniciarParaTarea } = useTemporizadorTarea();
+  const {
+    activo: timerActivo,
+    iniciarParaTarea,
+    resetear: resetearTemporizador,
+  } = useTemporizadorTarea();
   const ahora = ahoraApp();
   const [anyo, setAnyo] = useState(ahora.getFullYear());
   const [mes, setMes] = useState(ahora.getMonth());
@@ -693,6 +715,8 @@ export default function Calendario() {
     new Set(),
   );
   const [modalVisible, setModalVisible] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [tareaEditando, setTareaEditando] = useState<any | null>(null);
 
   const hoy = hoyAppStr();
 
@@ -772,7 +796,10 @@ export default function Calendario() {
   };
 
   const abrirTemporizadorTarea = async (tarea: any) => {
-    if (timerActivo?.tareaId === tarea.id) {
+    // Si el temporizador de esta misma tarea ya terminó, no hay que
+    // reabrirlo tal cual (se quedaría pillado mostrando "Volver a mis
+    // tareas" para siempre) — hay que arrancarlo de nuevo desde cero.
+    if (timerActivo && timerActivo.tareaId === tarea.id && timerActivo.estado !== "finished") {
       router.push("/temporizador");
       return;
     }
@@ -810,6 +837,121 @@ export default function Calendario() {
     setTareasDia((prev) => prev.filter((t) => t.id !== id));
     await actualizarFechasConTareas();
     AccessibilityInfo.announceForAccessibility(`Tarea ${titulo} eliminada`);
+  };
+
+  const recargarTareasDia = async () => {
+    if (!fechaSelec) return;
+    const pendientes = ((await getTareasPorFecha(fechaSelec)) as any[]).filter(
+      esPendiente,
+    );
+    setTareasDia(pendientes);
+  };
+
+  const guardarEdicion = async (
+    titulo: string,
+    pictogramId: number | null,
+    hora: string,
+    duracionSeg: number | null,
+    repeticion: "ninguna" | "diaria" | "semanal",
+    diasSemana: number[] | null,
+  ) => {
+    if (!tareaEditando) return;
+    const horaFinal = hora ?? "Sin hora";
+    const esInstanciaRepetitiva =
+      !!tareaEditando.tareaBaseId && tareaEditando.tareaBaseId !== "";
+    const esTareaBase =
+      tareaEditando.repeticion &&
+      tareaEditando.repeticion !== "ninguna" &&
+      !esInstanciaRepetitiva;
+    const cambioFrecuencia =
+      repeticion !== (tareaEditando.repeticion ?? "ninguna") ||
+      (repeticion === "semanal" &&
+        JSON.stringify(diasSemana ?? []) !==
+          JSON.stringify(tareaEditando.diasSemana ?? []));
+    // Cambiar la duración invalida el temporizador ya cumplido con la
+    // duración anterior; el temporizador "en vivo" del contexto global
+    // también hay que limpiarlo si seguía apuntando a esta tarea como
+    // terminada, o la tarea aparecía lista para repetir en verde aunque se
+    // hubiera reiniciado.
+    if (
+      duracionSeg !== (tareaEditando.duracionSeg ?? null) &&
+      timerActivo?.tareaId === tareaEditando.id
+    ) {
+      resetearTemporizador();
+    }
+
+    if (esInstanciaRepetitiva || esTareaBase) {
+      setEditModalVisible(false);
+      setTimeout(async () => {
+        const opcion = await mostrarConfirm(
+          "Editar tarea repetitiva",
+          "¿Qué quieres cambiar?",
+          [
+            { texto: "Cancelar", valor: null },
+            { texto: "Solo esta vez", valor: "esta" },
+            { texto: "Todas las veces", valor: "todas" },
+          ],
+        );
+        if (!opcion) return;
+        if (Platform.OS !== "web")
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        if (opcion === "esta") {
+          await updateTareaTituloPicto(tareaEditando.id, titulo, pictogramId);
+          await updateTareaHora(tareaEditando.id, horaFinal);
+          await updateTareaDuracion(tareaEditando.id, duracionSeg);
+          const notifIdEsta = await programarNotif5MinAntes(
+            tareaEditando.fechaDia,
+            horaFinal,
+            titulo,
+            tareaEditando.notifId,
+          );
+          await updateTareaNotifId(tareaEditando.id, notifIdEsta);
+        } else {
+          const baseId = esInstanciaRepetitiva
+            ? tareaEditando.tareaBaseId
+            : tareaEditando.id;
+          await updateTareaBaseCompleta(
+            baseId,
+            titulo,
+            pictogramId,
+            horaFinal,
+            duracionSeg,
+          );
+          const notifIdTodas = await programarNotif5MinAntes(
+            tareaEditando.fechaDia,
+            horaFinal,
+            titulo,
+            tareaEditando.notifId,
+          );
+          await updateTareaNotifId(tareaEditando.id, notifIdTodas);
+        }
+        if (cambioFrecuencia) {
+          const baseId = esInstanciaRepetitiva
+            ? tareaEditando.tareaBaseId
+            : tareaEditando.id;
+          await updateTareaFrecuencia(baseId, repeticion, diasSemana);
+        }
+        await recargarTareasDia();
+        setTareaEditando(null);
+      }, 300);
+    } else {
+      await updateTareaTituloPicto(tareaEditando.id, titulo, pictogramId);
+      await updateTareaHora(tareaEditando.id, horaFinal);
+      await updateTareaDuracion(tareaEditando.id, duracionSeg);
+      if (cambioFrecuencia) {
+        await updateTareaFrecuencia(tareaEditando.id, repeticion, diasSemana);
+      }
+      const notifIdSimple = await programarNotif5MinAntes(
+        tareaEditando.fechaDia,
+        horaFinal,
+        titulo,
+        tareaEditando.notifId,
+      );
+      await updateTareaNotifId(tareaEditando.id, notifIdSimple);
+      setEditModalVisible(false);
+      setTareaEditando(null);
+      await recargarTareasDia();
+    }
   };
 
   const esFuturo = fechaSelec !== null && fechaSelec > hoy;
@@ -907,11 +1049,7 @@ export default function Calendario() {
               )}
             </View>
 
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              accessible={false}
-              style={{ maxHeight: 300 }}
-            >
+            <View accessible={false}>
               {tareasDia.length === 0 ? (
                 <View
                   style={s.emptyDia}
@@ -1004,6 +1142,26 @@ export default function Calendario() {
                           />
                         </Pressable>
                       )}
+                      {(esHoy || esFuturo) && !t.virtual && (
+                        <Pressable
+                          onPress={() => {
+                            setTareaEditando(t);
+                            setEditModalVisible(true);
+                          }}
+                          style={s.btnEditar}
+                          accessible
+                          accessibilityRole="button"
+                          accessibilityLabel={`Editar tarea ${t.title}`}
+                        >
+                          <Ionicons
+                            name="pencil"
+                            size={15}
+                            color={PURPLE}
+                            accessibilityElementsHidden
+                            importantForAccessibility="no"
+                          />
+                        </Pressable>
+                      )}
                       {esFuturo && !t.virtual && (
                         <Pressable
                           onPress={() => eliminar(t.id, t.title)}
@@ -1025,7 +1183,7 @@ export default function Calendario() {
                   );
                 })
               )}
-            </ScrollView>
+            </View>
           </View>
         )}
       </ScrollView>
@@ -1035,6 +1193,15 @@ export default function Calendario() {
         fecha={fechaSelec || ""}
         onClose={() => setModalVisible(false)}
         onGuardar={onGuardar}
+      />
+      <ModalEditarTarea
+        visible={editModalVisible}
+        tarea={tareaEditando}
+        onCerrar={() => {
+          setEditModalVisible(false);
+          setTareaEditando(null);
+        }}
+        onGuardar={guardarEdicion}
       />
       {confirmModal}
     </View>
@@ -1228,6 +1395,7 @@ const s = StyleSheet.create({
     fontFamily: AppFonts.bodyBold,
     marginTop: 2,
   },
+  btnEditar: { padding: 10 },
   btnEliminar: { padding: 10 },
   btnTemporizador: {
     width: 44,

@@ -310,6 +310,7 @@ function MedalCard({
 }) {
   const reduceMotion = useReduceMotion();
   const glowAnim = useRef(new Animated.Value(0)).current;
+  const glowLoop = useRef<Animated.CompositeAnimation | null>(null);
 
   const cfg = {
     bronce: {
@@ -349,7 +350,7 @@ function MedalCard({
 
   useEffect(() => {
     if (earned && !reduceMotion) {
-      Animated.loop(
+      glowLoop.current = Animated.loop(
         Animated.sequence([
           Animated.timing(glowAnim, {
             toValue: 1,
@@ -364,8 +365,10 @@ function MedalCard({
             easing: Easing.inOut(Easing.ease),
           }),
         ]),
-      ).start();
+      );
+      glowLoop.current.start();
     }
+    return () => glowLoop.current?.stop();
   }, [earned]);
 
   const a11yLabel = earned
@@ -468,6 +471,15 @@ export default function Progreso() {
   const [tab, setTab] = useState(1);
   const [completadas, setCompletadas] = useState<Tarea[]>([]);
   const gami = useGamificacion();
+
+  const [rachaScrollEnabled, setRachaScrollEnabled] = useState(false);
+  const rachaContainerAlto = useRef(0);
+  const rachaContenidoAlto = useRef(0);
+  const actualizarRachaScroll = () => {
+    setRachaScrollEnabled(
+      rachaContenidoAlto.current > rachaContainerAlto.current,
+    );
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -679,6 +691,15 @@ export default function Progreso() {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 80 }}
             accessible={false}
+            scrollEnabled={rachaScrollEnabled}
+            onLayout={(e) => {
+              rachaContainerAlto.current = e.nativeEvent.layout.height;
+              actualizarRachaScroll();
+            }}
+            onContentSizeChange={(_w, h) => {
+              rachaContenidoAlto.current = h;
+              actualizarRachaScroll();
+            }}
           >
             <FireHero racha={gami.racha} />
 
@@ -738,67 +759,6 @@ export default function Progreso() {
             contentContainerStyle={{ paddingBottom: 80 }}
             accessible={false}
           >
-            {/* Siguiente medalla */}
-            {nextMedal && (
-              <View
-                style={[s.nextBox, { borderColor: nextMedal.color }]}
-                accessible
-                accessibilityLabel={`Siguiente medalla: ${nextMedal.plainLabel}. ${nextMedal.progreso} de ${nextMedal.req} estrellas, faltan ${nextMedal.req - nextMedal.progreso}`}
-              >
-                <Text
-                  style={[s.nextLabel, { color: nextMedal.color }]}
-                  accessibilityElementsHidden
-                  importantForAccessibility="no"
-                >
-                  OBJETIVO
-                </Text>
-                <Text
-                  style={[s.nextTitle, { color: nextMedal.color }]}
-                  accessibilityElementsHidden
-                  importantForAccessibility="no"
-                >
-                  {nextMedal.plainLabel} {nextMedal.emoji}
-                </Text>
-                <View style={{ width: "100%", marginVertical: 8 }}>
-                  <BarraProgreso
-                    pct={Math.min(
-                      (nextMedal.progreso / nextMedal.req) * 100,
-                      100,
-                    )}
-                    color={nextMedal.color}
-                  />
-                </View>
-                <View style={s.nextFooter}>
-                  <Text
-                    style={[s.nextDetailBig, { color: nextMedal.color }]}
-                    accessibilityElementsHidden
-                    importantForAccessibility="no"
-                  >
-                    {nextMedal.progreso} / {nextMedal.req} ⭐
-                  </Text>
-                  <View
-                    style={[
-                      s.nextPill,
-                      {
-                        backgroundColor: nextMedal.color + "22",
-                        borderColor: nextMedal.color,
-                      },
-                    ]}
-                  >
-                    <Text style={[s.nextPillTxt, { color: nextMedal.color }]}>
-                      faltan {nextMedal.req - nextMedal.progreso} ⭐
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            )}
-
-            {gami.estrellas >= 100 && (
-              <Text style={[s.sectionLabel]} accessibilityRole="header">
-                Conseguidas
-              </Text>
-            )}
-
             {/* Tarjetas verticales */}
             <View style={s.medalsCol}>
               <MedalCard type="bronce" progreso={progresBronce} />
@@ -1105,42 +1065,4 @@ const s = StyleSheet.create({
   },
   medalCount: { fontSize: 12, fontFamily: AppFonts.bodyBold, marginTop: 4 },
 
-  // Siguiente medalla
-  nextBox: {
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 16,
-    borderWidth: 2,
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "#fff",
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
-  },
-  nextLabel: {
-    fontSize: 10,
-    fontFamily: AppFonts.bodyBold,
-    letterSpacing: 1.5,
-    textTransform: "uppercase",
-    opacity: 0.7,
-  },
-  nextTitle: { fontSize: 26, fontFamily: AppFonts.displayExtraBold },
-  nextFooter: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
-    marginTop: 4,
-  },
-  nextDetailBig: { fontSize: 15, fontFamily: AppFonts.bodyBold },
-  nextPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  nextPillTxt: { fontSize: 12, fontFamily: AppFonts.bodyBold },
 });

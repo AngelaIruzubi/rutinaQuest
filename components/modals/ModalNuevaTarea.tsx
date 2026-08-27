@@ -13,13 +13,14 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DuracionPicker } from '../../components/ui/DuracionPicker';
 import { AppFonts, Colors } from '../../constants/theme';
 import { useAjustesCtx } from '../../context/AjustesContext';
-import { buscarPictogramas } from '../../services/arasaac';
+import { useBuscarPictogramasDebounced } from '../../hooks/useBuscarPictogramasDebounced';
 import { Tarea } from '../../types/tarea';
 import { ahoraAppMs, fechaAppDate, hoyAppStr } from '../../utils/fecha';
 
@@ -37,38 +38,25 @@ export function ModalNuevaTarea({ visible, onCerrar, onGuardar }: ModalNuevaTare
   const { escala } = useAjustesCtx();
   const fs = (n: number) => Math.round(n * escala);
   const insets = useSafeAreaInsets();
+  const { height: alturaVentana } = useWindowDimensions();
   const [titulo,      setTitulo]      = useState('');
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
-  const [pictogramas, setPictogramas] = useState<number[]>([]);
+  const { pictogramas, setPictogramas, buscar: buscarPictosDebounced } = useBuscarPictogramasDebounced();
   const [pictogramId, setPictogramId] = useState<number | null>(null);
   const [repeticion,  setRepeticion]  = useState<'ninguna' | 'diaria' | 'semanal'>('ninguna');
   const [duracionSeg, setDuracionSeg] = useState<number | null>(null);
   const [showPicker,  setShowPicker]  = useState(false);
   const [tempTime]                    = useState(fechaAppDate());
 
- const buscarImagen = (texto: string) => {
-  const capitalizado = texto.length > 0
-    ? texto.charAt(0).toUpperCase() + texto.slice(1)
-    : texto;
-  setTitulo(capitalizado);
-  buscarPictogramasDebounced(capitalizado);
-};
-
-const buscarPictogramasDebounced = async (texto: string) => {
-  if (texto.trim().length < 2) {
-    setPictogramas([]);
-    setPictogramId(null);
-    return;
-  }
-  const ids = await buscarPictogramas(texto, 6);
-  if (ids.length > 0) {
-    setPictogramas(ids);
-    setPictogramId(ids[0]);
-  } else {
-    setPictogramas([]);
-    setPictogramId(null);
-  }
-};
+  const buscarImagen = (texto: string) => {
+    const capitalizado = texto.length > 0
+      ? texto.charAt(0).toUpperCase() + texto.slice(1)
+      : texto;
+    setTitulo(capitalizado);
+    buscarPictosDebounced(capitalizado, (ids) => {
+      setPictogramId(ids.length > 0 ? ids[0] : null);
+    });
+  };
 
   const handleTimeChange = (event: any, date?: Date) => {
     if (Platform.OS === 'android') setShowPicker(false);
@@ -113,7 +101,7 @@ const buscarPictogramasDebounced = async (texto: string) => {
       accessibilityViewIsModal
     >
       <View style={[s.overlay, { paddingTop: insets.top + 20 }]}>
-        <View style={s.modalBox}>
+        <View style={[s.modalBox, { maxHeight: alturaVentana * 0.85 }]}>
           <LinearGradient
             colors={['#F7F2FA', '#EFE6F4']}
             start={{ x: 0, y: 0 }}
@@ -139,7 +127,7 @@ const buscarPictogramasDebounced = async (texto: string) => {
             </View>
           </LinearGradient>
 
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[s.body, { paddingBottom: 20 + insets.bottom }]}>
+          <ScrollView style={{ flexShrink: 1, minHeight: 0 }} keyboardShouldPersistTaps="handled" contentContainerStyle={[s.body, { paddingBottom: 20 + insets.bottom }]}>
 
             {/* Título */}
             <View style={s.inputRow}>
@@ -297,7 +285,6 @@ const s = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 26,
     width: '90%',
-    maxHeight: '85%',
     overflow: 'hidden',
     shadowColor: '#2E203A',
     shadowOpacity: 0.28,

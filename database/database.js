@@ -507,6 +507,26 @@ export function updateTareaBaseCompleta(
   );
 }
 
+// Cambia la repetición/días de una tarea que es ella misma la "base" (no
+// tiene tareaBaseId): o bien una tarea suelta que pasa a repetirse, o la
+// plantilla de una serie ya repetitiva. Solo afecta a cómo se generarán las
+// próximas instancias; las instancias pendientes ya creadas no se tocan.
+async function updateTareaFrecuenciaImpl(id, repeticion, diasSemana) {
+  const tareas = (await getTareasImpl()).map((t) =>
+    t.id === id
+      ? {
+          ...t,
+          repeticion,
+          diasSemana: repeticion === "semanal" ? diasSemana : null,
+        }
+      : t,
+  );
+  await guardarTareas(tareas);
+}
+export function updateTareaFrecuencia(id, repeticion, diasSemana) {
+  return encolar(() => updateTareaFrecuenciaImpl(id, repeticion, diasSemana));
+}
+
 async function deleteTareaImpl(id) {
   const tareas = (await getTareasImpl()).filter((t) => t.id !== id);
   await guardarTareas(tareas);

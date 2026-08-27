@@ -30,7 +30,7 @@
       "barStyle": "dark-content"
     },
     "splash": {
-      "image": "./assets/images/icono.png",
+      "image": "./assets/images/splash-blank.png",
       "resizeMode": "contain",
       "backgroundColor": "#FBF6F0"
     },
@@ -43,7 +43,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/icono.png",
+          "image": "./assets/images/splash-blank.png",
           "imageWidth": 220,
           "resizeMode": "contain",
           "backgroundColor": "#FBF6F0",
