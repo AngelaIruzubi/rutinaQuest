@@ -24,6 +24,7 @@ import { AvatarProvider } from "../../context/AvatarContext";
 import { DBReadyContext } from "../../context/Dbreadycontext";
 import { TemporizadorProvider } from "../../context/TemporizadorContext";
 import { initDB } from "../../database/database";
+import { pedirPermisosNotificaciones } from "../../utils/permisosNotificaciones";
 
 const CLAVE_BIENVENIDA_VISTA = "rutinaquest_bienvenida_vista";
 
@@ -96,7 +97,7 @@ function Layout() {
     (async () => {
       // Pedir permisos de notificación
       if (Platform.OS !== "web") {
-        const { status } = await Notifications.requestPermissionsAsync();
+        const status = await pedirPermisosNotificaciones();
         console.log("[NOTIF] Permiso:", status);
 
         if (Platform.OS === "android") {

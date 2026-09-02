@@ -16,6 +16,7 @@ import {
   cancelarNotifTarea,
   programarNotif5MinAntes,
 } from "../../../utils/notificacionesTarea";
+import { pedirPermisosNotificaciones } from "../../../utils/permisosNotificaciones";
 import { minutosRestantes, parseTiempoLim } from "../../../utils/tiempo";
 
 import {
@@ -91,11 +92,6 @@ function duracionNotif(type: string): number {
   return esTareaCompletada ? 2200 : 4500;
 }
 
-async function pedirPermisosNotificaciones() {
-  if (Platform.OS === "web") return;
-  const { status } = await Notifications.requestPermissionsAsync();
-  if (status !== "granted") console.warn("Permisos de notificación denegados");
-}
 async function configurarCanalAndroid() {
   if (Platform.OS !== "android") return;
   await Notifications.setNotificationChannelAsync("default", {
