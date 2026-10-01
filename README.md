@@ -1,98 +1,104 @@
 # RutinaQuest
 
-Aplicación móvil de gestión de rutinas con gamificación, desarrollada con **React Native + Expo**.
+App móvil de rutinas gamificada para que cualquier persona pueda organizar su día, diseñada con especial cuidado para **personas con discapacidad intelectual**.
+
+Proyecto de fin de ciclo de Desarrollo de Aplicaciones Multiplataforma (DAM). Nace de mis años como educadora social: uno de los mayores retos del día a día era la autonomía, que cada persona pudiera seguir su rutina y sentir que tenía el control de su tiempo.
+
+Sin registro, sin anuncios y sin servidores: los datos se quedan en el móvil.
+
+📲 **Descarga el APK para Android:** [ENLACE A DRIVE]
+
+<!-- Añade aquí 3 o 4 capturas de la app -->
+<p align="center">
+  <img src="assets/captura1.png" width="200" />
+  <img src="assets/captura2.png" width="200" />
+  <img src="assets/captura3.png" width="200" />
+</p>
 
 ---
 
-## Requisitos previos
+## Accesibilidad
 
-- [Node.js](https://nodejs.org/) (v18 o superior)
-- npm (incluido con Node.js)
+- Tareas con **pictogramas de ARASAAC**, el sistema de comunicación aumentativa más usado en España.
+- Tipografía **Atkinson Hyperlegible**, diseñada para personas con baja visión.
+- El texto se adapta al tamaño de letra configurado en el móvil.
+- Compatible con los lectores de pantalla **TalkBack** y **VoiceOver**.
+- **Vibración** como respuesta en las acciones principales.
 
----
+## Funcionalidades
+
+| Pantalla | Descripción |
+|---|---|
+| Tareas | Tareas diarias con pictogramas, prioridades y temporizador |
+| Calendario | Vista semanal del historial de actividad |
+| Progreso | Estrellas, racha diaria y medallas (bronce, plata y oro) |
+| Historial | Registro de tareas completadas con búsqueda |
+| Temporizador | Contador por tarea con configuración personalizada |
+| Perfil | Avatar generado y estadísticas |
+| Ajustes | Personalización visual, notificaciones y exportación de datos |
+| Normas | Reglas del sistema de gamificación explicadas de forma sencilla |
+
+Un perezoso animado celebra cada logro. 🦥
+
+## Stack tecnológico
+
+- **React Native** + **Expo** (SDK 54) + **TypeScript**
+- **Expo Router**: navegación basada en archivos (drawer + tabs)
+- **Context API** y **hooks personalizados** para el estado global
+- **AsyncStorage** para el almacenamiento local
+- **API de ARASAAC** para los pictogramas
+- **expo-notifications** para los recordatorios
+- **expo-haptics**, **Lottie** y **Reanimated** para la respuesta háptica y las animaciones
+- **DiceBear** para los avatares
+- **Sentry** para monitorizar errores en producción
+- **Jest** para los tests de la lógica de fechas, tiempo y gamificación
+- **EAS Build** para generar los instalables
+
+## Decisiones técnicas
+
+**De SQLite a AsyncStorage.** La primera versión guardaba los datos con expo-sqlite, pero su módulo nativo fallaba de forma intermitente en algunos dispositivos. Gracias a Sentry detecté un `NullPointerException` al crear la conexión en un Galaxy A40, a los pocos segundos de abrir la app. Como los datos son solo una lista de tareas y un perfil, no hacía falta SQL: migré a AsyncStorage, que es más simple y más estable, sin cambiar el resto de la app gracias a tener todo el acceso a datos centralizado en `database/database.js`.
+
+**Desarrollo con IA.** He usado Claude como compañero de desarrollo para razonar soluciones, revisar la arquitectura y depurar errores, siempre entendiendo y validando el código.
 
 ## Instalación y ejecución
 
-### 1. Clona el repositorio
+Requisitos: Node.js 18 o superior.
 
 ```bash
-git clone <url-del-repositorio>
-cd <nombre-del-proyecto>
-```
-
-### 2. Instala las dependencias
-
-```bash
+git clone https://github.com/AngelaIruzubi/rutinaQuest.git
+cd rutinaQuest
 npm install
-```
-
-### 3. Inicia el servidor de desarrollo
-
-```bash
 npx expo start --dev-client
 ```
 
-Aparecerá un **código QR** en la terminal.
+### En el móvil (recomendado)
 
----
+El proyecto usa módulos nativos (notificaciones, Sentry), así que **Expo Go no sirve**: hace falta un *development build*.
 
-## Ver la app en el móvil (recomendado)
-
-Esta es la forma recomendada para disfrutar de **todas las funcionalidades**, incluyendo las notificaciones.
-
-Este proyecto usa módulos nativos personalizados (notificaciones, Sentry), así que **la app de Expo Go de las tiendas no sirve** — hace falta un _development build_ propio:
-
-1. Genera tu build de desarrollo instalable (solo hace falta una vez, o cuando cambien las dependencias nativas):
-
+1. Genera el build (solo una vez, o cuando cambien las dependencias nativas):
    ```bash
    eas build --profile development --platform android
    ```
+2. Instala el `.apk` que te da EAS en el móvil.
+3. Con el servidor arrancado, abre la app y escanea el código QR.
 
-   Instala el `.apk` que te da el enlace de EAS en tu móvil.
+El ordenador y el móvil deben estar en la misma red Wi-Fi.
 
-2. Con el servidor arrancado (`npx expo start --dev-client`), abre esa app en el móvil y escanea el QR.
-
-3. La app se cargará directamente en tu dispositivo.
-
-El ordenador y el móvil deben estar conectados a la **misma red Wi-Fi**.
-
----
-
-## Ver la app en el navegador
-
-Si prefieres no usar el móvil, puedes abrirla en el navegador con:
+### En el navegador
 
 ```bash
 npx expo start --web
 ```
 
-**Nota:** En la versión web las **notificaciones push no están disponibles**. Para probar esa funcionalidad hace falta el _development build_ en un dispositivo móvil (ver sección anterior).
+En la versión web no están disponibles las notificaciones.
 
----
+## Tests
 
-## Funcionalidades principales
+```bash
+npm test               # ejecuta los tests
+npm run test:coverage  # informe de cobertura
+```
 
-| Pantalla     | Descripción                                               |
-| ------------ | --------------------------------------------------------- |
-| Tareas       | Gestión de tareas diarias con prioridades y temporizador  |
-| Calendario   | Vista semanal del historial de actividad                  |
-| Progreso     | Estrellas, racha diaria y medallas (Bronce / Plata / Oro) |
-| Historial    | Registro de tareas completadas con búsqueda               |
-| Temporizador | Contador por tarea con configuración personalizada        |
-| Ajustes      | Personalización visual, notificaciones y exportación      |
-| Perfil       | Avatar y estadísticas del usuario                         |
-| Normas       | Reglas del sistema de gamificación                        |
+## Autora
 
----
-
-## Stack tecnológico
-
-- **React Native** con **Expo** (SDK 54)
-- **Expo Router** — navegación basada en archivos
-- **AsyncStorage** — almacenamiento local en el dispositivo
-- **Sentry** — reporte de errores en producción
-- **TypeScript**
-
-## Versión
-
-RutinaQuest · v1.0
+**Ángela Iruzubieta** · [LinkedIn](https://linkedin.com/in/angela-iruzubieta) · [GitHub](https://github.com/AngelaIruzubi)
