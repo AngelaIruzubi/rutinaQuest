@@ -6,7 +6,7 @@ Proyecto de fin de ciclo de Desarrollo de Aplicaciones Multiplataforma (DAM). Na
 
 Sin registro, sin anuncios y sin servidores: los datos se quedan en el móvil.
 
-📲 **Descarga el APK para Android:** [ENLACE A DRIVE]
+📲 **Descarga el APK para Android:** https://drive.google.com/file/d/1ta-ucBK0XurCRLKiQ3IjiLQ2E-zvWtWL/view?usp=sharing
 
 <!-- Añade aquí 3 o 4 capturas de la app -->
 <p align="center">
